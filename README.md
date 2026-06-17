@@ -1,22 +1,13 @@
 <div align="center">
 
-```
-██████╗  ██████╗ ██████╗  ██████╗ ██████╗ ████████╗██╗██╗  ██╗
-██╔══██╗██╔═══██╗██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝██║╚██╗██╔╝
-██████╔╝██║   ██║██║  ██║██║   ██║██████╔╝   ██║   ██║ ╚███╔╝ 
-██╔═══╝ ██║   ██║██║  ██║██║   ██║██╔═══╝    ██║   ██║ ██╔██╗ 
-██║     ╚██████╔╝██████╔╝╚██████╔╝██║        ██║   ██║██╔╝ ██╗
-╚═╝      ╚═════╝ ╚═════╝  ╚═════╝ ╚═╝        ╚═╝   ╚═╝╚═╝  ╚═╝
-```
+<img src="./assets/banner.svg" alt="PodOptix" width="100%"/>
 
-**Stop guessing. Start optimizing.**
+<br/>
 
-Kubernetes resource right-sizing powered by real p99 usage data.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.24%2B-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
-[![Prometheus](https://img.shields.io/badge/Prometheus-compatible-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
-[![Go](https://img.shields.io/badge/Built%20with-Go-00ADD8?logo=go&logoColor=white)](https://golang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-FF6B00?style=for-the-badge)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.24%2B-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Compatible-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)](https://prometheus.io)
+[![Go](https://img.shields.io/badge/Built%20with-Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
 
 </div>
 
