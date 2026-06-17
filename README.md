@@ -3,6 +3,8 @@
 <img src="./assets/banner.svg" alt="PodOptix" width="100%"/>
 
 <br/>
+<br/>
+<br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-FF6B00?style=for-the-badge)](LICENSE)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.24%2B-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io)
