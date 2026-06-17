@@ -1,55 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 220">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0d1117"/>
-      <stop offset="100%" style="stop-color:#161b22"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#08090f"/>
+      <stop offset="100%" stop-color="#0d1220"/>
     </linearGradient>
-    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#FF4500"/>
-      <stop offset="45%" style="stop-color:#FF8C00"/>
-      <stop offset="100%" style="stop-color:#FF4500"/>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF4500"/>
+      <stop offset="50%" stop-color="#FF8C00"/>
+      <stop offset="100%" stop-color="#FF4500"/>
     </linearGradient>
-    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#0d1117"/>
-      <stop offset="30%" style="stop-color:#FF6B00"/>
-      <stop offset="70%" style="stop-color:#FF6B00"/>
-      <stop offset="100%" style="stop-color:#0d1117"/>
-    </linearGradient>
+    <pattern id="scan" x="0" y="0" width="860" height="4" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="860" height="1" fill="#000000" opacity="0.25"/>
+    </pattern>
   </defs>
 
   <!-- Background -->
-  <rect width="860" height="220" fill="url(#bgGrad)" rx="12"/>
+  <rect width="860" height="200" fill="url(#bg)"/>
+  <!-- Scanlines -->
+  <rect width="860" height="200" fill="url(#scan)"/>
 
-  <!-- Grid dots -->
-  <g fill="#FF6B00" opacity="0.08">
-    <circle cx="40" cy="40" r="1.5"/><circle cx="80" cy="40" r="1.5"/><circle cx="120" cy="40" r="1.5"/><circle cx="160" cy="40" r="1.5"/><circle cx="200" cy="40" r="1.5"/>
-    <circle cx="40" cy="80" r="1.5"/><circle cx="80" cy="80" r="1.5"/><circle cx="120" cy="80" r="1.5"/><circle cx="160" cy="80" r="1.5"/><circle cx="200" cy="80" r="1.5"/>
-    <circle cx="40" cy="120" r="1.5"/><circle cx="80" cy="120" r="1.5"/><circle cx="120" cy="120" r="1.5"/><circle cx="160" cy="120" r="1.5"/><circle cx="200" cy="120" r="1.5"/>
-    <circle cx="40" cy="160" r="1.5"/><circle cx="80" cy="160" r="1.5"/><circle cx="120" cy="160" r="1.5"/><circle cx="160" cy="160" r="1.5"/><circle cx="200" cy="160" r="1.5"/>
-    <circle cx="660" cy="40" r="1.5"/><circle cx="700" cy="40" r="1.5"/><circle cx="740" cy="40" r="1.5"/><circle cx="780" cy="40" r="1.5"/><circle cx="820" cy="40" r="1.5"/>
-    <circle cx="660" cy="80" r="1.5"/><circle cx="700" cy="80" r="1.5"/><circle cx="740" cy="80" r="1.5"/><circle cx="780" cy="80" r="1.5"/><circle cx="820" cy="80" r="1.5"/>
-    <circle cx="660" cy="120" r="1.5"/><circle cx="700" cy="120" r="1.5"/><circle cx="740" cy="120" r="1.5"/><circle cx="780" cy="120" r="1.5"/><circle cx="820" cy="120" r="1.5"/>
-    <circle cx="660" cy="160" r="1.5"/><circle cx="700" cy="160" r="1.5"/><circle cx="740" cy="160" r="1.5"/><circle cx="780" cy="160" r="1.5"/><circle cx="820" cy="160" r="1.5"/>
-  </g>
+  <!-- Border -->
+  <rect x="0" y="0" width="860" height="2" fill="#FF6B00" opacity="0.9"/>
+  <rect x="0" y="198" width="860" height="2" fill="#FF6B00" opacity="0.9"/>
+  <rect x="0" y="0" width="2" height="200" fill="#FF6B00" opacity="0.4"/>
+  <rect x="858" y="0" width="2" height="200" fill="#FF6B00" opacity="0.4"/>
 
-  <!-- Top accent line -->
-  <rect x="0" y="0" width="860" height="4" fill="url(#lineGrad)" rx="2"/>
+  <!-- Corner brackets — top left -->
+  <polyline points="8,35 8,8 35,8" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
+  <line x1="35" y1="8" x2="80" y2="8" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
+  <!-- Corner brackets — top right -->
+  <polyline points="852,35 852,8 825,8" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
+  <line x1="825" y1="8" x2="780" y2="8" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
+  <!-- Corner brackets — bottom left -->
+  <polyline points="8,165 8,192 35,192" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
+  <line x1="35" y1="192" x2="80" y2="192" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
+  <!-- Corner brackets — bottom right -->
+  <polyline points="852,165 852,192 825,192" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
+  <line x1="825" y1="192" x2="780" y2="192" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
 
-  <!-- Bracket decorators -->
-  <text x="60" y="135" font-family="monospace" font-size="80" fill="#FF6B00" opacity="0.15" font-weight="bold">{</text>
-  <text x="770" y="135" font-family="monospace" font-size="80" fill="#FF6B00" opacity="0.15" font-weight="bold">}</text>
+  <!-- Side decorative lines -->
+  <line x1="30" y1="60" x2="180" y2="60" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
+  <circle cx="180" cy="60" r="3" fill="#FF6B00" opacity="0.5"/>
+  <line x1="680" y1="60" x2="830" y2="60" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
+  <circle cx="680" cy="60" r="3" fill="#FF6B00" opacity="0.5"/>
+  <line x1="30" y1="140" x2="180" y2="140" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
+  <circle cx="180" cy="140" r="3" fill="#FF6B00" opacity="0.5"/>
+  <line x1="680" y1="140" x2="830" y2="140" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
+  <circle cx="680" cy="140" r="3" fill="#FF6B00" opacity="0.5"/>
+
+  <!-- Glitch layers -->
+  <text x="427" y="116" font-family="sans-serif" font-size="92" font-weight="bold"
+        fill="#00E5FF" opacity="0.25" text-anchor="middle" letter-spacing="4">PodOptix</text>
+  <text x="433" y="120" font-family="sans-serif" font-size="92" font-weight="bold"
+        fill="#FF00FF" opacity="0.15" text-anchor="middle" letter-spacing="4">PodOptix</text>
 
   <!-- Main title -->
-  <text x="430" y="128" font-family="'Arial Black', Impact, sans-serif" font-size="88" font-weight="900"
-        fill="url(#orangeGrad)" text-anchor="middle" letter-spacing="6">PodOptix</text>
-
-  <!-- Divider line -->
-  <rect x="280" y="148" width="300" height="1.5" fill="url(#lineGrad)" opacity="0.6"/>
+  <text x="430" y="118" font-family="sans-serif" font-size="92" font-weight="bold"
+        fill="url(#orange)" text-anchor="middle" letter-spacing="4">PodOptix</text>
 
   <!-- Tagline -->
-  <text x="430" y="175" font-family="'Segoe UI', Arial, sans-serif" font-size="13"
-        fill="#8b949e" text-anchor="middle" letter-spacing="4">KUBERNETES RESOURCE RIGHT-SIZING  ·  POWERED BY P99</text>
+  <text x="430" y="163" font-family="monospace" font-size="11" fill="#00E5FF"
+        text-anchor="middle" opacity="0.8" letter-spacing="3">[ KUBERNETES RESOURCE RIGHT-SIZING  ·  POWERED BY P99 ]</text>
 
-  <!-- Bottom accent line -->
-  <rect x="0" y="216" width="860" height="4" fill="url(#lineGrad)" rx="2"/>
+  <!-- Corner status labels -->
+  <text x="25" y="188" font-family="monospace" font-size="9" fill="#FF6B00" opacity="0.7">SYS::ACTIVE</text>
+  <text x="835" y="188" font-family="monospace" font-size="9" fill="#00E5FF" opacity="0.7" text-anchor="end">v0.1.0-MVP</text>
 </svg>
