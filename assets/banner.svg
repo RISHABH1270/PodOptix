@@ -1,38 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 220">
   <defs>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#161b22"/>
     </linearGradient>
-    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#FF6B00;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#FF9A3C;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#FF6B00;stop-opacity:1" />
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF4500"/>
+      <stop offset="45%" style="stop-color:#FF8C00"/>
+      <stop offset="100%" style="stop-color:#FF4500"/>
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="30%" style="stop-color:#FF6B00"/>
+      <stop offset="70%" style="stop-color:#FF6B00"/>
+      <stop offset="100%" style="stop-color:#0d1117"/>
     </linearGradient>
   </defs>
 
-  <rect width="860" height="200" fill="url(#bgGrad)" rx="10"/>
+  <!-- Background -->
+  <rect width="860" height="220" fill="url(#bgGrad)" rx="12"/>
 
-  <rect x="0" y="0" width="860" height="3" fill="url(#textGrad)" rx="2"/>
-  <rect x="0" y="197" width="860" height="3" fill="url(#textGrad)" rx="2"/>
+  <!-- Grid dots -->
+  <g fill="#FF6B00" opacity="0.08">
+    <circle cx="40" cy="40" r="1.5"/><circle cx="80" cy="40" r="1.5"/><circle cx="120" cy="40" r="1.5"/><circle cx="160" cy="40" r="1.5"/><circle cx="200" cy="40" r="1.5"/>
+    <circle cx="40" cy="80" r="1.5"/><circle cx="80" cy="80" r="1.5"/><circle cx="120" cy="80" r="1.5"/><circle cx="160" cy="80" r="1.5"/><circle cx="200" cy="80" r="1.5"/>
+    <circle cx="40" cy="120" r="1.5"/><circle cx="80" cy="120" r="1.5"/><circle cx="120" cy="120" r="1.5"/><circle cx="160" cy="120" r="1.5"/><circle cx="200" cy="120" r="1.5"/>
+    <circle cx="40" cy="160" r="1.5"/><circle cx="80" cy="160" r="1.5"/><circle cx="120" cy="160" r="1.5"/><circle cx="160" cy="160" r="1.5"/><circle cx="200" cy="160" r="1.5"/>
+    <circle cx="660" cy="40" r="1.5"/><circle cx="700" cy="40" r="1.5"/><circle cx="740" cy="40" r="1.5"/><circle cx="780" cy="40" r="1.5"/><circle cx="820" cy="40" r="1.5"/>
+    <circle cx="660" cy="80" r="1.5"/><circle cx="700" cy="80" r="1.5"/><circle cx="740" cy="80" r="1.5"/><circle cx="780" cy="80" r="1.5"/><circle cx="820" cy="80" r="1.5"/>
+    <circle cx="660" cy="120" r="1.5"/><circle cx="700" cy="120" r="1.5"/><circle cx="740" cy="120" r="1.5"/><circle cx="780" cy="120" r="1.5"/><circle cx="820" cy="120" r="1.5"/>
+    <circle cx="660" cy="160" r="1.5"/><circle cx="700" cy="160" r="1.5"/><circle cx="740" cy="160" r="1.5"/><circle cx="780" cy="160" r="1.5"/><circle cx="820" cy="160" r="1.5"/>
+  </g>
 
-  <text font-family="'Courier New', Courier, monospace" font-size="13.5" fill="url(#textGrad)" filter="url(#glow)" font-weight="bold">
-    <tspan x="30" y="42">██████╗  ██████╗ ██████╗  ██████╗ ██████╗ ████████╗██╗██╗  ██╗</tspan>
-    <tspan x="30" y="64">██╔══██╗██╔═══██╗██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝██║╚██╗██╔╝</tspan>
-    <tspan x="30" y="86">██████╔╝██║   ██║██║  ██║██║   ██║██████╔╝   ██║   ██║ ╚███╔╝ </tspan>
-    <tspan x="30" y="108">██╔═══╝ ██║   ██║██║  ██║██║   ██║██╔═══╝    ██║   ██║ ██╔██╗ </tspan>
-    <tspan x="30" y="130">██║     ╚██████╔╝██████╔╝╚██████╔╝██║        ██║   ██║██╔╝ ██╗</tspan>
-    <tspan x="30" y="152">╚═╝      ╚═════╝ ╚═════╝  ╚═════╝ ╚═╝        ╚═╝   ╚═╝╚═╝  ╚═╝</tspan>
-  </text>
+  <!-- Top accent line -->
+  <rect x="0" y="0" width="860" height="4" fill="url(#lineGrad)" rx="2"/>
 
-  <text font-family="'Segoe UI', Arial, sans-serif" font-size="13" fill="#8b949e" letter-spacing="3" text-anchor="middle">
-    <tspan x="430" y="185">STOP GUESSING. START OPTIMIZING.</tspan>
-  </text>
+  <!-- Bracket decorators -->
+  <text x="60" y="135" font-family="monospace" font-size="80" fill="#FF6B00" opacity="0.15" font-weight="bold">{</text>
+  <text x="770" y="135" font-family="monospace" font-size="80" fill="#FF6B00" opacity="0.15" font-weight="bold">}</text>
+
+  <!-- Main title -->
+  <text x="430" y="128" font-family="'Arial Black', Impact, sans-serif" font-size="88" font-weight="900"
+        fill="url(#orangeGrad)" text-anchor="middle" letter-spacing="6">PodOptix</text>
+
+  <!-- Divider line -->
+  <rect x="280" y="148" width="300" height="1.5" fill="url(#lineGrad)" opacity="0.6"/>
+
+  <!-- Tagline -->
+  <text x="430" y="175" font-family="'Segoe UI', Arial, sans-serif" font-size="13"
+        fill="#8b949e" text-anchor="middle" letter-spacing="4">KUBERNETES RESOURCE RIGHT-SIZING  ·  POWERED BY P99</text>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="216" width="860" height="4" fill="url(#lineGrad)" rx="2"/>
 </svg>
