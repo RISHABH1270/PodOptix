@@ -1,27 +1,118 @@
-# PodOptix
+<div align="center">
 
-> Kubernetes resource right-sizing — optimize pod CPU & memory limits based on real p99 usage data.
+```
+██████╗  ██████╗ ██████╗  ██████╗ ██████╗ ████████╗██╗██╗  ██╗
+██╔══██╗██╔═══██╗██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝██║╚██╗██╔╝
+██████╔╝██║   ██║██║  ██║██║   ██║██████╔╝   ██║   ██║ ╚███╔╝ 
+██╔═══╝ ██║   ██║██║  ██║██║   ██║██╔═══╝    ██║   ██║ ██╔██╗ 
+██║     ╚██████╔╝██████╔╝╚██████╔╝██║        ██║   ██║██╔╝ ██╗
+╚═╝      ╚═════╝ ╚═════╝  ╚═════╝ ╚═╝        ╚═╝   ╚═╝╚═╝  ╚═╝
+```
+
+**Stop guessing. Start optimizing.**
+
+Kubernetes resource right-sizing powered by real p99 usage data.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.24%2B-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-compatible-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
+[![Go](https://img.shields.io/badge/Built%20with-Go-00ADD8?logo=go&logoColor=white)](https://golang.org)
+
+</div>
 
 ---
 
-## What is PodOptix?
+## The Problem
 
-Most Kubernetes teams set pod resource limits by guesswork or copy-paste. PodOptix analyzes actual Prometheus metrics and recommends limits at **2x the p99 percentile** of observed usage — making clusters cost-effective without sacrificing reliability.
+Most Kubernetes teams set pod resource limits by **guesswork or copy-paste**.
+
+The result?
+
+- Pods get OOMKilled at 3AM
+- Clusters are 40-60% over-provisioned
+- Cloud bills keep growing with no visibility into why
+
+---
+
+## The Solution
+
+PodOptix connects to your Prometheus, analyzes **real usage patterns**, and recommends limits at **2× the p99 percentile** — the engineering sweet spot between reliability and cost.
+
+```
+Actual Usage (p99)  →  × 2  →  Recommended Limit
+      120m CPU                      240m CPU
+      180Mi RAM                     360Mi RAM
+```
+
+No more guessing. No more waste.
+
+---
 
 ## Architecture
 
-Hub & Spoke model:
-- **Agent** — runs inside each cluster, reads from Prometheus, computes recommendations
-- **Hub** — central aggregator with a single dashboard across all clusters
+PodOptix uses a **Hub & Spoke** model built for multi-cluster environments.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        HUB                              │
+│              Single Dashboard · REST API                │
+│                   Multi-cluster View                    │
+└────────────────────┬────────────────────────────────────┘
+                     │
+       ┌─────────────┼─────────────┐
+       │             │             │
+  ┌────▼────┐  ┌─────▼────┐  ┌────▼────┐
+  │ Agent   │  │  Agent   │  │  Agent  │
+  │Cluster 1│  │Cluster 2 │  │Cluster 3│
+  │         │  │          │  │         │
+  │Prometheus│  │Prometheus│  │Prometheus│
+  └─────────┘  └──────────┘  └─────────┘
+```
+
+| Component | Role |
+|-----------|------|
+| **Agent** | Runs inside each cluster · Reads Prometheus · Computes p99 · Sends recommendations to Hub |
+| **Hub** | Aggregates all clusters · Serves the dashboard · Manages auth tokens |
+
+---
 
 ## Quick Start
 
 ```bash
-helm install podoptix podoptix/podoptix \
-  --set hub.token=<your-token> \
-  --set hub.url=<hub-url>
+# Install the PodOptix agent in your cluster
+helm repo add podoptix https://charts.podoptix.io
+helm repo update
+
+helm install podoptix podoptix/agent \
+  --namespace podoptix \
+  --create-namespace \
+  --set hub.url=<your-hub-url> \
+  --set hub.token=<your-token>
 ```
+
+That's it. Your cluster starts sending recommendations within minutes.
 
 ---
 
-*Documentation and architecture decisions are tracked in `/docs`.*
+## Roadmap
+
+- [x] Architecture design
+- [ ] Prometheus metrics collector (Agent)
+- [ ] p99 computation engine
+- [ ] Recommendation API
+- [ ] Central Hub with multi-cluster support
+- [ ] Web Dashboard
+- [ ] Helm chart
+- [ ] Slack / PagerDuty alerts for limit drift
+
+---
+
+## Contributing
+
+PodOptix is in early development. PRs, issues, and ideas are welcome.
+
+---
+
+<div align="center">
+Built with passion for platform engineers who are tired of paying for wasted compute.
+</div>
