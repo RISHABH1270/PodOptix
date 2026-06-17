@@ -1,68 +1,65 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 200">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#08090f"/>
-      <stop offset="100%" stop-color="#0d1220"/>
+      <stop offset="0%" stop-color="#020c02"/>
+      <stop offset="100%" stop-color="#051505"/>
     </linearGradient>
-    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#FF4500"/>
-      <stop offset="50%" stop-color="#FF8C00"/>
-      <stop offset="100%" stop-color="#FF4500"/>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00CC33"/>
+      <stop offset="50%" stop-color="#00FF41"/>
+      <stop offset="100%" stop-color="#00CC33"/>
     </linearGradient>
     <pattern id="scan" x="0" y="0" width="860" height="4" patternUnits="userSpaceOnUse">
-      <rect x="0" y="0" width="860" height="1" fill="#000000" opacity="0.25"/>
+      <rect x="0" y="0" width="860" height="1" fill="#000000" opacity="0.3"/>
     </pattern>
+    <clipPath id="shape">
+      <polygon points="32,0 828,0 860,32 860,168 828,200 32,200 0,168 0,32"/>
+    </clipPath>
   </defs>
 
-  <!-- Background -->
-  <rect width="860" height="200" fill="url(#bg)"/>
+  <!-- Background with cut corners -->
+  <polygon points="32,0 828,0 860,32 860,168 828,200 32,200 0,168 0,32" fill="url(#bg)"/>
+
   <!-- Scanlines -->
-  <rect width="860" height="200" fill="url(#scan)"/>
+  <rect width="860" height="200" fill="url(#scan)" clip-path="url(#shape)"/>
 
-  <!-- Border -->
-  <rect x="0" y="0" width="860" height="2" fill="#FF6B00" opacity="0.9"/>
-  <rect x="0" y="198" width="860" height="2" fill="#FF6B00" opacity="0.9"/>
-  <rect x="0" y="0" width="2" height="200" fill="#FF6B00" opacity="0.4"/>
-  <rect x="858" y="0" width="2" height="200" fill="#FF6B00" opacity="0.4"/>
+  <!-- Cut corner lines (highlighted) -->
+  <line x1="32" y1="0"   x2="0"   y2="32"  stroke="#00FF41" stroke-width="2"/>
+  <line x1="828" y1="0"  x2="860" y2="32"  stroke="#00FF41" stroke-width="2"/>
+  <line x1="860" y1="168" x2="828" y2="200" stroke="#00FF41" stroke-width="2"/>
+  <line x1="0"   y1="168" x2="32"  y2="200" stroke="#00FF41" stroke-width="2"/>
 
-  <!-- Corner brackets — top left -->
-  <polyline points="8,35 8,8 35,8" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
-  <line x1="35" y1="8" x2="80" y2="8" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
-  <!-- Corner brackets — top right -->
-  <polyline points="852,35 852,8 825,8" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
-  <line x1="825" y1="8" x2="780" y2="8" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
-  <!-- Corner brackets — bottom left -->
-  <polyline points="8,165 8,192 35,192" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
-  <line x1="35" y1="192" x2="80" y2="192" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
-  <!-- Corner brackets — bottom right -->
-  <polyline points="852,165 852,192 825,192" stroke="#FF6B00" stroke-width="2.5" fill="none"/>
-  <line x1="825" y1="192" x2="780" y2="192" stroke="#00E5FF" stroke-width="1" opacity="0.5"/>
+  <!-- Border edges -->
+  <line x1="32"  y1="0"   x2="828" y2="0"   stroke="#00FF41" stroke-width="1.5" opacity="0.9"/>
+  <line x1="32"  y1="200" x2="828" y2="200" stroke="#00FF41" stroke-width="1.5" opacity="0.9"/>
+  <line x1="0"   y1="32"  x2="0"   y2="168" stroke="#00FF41" stroke-width="1"   opacity="0.5"/>
+  <line x1="860" y1="32"  x2="860" y2="168" stroke="#00FF41" stroke-width="1"   opacity="0.5"/>
 
   <!-- Side decorative lines -->
-  <line x1="30" y1="60" x2="180" y2="60" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
-  <circle cx="180" cy="60" r="3" fill="#FF6B00" opacity="0.5"/>
-  <line x1="680" y1="60" x2="830" y2="60" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
-  <circle cx="680" cy="60" r="3" fill="#FF6B00" opacity="0.5"/>
-  <line x1="30" y1="140" x2="180" y2="140" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
-  <circle cx="180" cy="140" r="3" fill="#FF6B00" opacity="0.5"/>
-  <line x1="680" y1="140" x2="830" y2="140" stroke="#FF6B00" stroke-width="0.8" opacity="0.35"/>
-  <circle cx="680" cy="140" r="3" fill="#FF6B00" opacity="0.5"/>
+  <line x1="50"  y1="58" x2="200" y2="58" stroke="#00FF41" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="200" cy="58" r="3" fill="#00FF41" opacity="0.6"/>
+  <line x1="660" y1="58" x2="810" y2="58" stroke="#00FF41" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="660" cy="58" r="3" fill="#00FF41" opacity="0.6"/>
+  <line x1="50"  y1="142" x2="200" y2="142" stroke="#00FF41" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="200" cy="142" r="3" fill="#00FF41" opacity="0.6"/>
+  <line x1="660" y1="142" x2="810" y2="142" stroke="#00FF41" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="660" cy="142" r="3" fill="#00FF41" opacity="0.6"/>
 
   <!-- Glitch layers -->
   <text x="427" y="116" font-family="sans-serif" font-size="92" font-weight="bold"
-        fill="#00E5FF" opacity="0.25" text-anchor="middle" letter-spacing="4">PodOptix</text>
+        fill="#00FFFF" opacity="0.2" text-anchor="middle" letter-spacing="4">PodOptix</text>
   <text x="433" y="120" font-family="sans-serif" font-size="92" font-weight="bold"
-        fill="#FF00FF" opacity="0.15" text-anchor="middle" letter-spacing="4">PodOptix</text>
+        fill="#39FF14" opacity="0.12" text-anchor="middle" letter-spacing="4">PodOptix</text>
 
   <!-- Main title -->
   <text x="430" y="118" font-family="sans-serif" font-size="92" font-weight="bold"
-        fill="url(#orange)" text-anchor="middle" letter-spacing="4">PodOptix</text>
+        fill="url(#green)" text-anchor="middle" letter-spacing="4">PodOptix</text>
 
   <!-- Tagline -->
-  <text x="430" y="163" font-family="monospace" font-size="11" fill="#00E5FF"
-        text-anchor="middle" opacity="0.8" letter-spacing="3">[ KUBERNETES RESOURCE RIGHT-SIZING  ·  POWERED BY P99 ]</text>
+  <text x="430" y="163" font-family="monospace" font-size="11" fill="#00FFFF"
+        text-anchor="middle" opacity="0.85" letter-spacing="3">[ KUBERNETES RESOURCE RIGHT-SIZING  ·  POWERED BY P99 ]</text>
 
   <!-- Corner status labels -->
-  <text x="25" y="188" font-family="monospace" font-size="9" fill="#FF6B00" opacity="0.7">SYS::ACTIVE</text>
-  <text x="835" y="188" font-family="monospace" font-size="9" fill="#00E5FF" opacity="0.7" text-anchor="end">v0.1.0-MVP</text>
+  <text x="42"  y="187" font-family="monospace" font-size="9" fill="#00FF41" opacity="0.7">SYS::ACTIVE</text>
+  <text x="818" y="187" font-family="monospace" font-size="9" fill="#00FFFF" opacity="0.7" text-anchor="end">v0.1.0-MVP</text>
 </svg>
