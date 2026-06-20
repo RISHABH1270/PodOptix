@@ -43,9 +43,9 @@ No more guessing. No more waste.
 
 ## Architecture
 
-PodOptix runs as a single **Master Hub**. No agents. No sidecars. Nothing to deploy inside your clusters.
+PodOptix runs as a single **Master Hub** — deployed once in your management or ops cluster. No agents. No sidecars. Nothing to deploy inside your workload clusters.
 
-The Hub connects directly to each cluster's Prometheus HTTP API, runs PromQL queries to fetch real usage data, computes p99 percentiles, and generates recommendations — all from one place.
+From there, the Hub connects directly to each cluster's Prometheus HTTP API, runs PromQL queries to fetch real usage data, computes p99 percentiles, and generates recommendations — all from one place.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
