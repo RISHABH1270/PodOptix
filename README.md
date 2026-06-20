@@ -43,29 +43,30 @@ No more guessing. No more waste.
 
 ## Architecture
 
-PodOptix uses a **Hub & Spoke** model built for multi-cluster environments.
+PodOptix runs as a single **Master Hub**. No agents. No sidecars. Nothing to deploy inside your clusters.
+
+The Hub connects directly to each cluster's Prometheus HTTP API, runs PromQL queries to fetch real usage data, computes p99 percentiles, and generates recommendations — all from one place.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                        HUB                              │
-│              Single Dashboard · REST API                │
-│                   Multi-cluster View                    │
-└────────────────────┬────────────────────────────────────┘
-                     │
-       ┌─────────────┼─────────────┐
-       │             │             │
-  ┌────▼────┐  ┌─────▼────┐  ┌────▼────┐
-  │ Agent   │  │  Agent   │  │  Agent  │
-  │Cluster 1│  │Cluster 2 │  │Cluster 3│
-  │         │  │          │  │         │
-  │Prometheus│  │Prometheus│  │Prometheus│
-  └─────────┘  └──────────┘  └─────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                         HUB                                 │
+│       Master Control Plane · Dashboard · REST API           │
+│        Queries p99 · Generates Recommendations              │
+└──────────┬──────────────────┬──────────────────┬───────────┘
+           │                  │                  │
+      (PromQL API)       (PromQL API)       (PromQL API)
+           │                  │                  │
+    ┌──────┴──────┐    ┌──────┴──────┐    ┌──────┴──────┐
+    │ Prometheus  │    │ Prometheus  │    │ Prometheus  │
+    │  Cluster 1  │    │  Cluster 2  │    │  Cluster 3  │
+    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 | Component | Role |
 |-----------|------|
-| **Agent** | Runs inside each cluster · Reads Prometheus · Computes p99 · Sends recommendations to Hub |
-| **Hub** | Aggregates all clusters · Serves the dashboard · Manages auth tokens |
+| **Hub** | Connects to each cluster's Prometheus · Runs PromQL queries · Computes p99 · Generates recommendations · Serves the dashboard |
+
+**Onboarding a cluster takes 30 seconds** — just register the Prometheus endpoint and an auth token. That's it.
 
 ---
 
