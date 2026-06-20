@@ -68,6 +68,8 @@ From there, the Hub connects directly to each cluster's Prometheus HTTP API, run
 
 **Onboarding a cluster takes 30 seconds** — just register the Prometheus endpoint and an auth token. That's it.
 
+> For a deep dive into Hub internals, data flow, component reference, metrics collected, and the security model — see [docs/architecture.md](docs/architecture.md).
+
 ---
 
 ## Quick Start
