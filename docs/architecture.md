@@ -13,7 +13,7 @@
 
 ## System Overview
 
-PodOptix runs as a single **Master Hub** deployed in your management or ops cluster. It directly queries each workload cluster's Prometheus via the PromQL HTTP API. No agents. No sidecars. Nothing to deploy inside workload clusters.
+PodOptix runs as a single **Master Hub** deployed in your management or ops Kubernetes cluster. It directly queries each workload cluster's Prometheus via the PromQL HTTP API. No agents. No sidecars. Nothing to deploy inside workload clusters.
 
 ```
                            ┌──────────────┐
