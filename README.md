@@ -91,7 +91,7 @@ That's it. Your cluster starts sending recommendations within minutes.
 ## Roadmap
 
 - [x] Architecture design
-- [ ] Prometheus metrics collector (Agent)
+- [ ] Prometheus metrics collector (Hub → PromQL API)
 - [ ] p99 computation engine
 - [ ] Recommendation API
 - [ ] Central Hub with multi-cluster support
