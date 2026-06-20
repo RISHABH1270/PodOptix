@@ -87,13 +87,13 @@ Use structured JSON logging — **never** `fmt.Println` in production code.
 **Library:** `zerolog` or `zap`
 
 ```go
-// ✅ correct
+// correct
 log.Info().
     Str("cluster_id", clusterID).
     Str("namespace", namespace).
     Msg("collection job started")
 
-// ❌ wrong
+// wrong
 fmt.Println("collection job started for " + clusterID)
 ```
 
@@ -115,13 +115,13 @@ fmt.Println("collection job started for " + clusterID)
 Go errors must be handled explicitly — never silently ignored.
 
 ```go
-// ✅ correct — wrap with context
+// correct — wrap with context
 result, err := collector.Query(ctx, clusterID, metric)
 if err != nil {
     return fmt.Errorf("query cluster %s: %w", clusterID, err)
 }
 
-// ❌ wrong — swallowing the error
+// wrong — swallowing the error
 result, _ := collector.Query(ctx, clusterID, metric)
 ```
 
