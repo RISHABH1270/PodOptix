@@ -159,3 +159,39 @@ UUID is not 100% mathematically guaranteed to be unique, so we add a second laye
 
 **Why `Window` is also a string:**
 The collection window (how far back to look in Prometheus) is stored as `"7d"`, `"24h"`, `"30d"` — not as a plain integer. A plain `7` loses the unit (days? hours?). The string format is self-describing and maps directly to PromQL range syntax: `container_cpu_usage_seconds_total[7d]`.
+
+---
+
+## 10. Data Model — Foreign Key Design
+
+### Decision: **Separate tables linked by ClusterID (Foreign Key)**
+
+Every table has its own `ID`. The `Recommendation` model has two ID fields:
+- `ID` — the recommendation's own unique identity
+- `ClusterID` — a pointer back to which cluster this recommendation belongs to
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Separate tables + Foreign Key** ✅ | No data duplication · Easy to update cluster info in one place · Industry standard relational design | Requires JOIN queries |
+| Single flat table | Simple queries | Cluster URL/name repeated thousands of times · Wasteful · Hard to update |
+
+**How it works:**
+
+```
+CLUSTER TABLE
+─────────────────────────────────────
+ID          │ Name
+────────────┼────────────────────────
+"abc-123"   │ production-cluster
+"def-456"   │ staging-cluster
+
+RECOMMENDATION TABLE
+──────────────────────────────────────────────
+ID          │ ClusterID   │ PodName
+────────────┼─────────────┼──────────────────
+"xyz-789"   │ "abc-123"   │ payment-api
+"xyz-790"   │ "abc-123"   │ auth-service
+"xyz-791"   │ "def-456"   │ payment-api
+```
+
+`ClusterID` in Recommendation points to `ID` in Cluster. This is called a **Foreign Key** — the standard way relational databases model relationships. Cluster info is stored once and referenced many times instead of being repeated per recommendation.
