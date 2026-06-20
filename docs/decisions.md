@@ -132,3 +132,30 @@ Every decision here was made intentionally. This doc records what we chose, what
 | Deployment | Helm | Industry standard K8s distribution |
 | Prometheus client | prometheus/client_golang | Official · battle-tested |
 | Auth | JWT + API tokens | Simple · stateless |
+| ID Strategy | UUID v4 (string) | Globally unique · secure · no collision risk |
+
+---
+
+## 9. ID Strategy
+
+### Decision: **UUID v4 as string**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **UUID v4 (string)** ✅ | Globally unique · Secure · No central counter needed · Industry standard | Slightly larger storage than int |
+| Auto-increment int | Simple · Small storage | Guessable · Clashes across distributed systems · Security risk |
+
+**Why not integer IDs:**
+- Integer IDs are sequential (`1, 2, 3...`) — an attacker can guess other cluster IDs and attempt unauthorized access
+- In distributed systems, two services can independently generate the same integer ID causing collisions
+
+**Why UUID v4:**
+- 122 bits of randomness → 2^122 possible values → practically impossible to collide
+- Cannot be guessed — protects against enumeration attacks
+- Industry standard used by AWS, Stripe, GitHub, Google
+
+**Collision safety:**
+UUID is not 100% mathematically guaranteed to be unique, so we add a second layer of protection — a `PRIMARY KEY` constraint in PostgreSQL. If a duplicate UUID ever occurs (probability near zero), the database rejects the insert and a new UUID is generated.
+
+**Why `Window` is also a string:**
+The collection window (how far back to look in Prometheus) is stored as `"7d"`, `"24h"`, `"30d"` — not as a plain integer. A plain `7` loses the unit (days? hours?). The string format is self-describing and maps directly to PromQL range syntax: `container_cpu_usage_seconds_total[7d]`.
