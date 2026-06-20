@@ -17,13 +17,13 @@
 
 ## The Problem
 
-Most Kubernetes teams set pod resource limits by **guesswork or copy-paste**.
+Most Kubernetes and infra teams set pod resource limits by **guesswork or copy-paste**.
 
 The result?
 
 - Pods get OOMKilled at 3AM
 - Clusters are 40-60% over-provisioned
-- Cloud bills keep growing with no visibility into why
+- Cloud bills keep growing with no visibility
 
 ---
 
