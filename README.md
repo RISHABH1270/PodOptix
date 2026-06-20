@@ -97,7 +97,6 @@ That's it. Your cluster starts sending recommendations within minutes.
 - [ ] Central Hub with multi-cluster support
 - [ ] Web Dashboard
 - [ ] Helm chart
-- [ ] Slack / PagerDuty alerts for limit drift
 
 ---
 
