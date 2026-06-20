@@ -13,7 +13,7 @@
 
 ## System Overview
 
-PodOptix runs as a single **Master Hub** deployed in your management or ops Kubernetes cluster. It directly queries each workload cluster's Prometheus via the PromQL HTTP API. No agents. No sidecars. Nothing to deploy inside workload clusters.
+PodOptix runs as a single **Master Hub** deployed in your management or ops cluster. It directly queries each workload cluster's Prometheus via the PromQL HTTP API. No agents. No sidecars. Nothing to deploy inside workload clusters.
 
 ```
                            ┌──────────────┐
@@ -106,7 +106,7 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops Kube
 │  │                                │                              │  │
 │  │   ┌────────────────────────────▼──────────────────────────┐   │  │
 │  │   │  Recommendation Engine                                │   │  │
-│  │   │  CPU = p99_cpu × 2   ·   Mem = p99_mem × 2           │   │  │
+│  │   │  CPU = p99_cpu × 2   ·   Mem = p99_mem × 2            │   │  │
 │  │   │  Output → YAML patch                                  │   │  │
 │  │   └───────────────────────────────────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────┘  │
