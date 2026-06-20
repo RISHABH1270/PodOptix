@@ -9,28 +9,33 @@ Standards and conventions every contributor must follow.
 Follow the [Standard Go Project Layout](https://github.com/golang-standards/project-layout).
 
 ```
-podoptix/
-├── cmd/
+PodOptix/
+│
+├── cmd/                    ← "Start here" — turns the app on
 │   └── hub/
-│       └── main.go          # entrypoint only — no business logic
-├── internal/
-│   ├── api/                 # REST API handlers
-│   ├── auth/                # JWT + token handling
-│   ├── cache/               # Redis client
-│   ├── collector/           # PromQL query engine
-│   ├── compute/             # p99 computation engine
-│   ├── recommender/         # recommendation engine
-│   ├── registry/            # cluster registry
-│   ├── scheduler/           # cron job runner
-│   └── store/               # database layer (PostgreSQL)
-├── pkg/
-│   └── models/              # shared data models
-├── api/
-│   └── v1/                  # OpenAPI / Swagger spec
-├── deploy/
-│   └── helm/                # Helm chart
-├── docs/                    # architecture, decisions, best practices
-└── Makefile
+│       └── main.go         ← the ON button of the whole app
+│
+├── internal/               ← all the actual brain/logic
+│   ├── api/                ← handles web requests (like a waiter)
+│   ├── collector/          ← goes and fetches data from Prometheus
+│   ├── compute/            ← does the p99 math
+│   ├── recommender/        ← calculates p99 × 2 = new limit
+│   ├── scheduler/          ← alarm clock — runs jobs every N hours
+│   ├── registry/           ← address book of all clusters
+│   ├── auth/               ← checks who you are (login)
+│   ├── cache/              ← short-term memory (Redis)
+│   └── store/              ← long-term memory (PostgreSQL)
+│
+├── pkg/                    ← reusable building blocks
+│   └── models/             ← blueprints for data (what a Cluster looks like)
+│
+├── api/                    ← documentation of all API endpoints
+│   └── v1/
+│
+├── deploy/                 ← how to ship it to Kubernetes
+│   └── helm/
+│
+└── docs/                   ← architecture, decisions, best practices
 ```
 
 **Rules:**
