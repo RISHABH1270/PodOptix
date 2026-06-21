@@ -115,5 +115,5 @@ PodOptix is in early development. PRs, issues, and ideas are welcome.
 ---
 
 <div align="center">
-<b>For every platform engineer who has been paged at midnight because someone set a memory limit by guesswork.</b>
+<b>For every platform engineer who got paged at midnight because someone set a memory limit by guesswork.</b>
 </div>
