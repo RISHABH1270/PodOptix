@@ -6,15 +6,12 @@ import "time"
 type RecommendationStatus string
 
 const (
-	// StatusNewService means this service was just deployed — no historical data exists yet.
-	// Recommendation will be available after 7 days of metrics are collected.
+	// StatusNewService means this service does not have enough data yet.
+	// Recommendation will be available after 7 days of metrics history.
 	StatusNewService RecommendationStatus = "new_service"
 
 	// StatusReady means p99 has been computed and recommendation is available.
 	StatusReady RecommendationStatus = "ready"
-
-	// StatusInsufficient means data exists but is too sparse to be reliable.
-	StatusInsufficient RecommendationStatus = "insufficient_data"
 )
 
 // Recommendation represents a resource limit recommendation

@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS recommendations (
     id                    VARCHAR(36)   PRIMARY KEY,                         -- UUID
     cluster_id            VARCHAR(36)   NOT NULL REFERENCES clusters(id),    -- foreign key → clusters
-    status                VARCHAR(20)   NOT NULL DEFAULT 'new_service',      -- new_service | ready | insufficient_data
+    status                VARCHAR(20)   NOT NULL DEFAULT 'new_service',      -- new_service | ready
     namespace             VARCHAR(255)  NOT NULL,                            -- e.g. "payments-ns"
     pod_name              VARCHAR(255)  NOT NULL,                            -- e.g. "payment-api-7d9f"
     container_name        VARCHAR(255)  NOT NULL,                            -- e.g. "payment-api"
