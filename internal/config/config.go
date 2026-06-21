@@ -17,18 +17,25 @@ type Config struct {
 // Load reads environment variables and returns a Config.
 // If a required variable is missing, the app panics — it cannot start without it.
 func Load() (*Config, error) {
-	cfg := &Config{
+	// step 1 — declare the variable
+	var cfg *Config
+
+	// step 2 — assign the value
+	cfg = &Config{
 		Port:        getEnv("PORT", "8080"), // defaults to 8080 if not set
 		DatabaseURL: mustGetEnv("DATABASE_URL"),
 		RedisURL:    mustGetEnv("REDIS_URL"),
 		JWTSecret:   mustGetEnv("JWT_SECRET"),
 	}
+
 	return cfg, nil
 }
 
 // getEnv reads an env variable — returns fallback if not set.
-func getEnv(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
+func getEnv(key string, fallback string) string {
+	var value string
+	value = os.Getenv(key)
+	if value != "" {
 		return value
 	}
 	return fallback
@@ -37,7 +44,8 @@ func getEnv(key, fallback string) string {
 // mustGetEnv reads an env variable — panics if not set.
 // The app cannot start without required variables.
 func mustGetEnv(key string) string {
-	value := os.Getenv(key)
+	var value string
+	value = os.Getenv(key)
 	if value == "" {
 		panic(fmt.Sprintf("required environment variable %q is not set", key))
 	}
