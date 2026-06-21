@@ -195,3 +195,47 @@ ID          │ ClusterID   │ PodName
 ```
 
 `ClusterID` in Recommendation points to `ID` in Cluster. This is called a **Foreign Key** — the standard way relational databases model relationships. Cluster info is stored once and referenced many times instead of being repeated per recommendation.
+
+---
+
+## 11. Why p99 and not p100
+
+### Decision: **p99 × 2 as the recommended limit**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **p99 × 2** ✅ | Based on real sustained usage · Smart buffer included · Cost-effective | Ignores the top 1% of spikes |
+| p100 × 2 | Covers every spike ever | One freak spike ruins the limit — massive overprovisioning |
+| p95 × 2 | Even more cost savings | Too aggressive — ignores too many real usage peaks |
+
+**The problem with p100:**
+
+p100 is the absolute maximum ever recorded. If a pod normally uses 80m–120m CPU but once spiked to 2000m for 30 seconds due to a bug:
+
+```
+p100 = 2000m  →  limit = 2000m × 2 = 4000m
+```
+
+You pay for 4000m every second — because of one 30-second incident. That is pure waste.
+
+**Why p99 × 2 is the right formula:**
+
+```
+p99  = 120m   →  limit = 120m  × 2 = 240m
+```
+
+The ×2 multiplier IS the safety buffer for that top 1%. You are not ignoring spikes — you are budgeting for them intelligently instead of over-provisioning for the worst freak event ever recorded.
+
+**What lives in that top 1%:**
+- One-time bugs
+- Deployment restart spikes
+- Abnormal batch jobs
+- Once-in-a-week events
+
+These should not define your permanent resource limits.
+
+| | p100 | p99 × 2 |
+|--|------|---------|
+| Based on | Worst freak spike ever | Real sustained usage + smart buffer |
+| Result | Massive overprovisioning | Right-sized with safe headroom |
+| Optimizes for | Paranoia | Reality |
