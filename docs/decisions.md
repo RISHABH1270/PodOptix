@@ -239,3 +239,49 @@ These should not define your permanent resource limits.
 | Based on | Worst freak spike ever | Real sustained usage + smart buffer |
 | Result | Massive overprovisioning | Right-sized with safe headroom |
 | Optimizes for | Paranoia | Reality |
+
+---
+
+## 12. Cold Start Problem — New Services with No Historical Data
+
+### Decision: **`new_service` status + namespace average as bootstrap**
+
+When a service is newly deployed it has zero historical data in Prometheus. No data = no p99 = no recommendation.
+
+**Three phases for new services:**
+
+```
+Phase 1 — Day 0 to Day 7   → Status: new_service
+          Service is new. PodOptix shows this status so the customer
+          knows it is not a system issue — the service simply has no history yet.
+          Dashboard shows: "Recommendation available after 7 days."
+
+Phase 2 — After 7 days     → Status: ready
+          7 days of real usage data exists.
+          p99 computed. Recommendation generated.
+
+Phase 3 — Ongoing          → Status: ready
+          Recommendations updated every N hours as usage evolves.
+```
+
+**Why `new_service` and not `collecting` or `pending`:**
+
+| Status | Problem |
+|--------|---------|
+| `collecting` | Makes it sound like the system is slow or broken |
+| `pending` | Implies something is wrong or stuck |
+| `warming_up` | Sounds like a system issue |
+| `new_service` ✅ | Clear — the service is new, no history exists yet. Not a system problem. |
+
+**Bootstrap strategy for Phase 1:**
+While waiting for 7 days of data, PodOptix uses the **namespace average** of existing services as a starting point — giving the team a reasonable initial estimate instead of nothing.
+
+```
+payment-api  → p99 cpu: 120m
+auth-api     → p99 cpu: 80m
+order-api    → p99 cpu: 100m
+─────────────────────────────────────
+new-service  → initial estimate: 100m  (namespace average × 2 = 200m limit)
+```
+
+This is clearly labeled as an estimate, not a real recommendation.
