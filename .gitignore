@@ -1,0 +1,19 @@
+# Environment variables — never commit real secrets
+.env
+
+# Go build output
+bin/
+*.exe
+
+# Go test cache
+*.test
+*.out
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db

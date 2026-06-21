@@ -17,13 +17,19 @@
 
 ## The Problem
 
-Most Kubernetes and infra teams set pod resource limits by **guesswork or copy-paste**.
+Most Kubernetes and infra teams set pod resource limits by **guesswork or copy-paste** — either picking numbers that "feel right" with no data, or copying limits from another workload that has nothing to do with theirs.
 
 The result?
 
-- Pods get OOMKilled at 3AM
+- Pods get OOMKilled at midnight
 - Clusters are 40-60% over-provisioned
 - Cloud bills keep growing with no visibility
+- Engineers waste hours manually tuning limits with no real data
+- Limits copied from one service cause cascading failures in another
+- Teams are afraid to reduce limits because they don't know actual usage
+- Finance has no insight into which team or service is burning the most cost
+- No single view across multiple clusters to understand total waste
+- The problem gets worse as the number of microservices grows
 
 ---
 
@@ -93,11 +99,24 @@ That's it. Your cluster starts sending recommendations within minutes.
 ## Roadmap
 
 - [x] Architecture design
+- [x] Technology decisions and trade-offs
+- [x] Project structure and scaffold
+- [x] Data models (Cluster, Recommendation)
+- [x] Config loader (environment variables)
+- [x] Database migrations (PostgreSQL)
+- [x] Database store layer with connection pool
+- [ ] HTTP server (Gin)
+- [ ] REST API endpoints
+- [ ] Auth (JWT)
 - [ ] Prometheus metrics collector (Hub → PromQL API)
 - [ ] p99 computation engine
-- [ ] Recommendation API
+- [ ] Recommendation engine
+- [ ] Scheduler (cron-based collection jobs)
+- [ ] Cache layer (Redis)
+- [ ] Token encryption at rest (AES-256)
 - [ ] Central Hub with multi-cluster support
 - [ ] Web Dashboard
+- [ ] Docker image
 - [ ] Helm chart
 
 ---
@@ -109,5 +128,5 @@ PodOptix is in early development. PRs, issues, and ideas are welcome.
 ---
 
 <div align="center">
-Built with passion for platform engineers who are tired of paying for wasted compute.
+<b>For every platform engineer who got paged at midnight because someone set a memory limit by guesswork.</b>
 </div>

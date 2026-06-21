@@ -42,5 +42,5 @@
 
   <!-- Corner status labels -->
   <text x="20" y="188" font-family="monospace" font-size="9" fill="#00FF41" opacity="0.7">SYS::ACTIVE</text>
-  <text x="840" y="188" font-family="monospace" font-size="9" fill="#00FFFF" opacity="0.7" text-anchor="end">v0.1.0-MVP</text>
+  <text x="840" y="188" font-family="monospace" font-size="9" fill="#00FFFF" opacity="0.7" text-anchor="end">v0.1.0</text>
 </svg>

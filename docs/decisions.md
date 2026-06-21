@@ -132,3 +132,240 @@ Every decision here was made intentionally. This doc records what we chose, what
 | Deployment | Helm | Industry standard K8s distribution |
 | Prometheus client | prometheus/client_golang | Official · battle-tested |
 | Auth | JWT + API tokens | Simple · stateless |
+| ID Strategy | UUID v4 (string) | Globally unique · secure · no collision risk |
+
+---
+
+## 9. ID Strategy
+
+### Decision: **UUID v4 as string**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **UUID v4 (string)** ✅ | Globally unique · Secure · No central counter needed · Industry standard | Slightly larger storage than int |
+| Auto-increment int | Simple · Small storage | Guessable · Clashes across distributed systems · Security risk |
+
+**Why not integer IDs:**
+- Integer IDs are sequential (`1, 2, 3...`) — an attacker can guess other cluster IDs and attempt unauthorized access
+- In distributed systems, two services can independently generate the same integer ID causing collisions
+
+**Why UUID v4:**
+- 122 bits of randomness → 2^122 possible values → practically impossible to collide
+- Cannot be guessed — protects against enumeration attacks
+- Industry standard used by AWS, Stripe, GitHub, Google
+
+**Collision safety:**
+UUID is not 100% mathematically guaranteed to be unique, so we add a second layer of protection — a `PRIMARY KEY` constraint in PostgreSQL. If a duplicate UUID ever occurs (probability near zero), the database rejects the insert and a new UUID is generated.
+
+**Why `Window` is also a string:**
+The collection window (how far back to look in Prometheus) is stored as `"7d"`, `"24h"`, `"30d"` — not as a plain integer. A plain `7` loses the unit (days? hours?). The string format is self-describing and maps directly to PromQL range syntax: `container_cpu_usage_seconds_total[7d]`.
+
+---
+
+## 10. Data Model — Foreign Key Design
+
+### Decision: **Separate tables linked by ClusterID (Foreign Key)**
+
+Every table has its own `ID`. The `Recommendation` model has two ID fields:
+- `ID` — the recommendation's own unique identity
+- `ClusterID` — a pointer back to which cluster this recommendation belongs to
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Separate tables + Foreign Key** ✅ | No data duplication · Easy to update cluster info in one place · Industry standard relational design | Requires JOIN queries |
+| Single flat table | Simple queries | Cluster URL/name repeated thousands of times · Wasteful · Hard to update |
+
+**How it works:**
+
+```
+CLUSTER TABLE
+─────────────────────────────────────
+ID          │ Name
+────────────┼────────────────────────
+"abc-123"   │ production-cluster
+"def-456"   │ staging-cluster
+
+RECOMMENDATION TABLE
+──────────────────────────────────────────────
+ID          │ ClusterID   │ PodName
+────────────┼─────────────┼──────────────────
+"xyz-789"   │ "abc-123"   │ payment-api
+"xyz-790"   │ "abc-123"   │ auth-service
+"xyz-791"   │ "def-456"   │ payment-api
+```
+
+`ClusterID` in Recommendation points to `ID` in Cluster. This is called a **Foreign Key** — the standard way relational databases model relationships. Cluster info is stored once and referenced many times instead of being repeated per recommendation.
+
+---
+
+## 11. Why p99 and not p100
+
+### Decision: **p99 × 2 as the recommended limit**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **p99 × 2** ✅ | Based on real sustained usage · Smart buffer included · Cost-effective | Ignores the top 1% of spikes |
+| p100 × 2 | Covers every spike ever | One freak spike ruins the limit — massive overprovisioning |
+| p95 × 2 | Even more cost savings | Too aggressive — ignores too many real usage peaks |
+
+**The problem with p100:**
+
+p100 is the absolute maximum ever recorded. If a pod normally uses 80m–120m CPU but once spiked to 2000m for 30 seconds due to a bug:
+
+```
+p100 = 2000m  →  limit = 2000m × 2 = 4000m
+```
+
+You pay for 4000m every second — because of one 30-second incident. That is pure waste.
+
+**Why p99 × 2 is the right formula:**
+
+```
+p99  = 120m   →  limit = 120m  × 2 = 240m
+```
+
+The ×2 multiplier IS the safety buffer for that top 1%. You are not ignoring spikes — you are budgeting for them intelligently instead of over-provisioning for the worst freak event ever recorded.
+
+**What lives in that top 1%:**
+- One-time bugs
+- Deployment restart spikes
+- Abnormal batch jobs
+- Once-in-a-week events
+
+These should not define your permanent resource limits.
+
+| | p100 | p99 × 2 |
+|--|------|---------|
+| Based on | Worst freak spike ever | Real sustained usage + smart buffer |
+| Result | Massive overprovisioning | Right-sized with safe headroom |
+| Optimizes for | Paranoia | Reality |
+
+---
+
+## 12. Cold Start Problem — New Services with No Historical Data
+
+### Decision: **`new_service` status + namespace average as bootstrap**
+
+When a service is newly deployed it has zero historical data in Prometheus. No data = no p99 = no recommendation.
+
+**Three phases for new services:**
+
+```
+Phase 1 — Day 0 to Day 7   → Status: new_service
+          Service is new. PodOptix shows this status so the customer
+          knows it is not a system issue — the service simply has no history yet.
+          Dashboard shows: "Recommendation available after 7 days."
+
+Phase 2 — After 7 days     → Status: ready
+          7 days of real usage data exists.
+          p99 computed. Recommendation generated.
+
+Phase 3 — Ongoing          → Status: ready
+          Recommendations updated every N hours as usage evolves.
+```
+
+**Why only two statuses — `new_service` and `ready`:**
+
+We intentionally kept it simple. Both "brand new service" and "sparse data" tell the customer the same thing — not ready yet. There is no value in showing the customer a third status. Two is enough.
+
+| Status | Meaning |
+|--------|---------|
+| `new_service` | Not enough data yet — recommendation available after 7 days |
+| `ready` | p99 computed — recommendation is available |
+
+**Why `new_service` and not `collecting` or `pending`:**
+
+| Status | Problem |
+|--------|---------|
+| `collecting` | Makes it sound like the system is slow or broken |
+| `pending` | Implies something is wrong or stuck |
+| `warming_up` | Sounds like a system issue |
+| `new_service` ✅ | Clear — the service is new, no history exists yet. Not a system problem. |
+
+**Bootstrap strategy for Phase 1:**
+While waiting for 7 days of data, PodOptix uses the **namespace average** of existing services as a starting point — giving the team a reasonable initial estimate instead of nothing.
+
+```
+payment-api  → p99 cpu: 120m
+auth-api     → p99 cpu: 80m
+order-api    → p99 cpu: 100m
+─────────────────────────────────────
+new-service  → initial estimate: 100m  (namespace average × 2 = 200m limit)
+```
+
+---
+
+## 13. Resource Unit Standardization
+
+### Decision: **Millicores for CPU · Mebibytes for Memory — stored as integers**
+
+Kubernetes allows many formats for the same value:
+```
+"1000m" = "1" = "1.0"       ← all mean 1 CPU core
+"1Gi"   = "1024Mi"          ← all mean same memory
+"1.2Gi" = "1228.8Mi"        ← decimal Gi
+```
+
+Storing raw strings makes comparison and math impossible.
+
+| Resource | Internal Unit | Type | Why |
+|----------|-------------|------|-----|
+| CPU | millicores | `int` | Easy math — p99 × 2 = whole number. 1 core = 1000m |
+| Memory | Mebibytes (MiB) | `int` | Most precise. 1Gi = 1024Mi. No floating point errors |
+
+**Conversion rules:**
+- `1` CPU → `1000` millicores
+- `0.5` CPU → `500` millicores
+- `1Gi` memory → `1024` MiB
+- `1.2Gi` memory → `1229` MiB (rounded up)
+
+**Display layer converts back to human-readable:**
+```
+2000 millicores → "2 cores"
+1229 MiB        → "1.2Gi"
+512  MiB        → "512Mi"
+```
+
+The customer always sees human-readable values. Internally everything is a clean integer.
+
+This is clearly labeled as an estimate, not a real recommendation.
+
+---
+
+## 14. Database Index on `cluster_id`
+
+### Decision: **Index `recommendations.cluster_id` for fast cluster-based lookups**
+
+The most common query in PodOptix is:
+
+```sql
+SELECT * FROM recommendations WHERE cluster_id = "abc-123"
+```
+
+This runs every time a customer opens their dashboard. Without an index, PostgreSQL performs a **full table scan** — reading every row in the table one by one.
+
+**Without index (1 million rows):**
+```
+Row 1       → not a match, skip
+Row 2       → not a match, skip
+...
+Row 1000000 → done
+```
+Time: proportional to total rows — gets slower as data grows.
+
+**With index — B-Tree lookup:**
+```
+"abc-123" found in 3 steps regardless of table size
+```
+
+PostgreSQL builds a sorted B-Tree structure behind the scenes. Finding any `cluster_id` takes the same number of steps whether the table has 1,000 or 10,000,000 rows.
+
+**Trade-off accepted:**
+
+| | Without Index | With Index |
+|--|--------------|-----------|
+| Read speed | Slow — scans all rows | Fast — direct jump |
+| Write speed | Fast | Slightly slower (index updates on insert) |
+| Storage | Less | Slightly more |
+
+We index `cluster_id` because it is the primary filter in every dashboard query. The read performance gain far outweighs the minor write overhead.
