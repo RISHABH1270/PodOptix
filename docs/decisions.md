@@ -293,4 +293,39 @@ order-api    → p99 cpu: 100m
 new-service  → initial estimate: 100m  (namespace average × 2 = 200m limit)
 ```
 
+---
+
+## 13. Resource Unit Standardization
+
+### Decision: **Millicores for CPU · Mebibytes for Memory — stored as integers**
+
+Kubernetes allows many formats for the same value:
+```
+"1000m" = "1" = "1.0"       ← all mean 1 CPU core
+"1Gi"   = "1024Mi"          ← all mean same memory
+"1.2Gi" = "1228.8Mi"        ← decimal Gi
+```
+
+Storing raw strings makes comparison and math impossible.
+
+| Resource | Internal Unit | Type | Why |
+|----------|-------------|------|-----|
+| CPU | millicores | `int` | Easy math — p99 × 2 = whole number. 1 core = 1000m |
+| Memory | Mebibytes (MiB) | `int` | Most precise. 1Gi = 1024Mi. No floating point errors |
+
+**Conversion rules:**
+- `1` CPU → `1000` millicores
+- `0.5` CPU → `500` millicores
+- `1Gi` memory → `1024` MiB
+- `1.2Gi` memory → `1229` MiB (rounded up)
+
+**Display layer converts back to human-readable:**
+```
+2000 millicores → "2 cores"
+1229 MiB        → "1.2Gi"
+512  MiB        → "512Mi"
+```
+
+The customer always sees human-readable values. Internally everything is a clean integer.
+
 This is clearly labeled as an estimate, not a real recommendation.
