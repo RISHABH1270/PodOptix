@@ -329,3 +329,43 @@ Storing raw strings makes comparison and math impossible.
 The customer always sees human-readable values. Internally everything is a clean integer.
 
 This is clearly labeled as an estimate, not a real recommendation.
+
+---
+
+## 14. Database Index on `cluster_id`
+
+### Decision: **Index `recommendations.cluster_id` for fast cluster-based lookups**
+
+The most common query in PodOptix is:
+
+```sql
+SELECT * FROM recommendations WHERE cluster_id = "abc-123"
+```
+
+This runs every time a customer opens their dashboard. Without an index, PostgreSQL performs a **full table scan** — reading every row in the table one by one.
+
+**Without index (1 million rows):**
+```
+Row 1       → not a match, skip
+Row 2       → not a match, skip
+...
+Row 1000000 → done
+```
+Time: proportional to total rows — gets slower as data grows.
+
+**With index — B-Tree lookup:**
+```
+"abc-123" found in 3 steps regardless of table size
+```
+
+PostgreSQL builds a sorted B-Tree structure behind the scenes. Finding any `cluster_id` takes the same number of steps whether the table has 1,000 or 10,000,000 rows.
+
+**Trade-off accepted:**
+
+| | Without Index | With Index |
+|--|--------------|-----------|
+| Read speed | Slow — scans all rows | Fast — direct jump |
+| Write speed | Fast | Slightly slower (index updates on insert) |
+| Storage | Less | Slightly more |
+
+We index `cluster_id` because it is the primary filter in every dashboard query. The read performance gain far outweighs the minor write overhead.
