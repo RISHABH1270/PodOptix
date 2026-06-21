@@ -25,7 +25,7 @@ func printBanner() {
 	fmt.Println()
 	fmt.Println(bold + cyan + "  PodOptix" + reset + white + bold + "  —  Kubernetes Resource Right-Sizing  —  Powered by p99" + reset)
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
-	fmt.Println(green  + "  Version  : " + reset + "v0.1.0-MVP")
+	fmt.Println(green  + "  Version  : " + reset + "v0.1.0")
 	fmt.Println(green  + "  Status   : " + reset + "Starting...")
 	fmt.Println(green  + "  Port     : " + reset + "8080")
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
