@@ -1,5 +1,4 @@
 -- Migration 001: Create clusters table
--- Stores every Kubernetes cluster registered in PodOptix
 
 CREATE TABLE IF NOT EXISTS clusters (
     id             VARCHAR(36)  PRIMARY KEY,                -- UUID

@@ -1,15 +1,13 @@
 -- Migration 002: Create recommendations table
 -- Stores p99-based resource recommendations per container
---
 -- All CPU values stored in millicores (integer). 1000m = 1 core
 -- All Memory values stored in Mebibytes (integer). 1024Mi = 1Gi
--- Conversion to human-readable format happens at the display layer.
 
 CREATE TABLE IF NOT EXISTS recommendations (
     id                    VARCHAR(36)   PRIMARY KEY,                         -- UUID
     cluster_id            VARCHAR(36)   NOT NULL REFERENCES clusters(id),    -- foreign key → clusters
     status                VARCHAR(20)   NOT NULL DEFAULT 'new_service',      -- new_service | ready
-    namespace             VARCHAR(255)  NOT NULL,                            -- e.g. "payments"
+    namespace             VARCHAR(255)  NOT NULL,                            -- e.g. "payments-ns"
     pod_name              VARCHAR(255)  NOT NULL,                            -- e.g. "payment-api-7d9f"
     container_name        VARCHAR(255)  NOT NULL,                            -- e.g. "payment-api"
     current_cpu_limit     INTEGER       NOT NULL DEFAULT 0,                  -- millicores e.g. 1000

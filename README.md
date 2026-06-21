@@ -113,6 +113,7 @@ That's it. Your cluster starts sending recommendations within minutes.
 - [ ] Recommendation engine
 - [ ] Scheduler (cron-based collection jobs)
 - [ ] Cache layer (Redis)
+- [ ] Token encryption at rest (AES-256)
 - [ ] Central Hub with multi-cluster support
 - [ ] Web Dashboard
 - [ ] Docker image
