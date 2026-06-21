@@ -20,7 +20,7 @@ const (
 type Recommendation struct {
 	ID            string `json:"id"             db:"id"`
 	ClusterID     string `json:"cluster_id"     db:"cluster_id"`
-	Namespace     string `json:"namespace"      db:"namespace"`      // e.g. "payments"
+	Namespace     string `json:"namespace"      db:"namespace"`      // e.g. "payments-ns"
 	PodName       string `json:"pod_name"       db:"pod_name"`       // e.g. "payment-api-7d9f"
 	ContainerName string `json:"container_name" db:"container_name"` // e.g. "payment-api"
 
