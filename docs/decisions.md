@@ -264,6 +264,15 @@ Phase 3 — Ongoing          → Status: ready
           Recommendations updated every N hours as usage evolves.
 ```
 
+**Why only two statuses — `new_service` and `ready`:**
+
+We intentionally kept it simple. Both "brand new service" and "sparse data" tell the customer the same thing — not ready yet. There is no value in showing the customer a third status. Two is enough.
+
+| Status | Meaning |
+|--------|---------|
+| `new_service` | Not enough data yet — recommendation available after 7 days |
+| `ready` | p99 computed — recommendation is available |
+
 **Why `new_service` and not `collecting` or `pending`:**
 
 | Status | Problem |
