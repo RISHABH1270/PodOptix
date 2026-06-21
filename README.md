@@ -99,11 +99,23 @@ That's it. Your cluster starts sending recommendations within minutes.
 ## Roadmap
 
 - [x] Architecture design
+- [x] Technology decisions and trade-offs
+- [x] Project structure and scaffold
+- [x] Data models (Cluster, Recommendation)
+- [x] Config loader (environment variables)
+- [x] Database migrations (PostgreSQL)
+- [x] Database store layer with connection pool
+- [ ] HTTP server (Gin)
+- [ ] REST API endpoints
+- [ ] Auth (JWT)
 - [ ] Prometheus metrics collector (Hub → PromQL API)
 - [ ] p99 computation engine
-- [ ] Recommendation API
+- [ ] Recommendation engine
+- [ ] Scheduler (cron-based collection jobs)
+- [ ] Cache layer (Redis)
 - [ ] Central Hub with multi-cluster support
 - [ ] Web Dashboard
+- [ ] Docker image
 - [ ] Helm chart
 
 ---
