@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: podoptix-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: podoptix
+    ports:
+      - "5432:5432"     # expose to localhost so our app can connect
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # persist data between restarts
+
+  redis:
+    image: redis:7-alpine
+    container_name: podoptix-redis
+    ports:
+      - "6379:6379"     # expose to localhost
+
+volumes:
+  postgres_data:        # named volume — data survives docker compose down

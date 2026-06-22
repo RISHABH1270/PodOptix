@@ -15,7 +15,7 @@ func (s *Store) SaveRecommendation(ctx context.Context, r *models.Recommendation
 			current_cpu_limit, current_mem_limit,
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
-			window, created_at
+			lookback_window, created_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	_, err := s.pool.Exec(ctx, query,
@@ -30,7 +30,7 @@ func (s *Store) SaveRecommendation(ctx context.Context, r *models.Recommendation
 		r.P99Mem,
 		r.RecommendedCPULimit,
 		r.RecommendedMemLimit,
-		r.Window,
+		r.LookbackWindow,
 		r.CreatedAt,
 	)
 	if err != nil {
@@ -47,7 +47,7 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 			current_cpu_limit, current_mem_limit,
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
-			window, created_at
+			lookback_window, created_at
 		FROM recommendations
 		WHERE cluster_id = $1
 		ORDER BY created_at DESC
@@ -73,7 +73,7 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 			&r.P99Mem,
 			&r.RecommendedCPULimit,
 			&r.RecommendedMemLimit,
-			&r.Window,
+			&r.LookbackWindow,
 			&r.CreatedAt,
 		)
 		if err != nil {

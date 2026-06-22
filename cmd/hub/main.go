@@ -6,6 +6,7 @@ import (
 
 	"github.com/RISHABH1270/podoptix/internal/api"
 	"github.com/RISHABH1270/podoptix/internal/config"
+	"github.com/RISHABH1270/podoptix/internal/store"
 )
 
 const (
@@ -25,10 +26,17 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// print banner with real values from config
+	// print banner
 	printBanner(cfg.Port)
 
-	// TODO: connect to PostgreSQL
+	// sync database schema on startup
+	if err = store.SyncSchema(cfg.DatabaseURL); err != nil {
+		log.Fatalf("schema sync failed: %v", err)
+	}
+	fmt.Println(green + "  Database : " + reset + "Schema synced")
+	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
+	fmt.Println()
+
 	// TODO: connect to Redis
 	// TODO: start scheduler
 
@@ -36,8 +44,10 @@ func main() {
 	var server *api.Server
 	server = api.NewServer()
 
-	fmt.Println(green  + "  Status   : " + reset + "Server Running")
-	fmt.Println(green  + "  Listening: " + reset + "port " + cfg.Port)
+	// print final status after all GIN-debug output
+	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
+	fmt.Println(green + "  Status   : " + reset + "Server Running")
+	fmt.Println(green + "  Listening: " + reset + "port " + cfg.Port)
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
 	fmt.Println()
 
@@ -52,9 +62,9 @@ func printBanner(port string) {
 	fmt.Println()
 	fmt.Println(bold + cyan + "  PodOptix" + reset + white + bold + "  —  Kubernetes Resource Right-Sizing  —  Powered by p99" + reset)
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
-	fmt.Println(green  + "  Version  : " + reset + "v0.1.0")
-	fmt.Println(green  + "  Status   : " + reset + "Starting...")
-	fmt.Println(green  + "  Port     : " + reset + port)
+	fmt.Println(green + "  Version  : " + reset + "v0.1.0")
+	fmt.Println(green + "  Status   : " + reset + "Starting...")
+	fmt.Println(green + "  Port     : " + reset + port)
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
 	fmt.Println()
 }

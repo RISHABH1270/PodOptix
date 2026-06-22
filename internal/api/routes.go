@@ -2,7 +2,7 @@ package api
 
 // registerRoutes wires up all HTTP routes to their handler functions.
 func (s *Server) registerRoutes() {
-	
+
 	// health check — used by Kubernetes to know if the app is alive
 	s.router.GET("/healthz", s.handleHealthz)
 
