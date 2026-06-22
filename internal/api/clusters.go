@@ -43,4 +43,3 @@ func (s *Server) deleteCluster(c *gin.Context) {
 		"id":      id,
 	})
 }
-

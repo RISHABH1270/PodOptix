@@ -103,7 +103,7 @@ That's it. Your cluster starts sending recommendations within minutes.
 - [x] Project structure and scaffold
 - [x] Data models (Cluster, Recommendation)
 - [x] Config loader (environment variables)
-- [x] Database migrations (PostgreSQL)
+- [x] Database schema sync (PostgreSQL)
 - [x] Database store layer with connection pool
 - [x] HTTP server (Gin)
 - [ ] REST API endpoints

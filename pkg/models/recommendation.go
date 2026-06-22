@@ -41,6 +41,6 @@ type Recommendation struct {
 	RecommendedCPULimit int `json:"recommended_cpu_limit" db:"recommended_cpu_limit"` // e.g. 241 (millicores)
 	RecommendedMemLimit int `json:"recommended_mem_limit" db:"recommended_mem_limit"` // e.g. 360 (MiB)
 
-	Window    string    `json:"window"     db:"window"`     // data window used e.g. "7d"
-	CreatedAt time.Time `json:"created_at" db:"created_at"` // when this recommendation was generated
+	LookbackWindow string    `json:"lookback_window"     db:"lookback_window"` // data window used e.g. "7d"
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`               // when this recommendation was generated
 }
