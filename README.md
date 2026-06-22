@@ -105,7 +105,7 @@ That's it. Your cluster starts sending recommendations within minutes.
 - [x] Config loader (environment variables)
 - [x] Database migrations (PostgreSQL)
 - [x] Database store layer with connection pool
-- [ ] HTTP server (Gin)
+- [x] HTTP server (Gin)
 - [ ] REST API endpoints
 - [ ] Auth (JWT)
 - [ ] Prometheus metrics collector (Hub → PromQL API)
