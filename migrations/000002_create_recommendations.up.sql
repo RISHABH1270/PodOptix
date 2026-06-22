@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS recommendations (
     p99_mem               FLOAT         NOT NULL DEFAULT 0,                  -- p99 Memory in MiB
     recommended_cpu_limit INTEGER       NOT NULL DEFAULT 0,                  -- millicores e.g. 241
     recommended_mem_limit INTEGER       NOT NULL DEFAULT 0,                  -- MiB e.g. 360
-    lookback_window                VARCHAR(10)   NOT NULL,                            -- data lookback_window e.g. "7d"
+    lookback_window                VARCHAR(10)   NOT NULL,                   -- data lookback_window e.g. "7d"
     created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 

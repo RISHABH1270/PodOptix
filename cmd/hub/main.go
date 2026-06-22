@@ -40,7 +40,7 @@ func main() {
 	// TODO: connect to Redis
 	// TODO: start scheduler
 
-	// create server — GIN-debug output appears here
+	// create and start HTTP server
 	var server *api.Server
 	server = api.NewServer()
 
