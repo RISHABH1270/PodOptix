@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/RISHABH1270/podoptix/internal/api"
 	"github.com/RISHABH1270/podoptix/internal/config"
 )
 
@@ -16,20 +17,34 @@ const (
 )
 
 func main() {
-	
 	// load config first — everything depends on it
-	cfg, err := config.Load()
+	var cfg *config.Config
+	var err error
+	cfg, err = config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// now print banner with real values from config
+	// print banner with real values from config
 	printBanner(cfg.Port)
 
 	// TODO: connect to PostgreSQL
 	// TODO: connect to Redis
 	// TODO: start scheduler
-	// TODO: start HTTP server
+
+	// create and start HTTP server
+	var server *api.Server
+	server = api.NewServer()
+
+	fmt.Println(green  + "  Status   : " + reset + "Server Running")
+	fmt.Println(green  + "  Listening: " + reset + "port " + cfg.Port)
+	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
+	fmt.Println()
+
+	if err = server.Start(cfg.Port); err != nil {
+		fmt.Println("\033[0;31m" + "  ERROR    : Server failed to start — " + err.Error() + reset)
+		log.Fatalf("server failed: %v", err)
+	}
 }
 
 func printBanner(port string) {
