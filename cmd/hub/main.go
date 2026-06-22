@@ -29,20 +29,24 @@ func main() {
 	// print banner
 	printBanner(cfg.Port)
 
-	// sync database schema on startup
+	// sync schema and initialize connection pool
 	if err = store.SyncSchema(cfg.DatabaseURL); err != nil {
 		log.Fatalf("schema sync failed: %v", err)
 	}
-	fmt.Println(green + "  Database : " + reset + "Schema synced")
-	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
-	fmt.Println()
+	var db *store.Store
+	db, err = store.New(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to initialize connection pool: %v", err)
+	}
+	defer db.Close()
+	fmt.Println(green + "  Database : " + reset + "Schema synced · Connection pool ready")
 
 	// TODO: connect to Redis
 	// TODO: start scheduler
 
-	// create and start HTTP server
+	// create and start HTTP server — inject store
 	var server *api.Server
-	server = api.NewServer()
+	server = api.NewServer(db)
 
 	// print final status after all GIN-debug output
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
