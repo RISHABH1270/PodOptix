@@ -29,6 +29,11 @@ func main() {
 	// print banner
 	printBanner(cfg.Port)
 
+	// ensure database exists — creates it if first time
+	if err = store.EnsureDatabase(cfg.DatabaseURL); err != nil {
+		log.Fatalf("failed to ensure database: %v", err)
+	}
+
 	// sync schema and initialize connection pool
 	if err = store.SyncSchema(cfg.DatabaseURL); err != nil {
 		log.Fatalf("schema sync failed: %v", err)

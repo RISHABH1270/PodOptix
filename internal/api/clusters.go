@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -19,29 +20,43 @@ type CreateClusterRequest struct {
 
 // listClusters returns all registered clusters.
 func (s *Server) listClusters(c *gin.Context) {
+	var requestID string
+	requestID = c.GetString("request_id")
+
 	clusters, err := s.store.ListClusters(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch clusters"})
+		log.Printf("ERROR [%s] listClusters: %v", requestID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "No cluster records found",
+			"request_id": requestID,
+		})
 		return
+	}
+	if clusters == nil {
+		clusters = []*models.Cluster{}
 	}
 	c.JSON(http.StatusOK, clusters)
 }
 
 // createCluster registers a new cluster.
 func (s *Server) createCluster(c *gin.Context) {
-	// step 1 — read and validate request body
+	var requestID string
+	requestID = c.GetString("request_id")
+
 	var req CreateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Printf("ERROR [%s] createCluster invalid request: %v", requestID, err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid request — name, prometheus_url and token are required",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// step 2 — default lookback_window to "7d" if not provided
 	if req.LookbackWindow == "" {
 		req.LookbackWindow = "7d"
 	}
 
-	// step 3 — build cluster object
 	var cluster *models.Cluster
 	cluster = &models.Cluster{
 		ID:             uuid.New().String(),
@@ -53,24 +68,33 @@ func (s *Server) createCluster(c *gin.Context) {
 		UpdatedAt:      time.Now(),
 	}
 
-	// step 4 — save to database
 	if err := s.store.SaveCluster(c.Request.Context(), cluster); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save cluster"})
+		log.Printf("ERROR [%s] createCluster save: %v", requestID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to register cluster, please try again",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// step 5 — return the created cluster
 	c.JSON(http.StatusCreated, cluster)
 }
 
 // getCluster returns a single cluster by ID.
 func (s *Server) getCluster(c *gin.Context) {
+	var requestID string
+	requestID = c.GetString("request_id")
+
 	var id string
 	id = c.Param("id")
 
 	cluster, err := s.store.GetCluster(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "cluster not found"})
+		log.Printf("ERROR [%s] getCluster id=%s: %v", requestID, id, err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":      "Cluster not found",
+			"request_id": requestID,
+		})
 		return
 	}
 	c.JSON(http.StatusOK, cluster)
@@ -78,14 +102,20 @@ func (s *Server) getCluster(c *gin.Context) {
 
 // deleteCluster removes a cluster by ID.
 func (s *Server) deleteCluster(c *gin.Context) {
+	var requestID string
+	requestID = c.GetString("request_id")
+
 	var id string
 	id = c.Param("id")
 
 	if err := s.store.DeleteCluster(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete cluster"})
+		log.Printf("ERROR [%s] deleteCluster id=%s: %v", requestID, id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to delete cluster, please try again",
+			"request_id": requestID,
+		})
 		return
 	}
 
-	// 204 No Content — success, nothing to return
 	c.Status(http.StatusNoContent)
 }

@@ -18,6 +18,9 @@ func NewServer(st *store.Store) *Server {
 	var router *gin.Engine
 	router = gin.Default()
 
+	// attach request ID middleware — runs before every request
+	router.Use(RequestIDMiddleware())
+
 	// create the server object with store injected
 	var server *Server
 	server = &Server{

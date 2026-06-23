@@ -8,6 +8,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -47,6 +48,36 @@ func New(databaseURL string) (*Store, error) {
 // Close shuts down the connection pool gracefully.
 func (s *Store) Close() {
 	s.pool.Close()
+}
+
+// EnsureDatabase creates the database if it does not already exist.
+// Connects to the default "postgres" database to run CREATE DATABASE.
+func EnsureDatabase(databaseURL string) error {
+	// extract database name from URL and connect to postgres default db
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return fmt.Errorf("parse database url: %w", err)
+	}
+
+	dbName := cfg.ConnConfig.Database
+	cfg.ConnConfig.Database = "postgres"
+
+	conn, err := pgx.Connect(context.Background(), cfg.ConnConfig.ConnString())
+	if err != nil {
+		return fmt.Errorf("connect to postgres: %w", err)
+	}
+	defer conn.Close(context.Background())
+
+	// create database only if it doesn't exist
+	_, err = conn.Exec(context.Background(), "CREATE DATABASE "+dbName)
+	if err != nil {
+		// ignore "already exists" error — that's fine
+		if err.Error() != "ERROR: database \""+dbName+"\" already exists (SQLSTATE 42P04)" {
+			return fmt.Errorf("create database: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // SyncSchema runs all SQL files from the migrations/ folder on startup.
