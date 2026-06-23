@@ -106,7 +106,7 @@ That's it. Your cluster starts sending recommendations within minutes.
 - [x] Database schema sync (PostgreSQL)
 - [x] Database store layer with connection pool
 - [x] HTTP server (Gin)
-- [ ] REST API endpoints
+- [x] REST API endpoints
 - [ ] Auth (JWT)
 - [ ] Prometheus metrics collector (Hub → PromQL API)
 - [ ] p99 computation engine
