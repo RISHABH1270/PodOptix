@@ -22,7 +22,7 @@ Blueprint for a Kubernetes cluster. Defines what data it holds.
 ```
 Cluster struct (in memory)
 ┌─────────────────────────────────────────────────┐
-│ ClusterID      "a3f8c2d1-9b4e-4f1a-8c3d..."    │  string
+│ ClusterID      "a3f8c2d1-9b4e-4f1a-8c3d..."     │  string
 │ Name           "production-cluster"             │  string
 │ PrometheusURL  "https://prometheus.example.com" │  string
 │ Token          "eyJhbGci..."  (hidden in API)   │  string

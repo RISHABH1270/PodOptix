@@ -19,7 +19,7 @@ func (s *Store) SaveRecommendation(ctx context.Context, r *models.Recommendation
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	_, err := s.pool.Exec(ctx, query,
-		r.ID,
+		r.RecommendationID,
 		r.ClusterID,
 		r.Namespace,
 		r.PodName,
@@ -62,7 +62,7 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 	for rows.Next() {
 		r := &models.Recommendation{}
 		err := rows.Scan(
-			&r.ID,
+			&r.RecommendationID,
 			&r.ClusterID,
 			&r.Namespace,
 			&r.PodName,

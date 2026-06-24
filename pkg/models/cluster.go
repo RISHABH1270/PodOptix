@@ -4,7 +4,7 @@ import "time"
 
 // Cluster represents a registered Kubernetes cluster whose Prometheus endpoint the Hub will query.
 type Cluster struct {
-	ClusterID      string    `json:"cluster_id"     db:"cluster_id"`
+	ClusterID      string    `json:"cluster_id"      db:"cluster_id"`
 	Name           string    `json:"name"            db:"name"`
 	PrometheusURL  string    `json:"prometheus_url"  db:"prometheus_url"`
 	Token          string    `json:"-"               db:"token"`           // never exposed in API response
