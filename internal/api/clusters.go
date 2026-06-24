@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/RISHABH1270/podoptix/pkg/models"
+	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

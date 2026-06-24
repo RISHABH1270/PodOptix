@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/RISHABH1270/podoptix/pkg/models"
+	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
 // SaveRecommendation inserts a new recommendation into the database.

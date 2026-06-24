@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/RISHABH1270/podoptix/internal/store"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/jackc/pgx/v5"
 )
 

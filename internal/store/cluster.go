@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/RISHABH1270/podoptix/pkg/models"
+	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
 // SaveCluster inserts a new cluster into the database.
@@ -15,7 +15,7 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 	_, err := s.pool.Exec(ctx, query,
-		c.ID,
+		c.ClusterID,
 		c.Name,
 		c.PrometheusURL,
 		c.Token,
@@ -40,7 +40,7 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 
 	c := &models.Cluster{}
 	err := row.Scan(
-		&c.ID,
+		&c.ClusterID,
 		&c.Name,
 		&c.PrometheusURL,
 		&c.Token,
@@ -71,7 +71,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	for rows.Next() {
 		c := &models.Cluster{}
 		err := rows.Scan(
-			&c.ID,
+			&c.ClusterID,
 			&c.Name,
 			&c.PrometheusURL,
 			&c.Token,
@@ -110,7 +110,7 @@ func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 		c.Token,
 		c.LookbackWindow,
 		time.Now(),
-		c.ID,
+		c.ClusterID,
 	)
 	if err != nil {
 		return fmt.Errorf("update cluster: %w", err)

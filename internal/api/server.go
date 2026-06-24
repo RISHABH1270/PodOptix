@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/RISHABH1270/podoptix/internal/store"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/gin-gonic/gin"
 )
 

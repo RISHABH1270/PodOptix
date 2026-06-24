@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/RISHABH1270/podoptix/internal/api"
-	"github.com/RISHABH1270/podoptix/internal/config"
-	"github.com/RISHABH1270/podoptix/internal/store"
+	"github.com/RISHABH1270/PodOptix/internal/api"
+	"github.com/RISHABH1270/PodOptix/internal/config"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 )
 
 const (
