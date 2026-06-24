@@ -11,7 +11,7 @@ import (
 // SaveCluster inserts a new cluster into the database.
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
-		INSERT INTO clusters (id, name, prometheus_url, token, lookback_window, created_at, updated_at)
+		INSERT INTO clusters (cluster_id, name, prometheus_url, token, lookback_window, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 	_, err := s.pool.Exec(ctx, query,
@@ -32,9 +32,9 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 // GetCluster fetches a single cluster by its ID.
 func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, error) {
 	query := `
-		SELECT id, name, prometheus_url, token, lookback_window, created_at, updated_at
+		SELECT cluster_id, name, prometheus_url, token, lookback_window, created_at, updated_at
 		FROM clusters
-		WHERE id = $1
+		WHERE cluster_id = $1
 	`
 	row := s.pool.QueryRow(ctx, query, id)
 
@@ -57,7 +57,7 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 // ListClusters fetches all registered clusters.
 func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	query := `
-		SELECT id, name, prometheus_url, token, lookback_window, created_at, updated_at
+		SELECT cluster_id, name, prometheus_url, token, lookback_window, created_at, updated_at
 		FROM clusters
 		ORDER BY created_at DESC
 	`
@@ -89,7 +89,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 
 // DeleteCluster removes a cluster by its ID.
 func (s *Store) DeleteCluster(ctx context.Context, id string) error {
-	query := `DELETE FROM clusters WHERE id = $1`
+	query := `DELETE FROM clusters WHERE cluster_id = $1`
 	_, err := s.pool.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("delete cluster: %w", err)
@@ -102,7 +102,7 @@ func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
 		UPDATE clusters
 		SET name = $1, prometheus_url = $2, token = $3, lookback_window = $4, updated_at = $5
-		WHERE id = $6
+		WHERE cluster_id = $6
 	`
 	_, err := s.pool.Exec(ctx, query,
 		c.Name,

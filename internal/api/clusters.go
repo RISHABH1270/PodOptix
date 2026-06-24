@@ -59,7 +59,7 @@ func (s *Server) createCluster(c *gin.Context) {
 
 	var cluster *models.Cluster
 	cluster = &models.Cluster{
-		ID:             uuid.New().String(),
+		ClusterID:      uuid.New().String(),
 		Name:           req.Name,
 		PrometheusURL:  req.PrometheusURL,
 		Token:          req.Token,
