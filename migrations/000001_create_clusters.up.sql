@@ -1,7 +1,7 @@
 -- Migration 001: Create clusters table
 
 CREATE TABLE IF NOT EXISTS clusters (
-    id              VARCHAR(36)  PRIMARY KEY,                -- UUID
+    cluster_id      VARCHAR(36)  PRIMARY KEY,                -- UUID
     name            VARCHAR(255) NOT NULL UNIQUE,            -- human-readable name
     prometheus_url  VARCHAR(500) NOT NULL,                   -- Prometheus HTTP endpoint
     token           TEXT         NOT NULL,                   -- encrypted auth token

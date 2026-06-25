@@ -2,14 +2,11 @@ package models
 
 import "time"
 
-// Recommendation status values
-const (
-	StatusNewService = "new_service" // not enough data yet — check back after 7 days
-	StatusReady      = "ready"       // p99 computed — recommendation is available
-)
+const StatusNewService = "new_service" // not enough data yet — check back after 7 days
+const StatusReady = "ready"            // p99 computed — recommendation is available
 
 // Recommendation represents a resource limit recommendation for a single container.
-// One pod with 3 containers = 3 separate recommendations.
+// One row per container — updated in place every day by the scheduler.
 // CPU stored in millicores (1000m = 1 core), Memory in MiB (1024Mi = 1Gi).
 type Recommendation struct {
 	RecommendationID string `json:"recommendation_id" db:"recommendation_id"`
@@ -29,5 +26,6 @@ type Recommendation struct {
 	RecommendedMemLimit int `json:"recommended_mem_limit" db:"recommended_mem_limit"` // p99 x 2
 
 	LookbackWindow string    `json:"lookback_window" db:"lookback_window"`
-	CreatedAt      time.Time `json:"created_at"      db:"created_at"`
+	CreatedAt      time.Time `json:"created_at"      db:"created_at"`  // when first generated
+	UpdatedAt      time.Time `json:"updated_at"      db:"updated_at"`  // last recalculated
 }

@@ -369,3 +369,31 @@ PostgreSQL builds a sorted B-Tree structure behind the scenes. Finding any `clus
 | Storage | Less | Slightly more |
 
 We index `cluster_id` because it is the primary filter in every dashboard query. The read performance gain far outweighs the minor write overhead.
+
+---
+
+## 15. Recommendation Storage Strategy — UPSERT not INSERT
+
+### Decision: **One row per container, updated in place daily**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **UPSERT — one row per container** ✅ | Always one current recommendation per container · Clean dashboard · No confusion | No history |
+| INSERT new row every run | Full history of every recommendation | After 360 days — 52 rows per container. User can't tell which to apply |
+
+**The problem with INSERT every run:**
+A pod running for 360 days with a daily scheduler = 360 recommendation rows per container. The user opens the dashboard and sees hundreds of rows with no clear indication which is the latest and correct one to apply.
+
+**The fix — UPSERT:**
+```sql
+ON CONFLICT (cluster_id, namespace, pod_name, container_name)
+DO UPDATE SET p99_cpu = EXCLUDED.p99_cpu, updated_at = EXCLUDED.updated_at ...
+```
+
+One row per container, always showing the latest values. `updated_at` shows when it was last recalculated.
+
+**Scheduler frequency:** Once per day. Balances freshness of data with Prometheus query load.
+
+**Two triggers for recalculation:**
+1. **Automatic** — scheduler runs once per day for all clusters
+2. **Manual** — "Recalculate" button in dashboard for on-demand refresh

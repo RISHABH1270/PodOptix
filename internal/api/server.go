@@ -11,14 +11,13 @@ type Server struct {
 	store  *store.Store // database connection injected from main
 }
 
-// NewServer creates a new HTTP server and registers all routes.
-// store is injected from main.go — server does not create its own connection.
+// Constructor - NewServer creates a new HTTP server and registers all routes.
 func NewServer(st *store.Store) *Server {
 	// create a new gin router
 	var router *gin.Engine
 	router = gin.Default()
 
-	// attach request ID middleware — runs before every request
+	// attach request ID middleware
 	router.Use(RequestIDMiddleware())
 
 	// create the server object with store injected

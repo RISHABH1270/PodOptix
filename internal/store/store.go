@@ -13,12 +13,11 @@ import (
 )
 
 // Store holds the PostgreSQL connection pool.
-// All database operations go through this.
 type Store struct {
 	pool *pgxpool.Pool
 }
 
-// New connects to PostgreSQL and returns a Store with a connection pool.
+// Constructor - New connects to PostgreSQL and returns a Store with a connection pool.
 func New(databaseURL string) (*Store, error) {
 	// configure the connection pool
 	config, err := pgxpool.ParseConfig(databaseURL)
@@ -26,8 +25,8 @@ func New(databaseURL string) (*Store, error) {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
 
-	config.MaxConns = 10                      // max 10 connections open at once
-	config.MinConns = 2                       // always keep 2 connections ready
+	config.MaxConns = 10                      
+	config.MinConns = 2                       
 	config.MaxConnLifetime = time.Hour        // refresh connections after 1 hour
 	config.MaxConnIdleTime = 30 * time.Minute // close idle connections after 30 min
 
@@ -51,14 +50,14 @@ func (s *Store) Close() {
 }
 
 // EnsureDatabase creates the database if it does not already exist.
-// Connects to the default "postgres" database to run CREATE DATABASE.
 func EnsureDatabase(databaseURL string) error {
 	// extract database name from URL and connect to postgres default db
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return fmt.Errorf("parse database url: %w", err)
 	}
-
+    
+	// reads it from the DATABASE_URL in .env
 	dbName := cfg.ConnConfig.Database
 	cfg.ConnConfig.Database = "postgres"
 
@@ -80,8 +79,7 @@ func EnsureDatabase(databaseURL string) error {
 	return nil
 }
 
-// SyncSchema runs all SQL files from the migrations/ folder on startup.
-// Safe to run multiple times — skips already applied schemas (IF NOT EXISTS).
+// SyncSchema runs all SQL files from the migrations/ folder on startup (IF NOT EXISTS).
 // If the database is in a dirty state from a previous failed run, it auto-fixes it.
 func SyncSchema(databaseURL string) error {
 	var m *migrate.Migrate
