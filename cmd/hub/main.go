@@ -29,15 +29,17 @@ func main() {
 	// print banner
 	printBanner(cfg.Port)
 
-	// ensure database exists — creates it if first time
+	// step 1 — ensure database exists
 	if err = store.EnsureDatabase(cfg.DatabaseURL); err != nil {
 		log.Fatalf("failed to ensure database: %v", err)
 	}
 
-	// sync schema and initialize connection pool
+	// step 2 — sync schema (run migrations)
 	if err = store.SyncSchema(cfg.DatabaseURL); err != nil {
 		log.Fatalf("schema sync failed: %v", err)
 	}
+
+	// step 3 — open permanent connection pool
 	var db *store.Store
 	db, err = store.New(cfg.DatabaseURL)
 	if err != nil {
@@ -53,13 +55,7 @@ func main() {
 	var server *api.Server
 	server = api.NewServer(db)
 
-	// print final status after all GIN-debug output
-	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
-	fmt.Println(green + "  Status   : " + reset + "Server Running")
-	fmt.Println(green + "  Listening: " + reset + "port " + cfg.Port)
-	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
-	fmt.Println()
-
+	// start server — blocks here until stopped or error
 	if err = server.Start(cfg.Port); err != nil {
 		fmt.Println("\033[0;31m" + "  ERROR    : Server failed to start — " + err.Error() + reset)
 		log.Fatalf("server failed: %v", err)
