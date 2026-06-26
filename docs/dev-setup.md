@@ -6,15 +6,13 @@ Everything you need to go from zero to a running local development environment.
 
 ## Prerequisites
 
-Make sure you have the following installed before starting:
-
 | Tool | Version | Install |
 |------|---------|---------|
-| Go | 1.23+ | `brew install go` |
+| Go | 1.26.4+ | `brew install go` |
 | Docker | 28+ | [docker.com/get-started](https://www.docker.com/get-started) |
 | Git | Any | `brew install git` |
 
-Verify installations:
+Verify:
 ```bash
 go version
 docker --version
@@ -28,6 +26,7 @@ git --version
 ```bash
 git clone https://github.com/RISHABH1270/PodOptix.git
 cd PodOptix
+git checkout development
 ```
 
 ---
@@ -46,8 +45,17 @@ go mod download
 cp .env.example .env
 ```
 
-The default values in `.env` are already configured to work with the local Docker setup.
-No changes needed for local development.
+Default values already match the local Docker setup — no changes needed for local development.
+
+`.env` contents:
+```
+PORT=8080
+DATABASE_URL=postgres://postgres:password@localhost:5432/podoptix?sslmode=disable
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=my-local-dev-secret-key
+```
+
+`.env` is in `.gitignore` — never committed to Git.
 
 ---
 
@@ -57,11 +65,11 @@ No changes needed for local development.
 docker compose up -d
 ```
 
-This starts:
-- **PostgreSQL** on port `5432`
-- **Redis** on port `6379`
+Starts:
+- **PostgreSQL** on port `5432` (container: `podoptix-db`)
+- **Redis** on port `6379` (container: `podoptix-redis`)
 
-Verify both are running:
+Verify:
 ```bash
 docker ps
 ```
@@ -74,11 +82,11 @@ docker ps
 export $(cat .env | xargs) && go run ./cmd/hub
 ```
 
-The app will automatically:
-1. Create the database if it does not exist
-2. Sync the database schema (run migrations)
-3. Initialize the connection pool
-4. Start the HTTP server on port `8080`
+The app automatically:
+1. Creates the `podoptix` database if it does not exist
+2. Syncs database schema (runs migrations)
+3. Initializes connection pool
+4. Starts HTTP server on port `8080`
 
 Expected output:
 ```
@@ -98,15 +106,11 @@ Expected output:
 
 ---
 
-## Step 6 — Verify the Server
+## Step 6 — Verify
 
 ```bash
 curl http://localhost:8080/healthz
-```
-
-Expected response:
-```json
-{"status":"ok"}
+# {"status":"ok"}
 ```
 
 ---
@@ -128,9 +132,9 @@ Expected response:
 curl -X POST http://localhost:8080/api/v1/clusters \
   -H "Content-Type: application/json" \
   -d '{
-    "name":           "production-cluster",
-    "prometheus_url": "https://prometheus.example.com",
-    "token":          "your-prometheus-token",
+    "name":            "production-cluster",
+    "prometheus_url":  "https://prometheus.example.com",
+    "token":           "your-prometheus-token",
     "lookback_window": "7d"
   }'
 ```
@@ -139,13 +143,13 @@ curl -X POST http://localhost:8080/api/v1/clusters \
 
 ## Running Tests
 
-Tests create and destroy their own isolated database automatically — no manual setup needed.
+Tests auto-create and destroy their own isolated database — no manual setup needed.
 
 ```bash
 go test ./internal/api/ -v
 ```
 
-Run all tests across the project:
+Run all tests:
 ```bash
 go test ./...
 ```
@@ -156,13 +160,13 @@ go test ./...
 
 | Command | Description |
 |---------|-------------|
-| `go run ./cmd/hub` | Run the app locally |
+| `go run ./cmd/hub` | Run the app |
 | `go build ./...` | Build all packages |
 | `go test ./...` | Run all tests |
 | `go fmt ./...` | Format all Go files |
 | `docker compose up -d` | Start PostgreSQL + Redis |
-| `docker compose down` | Stop all containers |
-| `docker compose down -v` | Stop containers and delete all data |
+| `docker compose down` | Stop containers |
+| `docker compose down -v` | Stop containers and wipe all data |
 | `docker ps` | Check running containers |
 
 ---
@@ -171,21 +175,17 @@ go test ./...
 
 ```
 PodOptix/
-├── cmd/hub/            ← app entry point (main.go)
+├── cmd/hub/            ← entry point (main.go)
 ├── internal/
-│   ├── api/            ← HTTP server, routes, handlers
+│   ├── api/            ← HTTP server, routes, handlers, middleware, tests
 │   ├── config/         ← environment variable loading
-│   ├── store/          ← database layer (PostgreSQL)
-│   ├── collector/      ← Prometheus PromQL queries (coming soon)
-│   ├── compute/        ← p99 computation engine (coming soon)
-│   └── recommender/    ← recommendation engine (coming soon)
-├── pkg/models/         ← shared data models
-├── migrations/         ← SQL schema files
-├── deploy/helm/        ← Helm chart (coming soon)
-├── docs/               ← architecture, decisions, best practices
+│   └── store/          ← PostgreSQL layer (CRUD, migrations, connection pool)
+├── pkg/models/         ← shared data models (Cluster, Recommendation)
+├── migrations/         ← SQL schema files (*.up.sql)
+├── docs/               ← architecture, decisions, best practices, dev setup
 ├── docker-compose.yml  ← local PostgreSQL + Redis
 ├── .env.example        ← environment variable template
-└── go.mod              ← Go module dependencies
+└── go.mod              ← Go module (equivalent of package.json)
 ```
 
 ---
@@ -194,21 +194,20 @@ PodOptix/
 
 **Port 8080 already in use:**
 ```bash
-lsof -i :8080          # find what is using the port
-kill -9 <PID>          # kill it
+lsof -i :8080
+kill -9 <PID>
 ```
 
 **Database connection refused:**
 ```bash
-docker ps              # check if PostgreSQL container is running
-docker compose up -d   # start it if not running
+docker ps
+docker compose up -d
 ```
 
 **Schema sync failed — dirty database:**
 ```bash
 docker exec -it podoptix-db psql -U postgres -d podoptix \
   -c "DROP TABLE IF EXISTS schema_migrations;"
-# then restart the app
 ```
 
 **Environment variables not loaded:**

@@ -81,18 +81,18 @@ From there, the Hub connects directly to each cluster's Prometheus HTTP API, run
 ## Quick Start
 
 ```bash
-# Install the PodOptix agent in your cluster
+# Deploy PodOptix Hub in your management / ops cluster
 helm repo add podoptix https://charts.podoptix.io
 helm repo update
 
-helm install podoptix podoptix/agent \
+helm install podoptix podoptix/hub \
   --namespace podoptix \
   --create-namespace \
-  --set hub.url=<your-hub-url> \
-  --set hub.token=<your-token>
+  --set db.url=<postgresql-url> \
+  --set redis.url=<redis-url>
 ```
 
-That's it. Your cluster starts sending recommendations within minutes.
+That's it. Register your workload clusters via the dashboard and recommendations start appearing within 24 hours.
 
 ---
 
