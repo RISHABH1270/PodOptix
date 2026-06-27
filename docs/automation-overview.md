@@ -142,6 +142,74 @@ If assertion fails → test fails with a clear message showing expected vs actua
 
 ---
 
+## `health_test.go` — Walkthrough
+
+Simplest test — one request, two assertions.
+
+```
+req  = fake GET /healthz (no body)
+w    = response recorder (captures status + body)
+ServeHTTP → runs full Gin pipeline: middleware → handleHealthz → w
+
+assert status = 200
+assert body contains "status":"ok"
+```
+
+---
+
+## `clusters_test.go` — Walkthrough
+
+Every test follows the **AAA pattern** — Arrange → Act → Assert.
+
+**`TestCreateCluster`**
+```
+Arrange → build JSON body with name, prometheus_url, token
+Act     → POST /api/v1/clusters with Content-Type: application/json
+Assert  → status 201, body contains cluster name and URL
+```
+
+**`TestCreateCluster_MissingFields`**
+```
+Arrange → JSON with only name (missing prometheus_url and token)
+Act     → POST /api/v1/clusters
+Assert  → status 400 (binding:"required" validation caught it)
+```
+
+**`TestGetCluster`** — two-step test
+```
+Step 1 → CREATE a cluster, extract the real UUID from response
+         json.Unmarshal parses JSON → created["id"].(string) reads id field
+         t.Fatalf stops test immediately if create failed
+
+Step 2 → GET /api/v1/clusters/{real-id}
+         Assert status 200, body contains cluster name
+```
+
+**`TestGetCluster_NotFound`**
+```
+Act    → GET /api/v1/clusters/non-existent-id
+Assert → status 404, body contains "Cluster not found"
+```
+
+**`TestDeleteCluster`** — three-step test
+```
+Step 1 → CREATE a cluster, extract real UUID
+Step 2 → DELETE /api/v1/clusters/{id}
+         Assert status 204 (no content — success, nothing to return)
+Step 3 → GET /api/v1/clusters/{id}
+         Assert status 404 — confirms data is actually gone from DB
+         (204 only means the query ran, GET after confirms it really deleted)
+```
+
+**Key patterns:**
+- `bytes.NewBufferString(body)` — converts string to readable stream for request body
+- `req.Header.Set("Content-Type", "application/json")` — tells Gin to parse body as JSON
+- `json.Unmarshal(w.Body.Bytes(), &map)` — parses JSON response into Go map
+- `.(string)` — type assertion: reads map value as string
+- `t.Fatalf` — fails test immediately, stops execution (unlike `assert` which continues)
+
+---
+
 ## Integration vs E2E
 
 | | Integration tests (current) | E2E tests (planned) |
