@@ -372,6 +372,38 @@ We index `cluster_id` because it is the primary filter in every dashboard query.
 
 ---
 
+## 16. Database Migration Strategy
+
+### Decision: **Never edit existing migration files after production deployment**
+
+| Situation | Action | Why |
+|-----------|--------|-----|
+| Before first production deployment | Edit migration files freely, drop and recreate local DB | No real data exists — nothing is lost |
+| After first production deployment | Add a new `ALTER TABLE` migration file | Real customer data exists — cannot drop or re-run |
+
+**Before production (development phase):**
+Migration files can be edited and the local database dropped and recreated safely. No customer data exists so nothing is lost. This is the correct approach during active development.
+
+```bash
+# reset local database after editing a migration file
+docker exec -it podoptix-db psql -U postgres \
+  -c "DROP DATABASE podoptix WITH (FORCE); CREATE DATABASE podoptix;"
+```
+
+**After production deployment:**
+Never touch existing migration files. Every schema change requires a new numbered migration file:
+
+```sql
+-- 000003_rename_columns.up.sql
+ALTER TABLE clusters RENAME COLUMN id TO cluster_id;
+```
+
+`SyncSchema` tracks which files already ran in the `schema_migrations` table. It skips already-applied migrations — editing an old file has no effect on an existing database.
+
+**The real cost:** `ALTER TABLE` in production runs against a live table with real data. For large tables this can be slow. The cost is unavoidable — even AWS, Stripe, and Google pay this cost for every schema change in production. This is why getting the schema right before the first deployment matters.
+
+---
+
 ## 15. Recommendation Storage Strategy — UPSERT not INSERT
 
 ### Decision: **One row per container, updated in place daily**
