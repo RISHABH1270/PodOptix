@@ -1,6 +1,9 @@
 package api
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/gin-gonic/gin"
 )
@@ -33,8 +36,17 @@ func NewServer(st *store.Store) *Server {
 	return server
 }
 
-// Start begins listening for incoming HTTP requests on the given port.
-// This is a blocking call — the app stays running here until stopped.
-func (s *Server) Start(port string) error {
-	return s.router.Run(":" + port)
+// Listen binds the TCP port. Returns the listener if successful.
+func (s *Server) Listen(port string) (net.Listener, error) {
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return nil, fmt.Errorf("bind port %s: %w", port, err)
+	}
+	return listener, nil
+}
+
+// Serve starts accepting HTTP requests on the given listener.
+// Blocking call — returns only on error.
+func (s *Server) Serve(listener net.Listener) error {
+	return s.router.RunListener(listener)
 }

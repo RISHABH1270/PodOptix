@@ -45,7 +45,12 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+
+	// connects to PostgreSQL itself - the default "postgres" database 
+	// You can't drop a database while you're connected to it
 	adminURL := "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
+
+	// connects to our test database - podoptix_test
 	testDBURL := "postgres://postgres:password@localhost:5432/podoptix_test?sslmode=disable"
 
 	// drop and recreate test DB — clean slate every run

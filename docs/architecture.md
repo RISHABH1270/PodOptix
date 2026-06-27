@@ -118,7 +118,7 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops clus
 │  │   │        Database        │     │         Cache          │   │  │
 │  │   │  · clusters            │     │  · PromQL results      │   │  │
 │  │   │  · recommendations     │     │  · TTL: 1 hr           │   │  │
-│  │   │  · recommendations     │     │                        │   │  │
+│  │   │                        │     │                        │   │  │
 │  │   └────────────────────────┘     └────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
