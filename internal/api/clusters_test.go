@@ -73,7 +73,7 @@ func TestGetCluster(t *testing.T) {
 	// extract the id from the create response
 	var created map[string]any
 	json.Unmarshal(createW.Body.Bytes(), &created)
-	id, ok := created["id"].(string)
+	id, ok := created["cluster_id"].(string)
 	if !ok {
 		t.Fatalf("create cluster failed: %s", createW.Body.String())
 	}
@@ -116,7 +116,7 @@ func TestDeleteCluster(t *testing.T) {
 	// extract the id
 	var created map[string]any
 	json.Unmarshal(createW.Body.Bytes(), &created)
-	id, ok := created["id"].(string)
+	id, ok := created["cluster_id"].(string)
 	if !ok {
 		t.Fatalf("create cluster failed: %s", createW.Body.String())
 	}

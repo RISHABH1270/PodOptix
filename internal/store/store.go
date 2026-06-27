@@ -25,8 +25,8 @@ func New(databaseURL string) (*Store, error) {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
 
-	config.MaxConns = 10                      
-	config.MinConns = 2                       
+	config.MaxConns = 10
+	config.MinConns = 2
 	config.MaxConnLifetime = time.Hour        // refresh connections after 1 hour
 	config.MaxConnIdleTime = 30 * time.Minute // close idle connections after 30 min
 
@@ -56,7 +56,7 @@ func EnsureDatabase(databaseURL string) error {
 	if err != nil {
 		return fmt.Errorf("parse database url: %w", err)
 	}
-    
+
 	// reads it from the DATABASE_URL in .env
 	dbName := cfg.ConnConfig.Database
 	cfg.ConnConfig.Database = "postgres"

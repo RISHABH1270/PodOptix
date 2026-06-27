@@ -23,7 +23,7 @@ type testCounter struct {
 	failed int
 }
 
-// trackTest registers a test for counting — call at the start of every test
+// trackTest registers a test for counting and prints its name when it starts.
 func trackTest(t *testing.T) {
 	counter.mu.Lock()
 	counter.total++
@@ -46,7 +46,7 @@ func init() {
 
 func TestMain(m *testing.M) {
 
-	// connects to PostgreSQL itself - the default "postgres" database 
+	// connects to PostgreSQL itself - the default "postgres" database
 	// You can't drop a database while you're connected to it
 	adminURL := "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
 

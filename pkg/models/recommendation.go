@@ -26,6 +26,6 @@ type Recommendation struct {
 	RecommendedMemLimit int `json:"recommended_mem_limit" db:"recommended_mem_limit"` // p99 x 2
 
 	LookbackWindow string    `json:"lookback_window" db:"lookback_window"`
-	CreatedAt      time.Time `json:"created_at"      db:"created_at"`  // when first generated
-	UpdatedAt      time.Time `json:"updated_at"      db:"updated_at"`  // last recalculated
+	CreatedAt      time.Time `json:"created_at"      db:"created_at"` // when first generated
+	UpdatedAt      time.Time `json:"updated_at"      db:"updated_at"` // last recalculated
 }
