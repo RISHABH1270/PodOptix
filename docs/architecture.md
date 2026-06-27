@@ -164,7 +164,7 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops clus
 |-----------|-------------|
 | **Web Dashboard** | UI to view recommendations per cluster, namespace, and pod |
 | **REST API Server** | HTTP server — CRUD for clusters, serve recommendations as JSON or YAML |
-| **Auth Service** | JWT-based user auth for dashboard · API token auth per cluster |
+| **Auth Service** | User registration + login · bcrypt password hashing · JWT token issuance · middleware verifies all `/api/v1/*` requests |
 | **Cluster Registry** | Stores Prometheus endpoint URLs and encrypted auth tokens |
 | **Scheduler** | Cron-based job runner — triggers data collection per cluster on a schedule |
 | **PromQL Engine** | Queries Prometheus `/api/v1/query_range` with PromQL expressions |

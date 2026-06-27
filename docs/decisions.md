@@ -429,3 +429,67 @@ One row per container, always showing the latest values. `updated_at` shows when
 **Two triggers for recalculation:**
 1. **Automatic** — scheduler runs once per day for all clusters
 2. **Manual** — "Recalculate" button in dashboard for on-demand refresh
+
+---
+
+## 17. Authentication — JWT (JSON Web Token)
+
+### Decision: **JWT for user authentication**
+
+**Problem JWT solves:**
+Without auth — any anonymous request can create, delete or read clusters. In production this is a critical security issue.
+
+**Why not username + password on every request:**
+- Hits the database on every API call — slow
+- Sending passwords repeatedly over the wire — risky
+- Does not scale across multiple services
+
+**How JWT works:**
+```
+Step 1  POST /auth/login { email, password }
+        Server verifies credentials → issues JWT token (24hr expiry)
+
+Step 2  GET /api/v1/clusters
+        Authorization: Bearer eyJhbGci...
+        Server verifies signature (no database hit) → allows request
+
+Step 3  GET /api/v1/clusters (no token or expired)
+        → 401 Unauthorized
+```
+
+**Why no database hit on every request:**
+```
+Signature = HMAC-SHA256(header + payload, JWT_SECRET)
+```
+The signature is mathematically tied to the payload and the secret. Server verifies by recomputing — if they match, token is valid. No database needed.
+
+**Why forging is impossible:**
+If an attacker modifies the payload, the signature no longer matches. To forge a new valid signature they need `JWT_SECRET` — which only exists on the server, never exposed.
+
+```
+Attacker modifies payload → recomputes signature without secret → MISMATCH → rejected
+```
+
+**Risks and mitigations:**
+
+| Risk | Mitigation |
+|------|-----------|
+| Token stolen (network) | Always use HTTPS — token safe over TLS |
+| Token stolen from client | Short expiry (24 hrs) — expires automatically |
+| `JWT_SECRET` leaked | Rotate secret immediately — all tokens invalidated |
+
+**`JWT_SECRET` rules:** 32+ random characters · never logged · never committed to Git · stored as Kubernetes Secret in production
+
+**User storage — Option B (chosen):** Full user table in PostgreSQL. Supports multiple users, proper registration and login. Passwords stored as bcrypt hashes — one-way function, cannot be reversed even if database is stolen.
+
+```
+POST /auth/register { email, password } → hash password → store user → return token
+POST /auth/login    { email, password } → fetch user → verify hash → return token
+GET  /api/v1/*      Authorization: Bearer <token> → JWT middleware verifies → allow
+```
+
+**Why bcrypt for passwords:**
+- One-way hash — impossible to reverse
+- Built-in salt — same password produces different hashes each time
+- Deliberately slow — makes brute force attacks impractical
+- Industry standard used by every major platform
