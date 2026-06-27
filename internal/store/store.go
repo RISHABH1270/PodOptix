@@ -51,26 +51,30 @@ func (s *Store) Close() {
 
 // EnsureDatabase creates the database if it does not already exist.
 func EnsureDatabase(databaseURL string) error {
-	// extract database name from URL and connect to postgres default db
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return fmt.Errorf("parse database url: %w", err)
 	}
 
-	// reads it from the DATABASE_URL in .env
 	dbName := cfg.ConnConfig.Database
-	cfg.ConnConfig.Database = "postgres"
 
-	conn, err := pgx.Connect(context.Background(), cfg.ConnConfig.ConnString())
+	// build admin URL pointing to default "postgres" database
+	adminURL := fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=disable",
+		cfg.ConnConfig.User,
+		cfg.ConnConfig.Password,
+		cfg.ConnConfig.Host,
+		cfg.ConnConfig.Port,
+	)
+
+	conn, err := pgx.Connect(context.Background(), adminURL)
 	if err != nil {
 		return fmt.Errorf("connect to postgres: %w", err)
 	}
 	defer conn.Close(context.Background())
 
-	// create database only if it doesn't exist
 	_, err = conn.Exec(context.Background(), "CREATE DATABASE "+dbName)
 	if err != nil {
-		// ignore "already exists" error — that's fine
+		// ignore "already exists" — that's fine
 		if err.Error() != "ERROR: database \""+dbName+"\" already exists (SQLSTATE 42P04)" {
 			return fmt.Errorf("create database: %w", err)
 		}
