@@ -4,26 +4,38 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/RISHABH1270/podoptix/pkg/models"
+	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
-// SaveRecommendation inserts a new recommendation into the database.
-func (s *Store) SaveRecommendation(ctx context.Context, r *models.Recommendation) error {
+// UpsertRecommendation inserts a new recommendation or updates the existing one.
+// One row per container — updated in place every time the scheduler runs.
+func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendation) error {
 	query := `
 		INSERT INTO recommendations (
-			id, cluster_id, namespace, pod_name, container_name,
-			current_cpu_limit, current_mem_limit,
+			recommendation_id, cluster_id, namespace, pod_name, container_name,
+			status, current_cpu_limit, current_mem_limit,
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
-			lookback_window, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			lookback_window, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		ON CONFLICT (cluster_id, namespace, pod_name, container_name)
+		DO UPDATE SET
+			status                = EXCLUDED.status,
+			current_cpu_limit     = EXCLUDED.current_cpu_limit,
+			current_mem_limit     = EXCLUDED.current_mem_limit,
+			p99_cpu               = EXCLUDED.p99_cpu,
+			p99_mem               = EXCLUDED.p99_mem,
+			recommended_cpu_limit = EXCLUDED.recommended_cpu_limit,
+			recommended_mem_limit = EXCLUDED.recommended_mem_limit,
+			updated_at            = EXCLUDED.updated_at
 	`
 	_, err := s.pool.Exec(ctx, query,
-		r.ID,
+		r.RecommendationID,
 		r.ClusterID,
 		r.Namespace,
 		r.PodName,
 		r.ContainerName,
+		r.Status,
 		r.CurrentCPULimit,
 		r.CurrentMemLimit,
 		r.P99CPU,
@@ -32,9 +44,10 @@ func (s *Store) SaveRecommendation(ctx context.Context, r *models.Recommendation
 		r.RecommendedMemLimit,
 		r.LookbackWindow,
 		r.CreatedAt,
+		r.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("save recommendation: %w", err)
+		return fmt.Errorf("upsert recommendation: %w", err)
 	}
 	return nil
 }
@@ -43,14 +56,14 @@ func (s *Store) SaveRecommendation(ctx context.Context, r *models.Recommendation
 func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.Recommendation, error) {
 	query := `
 		SELECT
-			id, cluster_id, namespace, pod_name, container_name,
-			current_cpu_limit, current_mem_limit,
+			recommendation_id, cluster_id, namespace, pod_name, container_name,
+			status, current_cpu_limit, current_mem_limit,
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
-			lookback_window, created_at
+			lookback_window, created_at, updated_at
 		FROM recommendations
 		WHERE cluster_id = $1
-		ORDER BY created_at DESC
+		ORDER BY namespace, pod_name, container_name
 	`
 	rows, err := s.pool.Query(ctx, query, clusterID)
 	if err != nil {
@@ -62,11 +75,12 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 	for rows.Next() {
 		r := &models.Recommendation{}
 		err := rows.Scan(
-			&r.ID,
+			&r.RecommendationID,
 			&r.ClusterID,
 			&r.Namespace,
 			&r.PodName,
 			&r.ContainerName,
+			&r.Status,
 			&r.CurrentCPULimit,
 			&r.CurrentMemLimit,
 			&r.P99CPU,
@@ -75,6 +89,7 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 			&r.RecommendedMemLimit,
 			&r.LookbackWindow,
 			&r.CreatedAt,
+			&r.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan recommendation: %w", err)

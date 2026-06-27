@@ -369,3 +369,63 @@ PostgreSQL builds a sorted B-Tree structure behind the scenes. Finding any `clus
 | Storage | Less | Slightly more |
 
 We index `cluster_id` because it is the primary filter in every dashboard query. The read performance gain far outweighs the minor write overhead.
+
+---
+
+## 16. Database Migration Strategy
+
+### Decision: **Never edit existing migration files after production deployment**
+
+| Situation | Action | Why |
+|-----------|--------|-----|
+| Before first production deployment | Edit migration files freely, drop and recreate local DB | No real data exists — nothing is lost |
+| After first production deployment | Add a new `ALTER TABLE` migration file | Real customer data exists — cannot drop or re-run |
+
+**Before production (development phase):**
+Migration files can be edited and the local database dropped and recreated safely. No customer data exists so nothing is lost. This is the correct approach during active development.
+
+```bash
+# reset local database after editing a migration file
+docker exec -it podoptix-db psql -U postgres \
+  -c "DROP DATABASE podoptix WITH (FORCE); CREATE DATABASE podoptix;"
+```
+
+**After production deployment:**
+Never touch existing migration files. Every schema change requires a new numbered migration file:
+
+```sql
+-- 000003_rename_columns.up.sql
+ALTER TABLE clusters RENAME COLUMN id TO cluster_id;
+```
+
+`SyncSchema` tracks which files already ran in the `schema_migrations` table. It skips already-applied migrations — editing an old file has no effect on an existing database.
+
+**The real cost:** `ALTER TABLE` in production runs against a live table with real data. For large tables this can be slow. The cost is unavoidable — even AWS, Stripe, and Google pay this cost for every schema change in production. This is why getting the schema right before the first deployment matters.
+
+---
+
+## 15. Recommendation Storage Strategy — UPSERT not INSERT
+
+### Decision: **One row per container, updated in place daily**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **UPSERT — one row per container** ✅ | Always one current recommendation per container · Clean dashboard · No confusion | No history |
+| INSERT new row every run | Full history of every recommendation | After 360 days — 52 rows per container. User can't tell which to apply |
+
+**The problem with INSERT every run:**
+A pod running for 360 days with a daily scheduler = 360 recommendation rows per container. The user opens the dashboard and sees hundreds of rows with no clear indication which is the latest and correct one to apply.
+
+**The fix — UPSERT:**
+```sql
+ON CONFLICT (cluster_id, namespace, pod_name, container_name)
+DO UPDATE SET p99_cpu = EXCLUDED.p99_cpu, updated_at = EXCLUDED.updated_at ...
+```
+
+One row per container, always showing the latest values. `updated_at` shows when it was last recalculated.
+
+**Scheduler frequency:** Once per day. Balances freshness of data with Prometheus query load.
+
+**Two triggers for recalculation:**
+1. **Automatic** — scheduler runs once per day for all clusters
+2. **Manual** — "Recalculate" button in dashboard for on-demand refresh

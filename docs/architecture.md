@@ -118,7 +118,7 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops clus
 │  │   │        Database        │     │         Cache          │   │  │
 │  │   │  · clusters            │     │  · PromQL results      │   │  │
 │  │   │  · recommendations     │     │  · TTL: 1 hr           │   │  │
-│  │   │  · history             │     │                        │   │  │
+│  │   │                        │     │                        │   │  │
 │  │   └────────────────────────┘     └────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
@@ -134,7 +134,7 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops clus
            Cluster Registry stores encrypted credentials in Database
 
   Step 2   Scheduler triggers a collection job
-           Runs every N hours (configurable) per registered cluster
+           Runs once per day per registered cluster
 
   Step 3   PromQL Engine queries Prometheus HTTP API
            GET /api/v1/query_range with the following metrics:
@@ -149,7 +149,8 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops clus
            CPU  limit = p99_cpu × 2   (unit: millicores)
            Mem  limit = p99_mem × 2   (unit: MiB)
 
-  Step 6   Recommendations stored in Database with timestamp + snapshot
+  Step 6   Recommendations UPSERTed — one row per container, updated in place
+           Unique key: (cluster_id, namespace, pod_name, container_name)
 
   Step 7   Dashboard displays per namespace / per pod recommendations
            REST API serves YAML patches ready for kubectl apply
@@ -169,7 +170,7 @@ PodOptix runs as a single **Master Hub** deployed in your management or ops clus
 | **PromQL Engine** | Queries Prometheus `/api/v1/query_range` with PromQL expressions |
 | **p99 Computation Engine** | Computes 99th percentile from raw time series over a rolling window |
 | **Recommendation Engine** | Applies 2× multiplier · Formats output as YAML resource patches |
-| **Database** | Persists cluster config, recommendations, and historical snapshots |
+| **Database** | Persists cluster config and recommendations (one row per container, updated daily) |
 | **Cache** | Caches PromQL query results per cluster to reduce Prometheus load |
 
 ---
