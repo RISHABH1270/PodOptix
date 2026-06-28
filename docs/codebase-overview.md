@@ -268,3 +268,68 @@ Responds to Kubernetes liveness probes. Simplest possible handler.
 - Kubernetes calls `/healthz` every few seconds. 200 = keep running. 500 or timeout = restart the pod automatically (liveness probe)
 
 ---
+
+## 16. `pkg/models/user.go`
+
+Blueprint for a dashboard user.
+
+```
+User struct (in memory)
+┌─────────────────────────────────────────┐
+│ UserID       "a3f8-..."    string       │
+│ Email        "user@x.com" string       │
+│ PasswordHash "$2a$10$..." string (hidden)│
+│ CreatedAt    2026-06-28   time.Time    │
+│ UpdatedAt    2026-06-28   time.Time    │
+└─────────────────────────────────────────┘
+```
+
+- `json:"-"` on PasswordHash — never included in any API response even accidentally
+- Email has `UNIQUE` constraint in DB — one account per email
+
+---
+
+## 17. `migrations/000003_create_users.up.sql`
+
+- `TEXT` for password_hash — bcrypt produces ~60 chars but TEXT future-proofs it
+- `UNIQUE` on email — one account per email address
+- Same patterns as clusters/recommendations migrations
+
+---
+
+## 18. `internal/auth/password.go`
+
+Two functions — hash and verify. Never store plain text passwords.
+
+- `bcrypt.GenerateFromPassword(password, DefaultCost)` — hashes with cost=10 rounds. More rounds = slower = harder to brute force. Automatically adds random salt — same password hashed twice gives different results
+- `bcrypt.CompareHashAndPassword(hash, password)` — extracts salt from stored hash, re-hashes input with same salt, compares. Returns `nil` = match, error = wrong password. One-way — impossible to reverse
+
+---
+
+## 19. `internal/auth/jwt.go`
+
+Generates and validates JWT tokens.
+
+```
+type Claims struct {
+    UserID string            ← our custom payload
+    Email  string            ← our custom payload
+    jwt.RegisteredClaims     ← embedded (like C++ inheritance) — gives ExpiresAt, IssuedAt
+}
+```
+
+- `jwt.NewWithClaims(HS256, claims)` → `SignedString(secret)` — creates `header.payload.signature`
+- Token expires in 24 hours — after that ValidateToken returns error automatically
+- `ParseWithClaims` callback checks `t.Method.(*jwt.SigningMethodHMAC)` — prevents algorithm confusion attacks where attacker sends `"alg":"none"` to bypass verification. We explicitly require HMAC before returning the secret
+
+---
+
+## 20. `internal/store/user.go`
+
+Same patterns as `cluster.go`.
+
+- `CreateUser` — INSERT with all fields
+- `GetUserByEmail` — SELECT by email (used during login: fetch user → CheckPassword against stored hash)
+- `UpdateUserPassword` — UPDATE hash + updated_at (for future password change feature)
+
+---
