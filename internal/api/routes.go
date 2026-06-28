@@ -3,11 +3,14 @@ package api
 // registerRoutes wires up all HTTP routes to their handler functions.
 func (s *Server) registerRoutes() {
 
-	// health check — used by Kubernetes to know if the app is alive
+	// public routes — no auth required
 	s.router.GET("/healthz", s.handleHealthz)
+	s.router.POST("/auth/register", s.register)
+	s.router.POST("/auth/login", s.login)
 
-	// API v1 routes
+	// protected routes — JWT required
 	v1 := s.router.Group("/api/v1")
+	v1.Use(JWTMiddleware(s.jwtSecret))
 	{
 		// clusters
 		v1.GET("/clusters", s.listClusters)
