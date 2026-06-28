@@ -133,6 +133,86 @@ Same patterns as `cluster.go`. Two operations only — Save and List.
 
 ---
 
+## 21. `internal/api/auth.go`
+
+Handles user registration and login. Same Input DTO pattern as clusters.
+
+**`register` handler flow:**
+```
+1. Read + validate JSON body (email, password)
+2. HashPassword(password) → bcrypt hash — never store plain text
+3. Build User { UUID, email, hash, timestamps }
+4. CreateUser in database → 409 if email already exists
+5. GenerateToken immediately → user is logged in right after registering
+6. Return { token, user_id, email }
+```
+
+**`login` handler flow:**
+```
+1. Read + validate JSON body
+2. GetUserByEmail — if not found → 401 "Invalid email or password"
+3. CheckPassword(input, storedHash) — if wrong → 401 same message
+   (same error for wrong email OR wrong password — prevents user enumeration)
+4. GenerateToken
+5. Return { token, user_id, email }
+```
+
+- `409 Conflict` — specific HTTP status for duplicate resource (email already exists)
+- User enumeration prevention — attacker cannot tell if an email exists by trying login
+
+---
+
+## 22. `internal/api/middleware.go` — JWTMiddleware
+
+Protects all `/api/v1/*` routes. Runs before every handler in the group.
+
+```
+Authorization: Bearer eyJhbGci...
+      ↓
+SplitN by " " → ["Bearer", "eyJhbGci..."]
+      ↓
+ValidateToken(parts[1], secret)
+      ↓
+valid  → c.Set("user_id", ...) → c.Next() → handler runs
+invalid → 401 → c.Abort() → handler never runs
+```
+
+- `c.GetHeader("Authorization")` — reads the Authorization header
+- `strings.SplitN(header, " ", 2)` — splits into exactly 2 parts, enforces `Bearer <token>` format
+- `c.Abort()` — stops the middleware chain. Without it Gin would continue to the handler even after sending 401
+- `c.Set("user_id", claims.UserID)` — stores identity in context, available to all downstream handlers via `c.GetString("user_id")`
+
+---
+
+## 23. `internal/api/routes.go` (updated)
+
+```
+Public (no auth):
+  GET  /healthz
+  POST /auth/register
+  POST /auth/login
+
+Protected (JWT required):
+  v1 group with JWTMiddleware
+  GET    /api/v1/clusters
+  POST   /api/v1/clusters
+  GET    /api/v1/clusters/:id
+  DELETE /api/v1/clusters/:id
+  GET    /api/v1/clusters/:id/recommendations
+```
+
+`v1.Use(JWTMiddleware(...))` attaches JWT check to every route in the group automatically. Routes outside the group remain public.
+
+---
+
+## 24. `internal/api/server.go` (updated)
+
+Added `jwtSecret string` field — injected from `main.go` which reads it from `JWT_SECRET` env var. Passed to `JWTMiddleware` and `GenerateToken`. Never hardcoded.
+
+---
+
+---
+
 ## 8. `migrations/`
 
 SQL files run automatically on startup by `SyncSchema()`. Named `000001_...up.sql`, `000002_...up.sql` — golang-migrate runs them in numeric order.
