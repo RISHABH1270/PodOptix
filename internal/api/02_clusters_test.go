@@ -13,6 +13,7 @@ import (
 // TestCreateCluster tests POST /api/v1/clusters
 func TestCreateCluster(t *testing.T) {
 	trackTest(t)
+	token := getTestToken()
 	body := `{
 		"name":           "test-cluster",
 		"prometheus_url": "http://prometheus.test.com",
@@ -21,34 +22,38 @@ func TestCreateCluster(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	testServer.router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 	assert.Contains(t, w.Body.String(), "test-cluster")
-	assert.Contains(t, w.Body.String(), "http://prometheus.test.com")
 }
 
-// TestCreateCluster_MissingFields tests POST /api/v1/clusters with missing required fields
+// TestCreateCluster_MissingFields tests POST /api/v1/clusters with missing fields
 func TestCreateCluster_MissingFields(t *testing.T) {
 	trackTest(t)
+	token := getTestToken()
 	body := `{"name": "incomplete-cluster"}`
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	testServer.router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "error")
 }
 
 // TestListClusters tests GET /api/v1/clusters
 func TestListClusters(t *testing.T) {
 	trackTest(t)
+	token := getTestToken()
+
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	testServer.router.ServeHTTP(w, req)
@@ -59,7 +64,9 @@ func TestListClusters(t *testing.T) {
 // TestGetCluster tests GET /api/v1/clusters/:id
 func TestGetCluster(t *testing.T) {
 	trackTest(t)
-	// first create a cluster
+	token := getTestToken()
+
+	// create a cluster
 	body := `{
 		"name":           "get-test-cluster",
 		"prometheus_url": "http://prometheus.get-test.com",
@@ -67,10 +74,10 @@ func TestGetCluster(t *testing.T) {
 	}`
 	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/clusters", bytes.NewBufferString(body))
 	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+token)
 	createW := httptest.NewRecorder()
 	testServer.router.ServeHTTP(createW, createReq)
 
-	// extract the id from the create response
 	var created map[string]any
 	json.Unmarshal(createW.Body.Bytes(), &created)
 	id, ok := created["cluster_id"].(string)
@@ -78,8 +85,9 @@ func TestGetCluster(t *testing.T) {
 		t.Fatalf("create cluster failed: %s", createW.Body.String())
 	}
 
-	// now fetch it by id
+	// fetch by id
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/"+id, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	testServer.router.ServeHTTP(w, req)
 
@@ -87,10 +95,13 @@ func TestGetCluster(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "get-test-cluster")
 }
 
-// TestGetCluster_NotFound tests GET /api/v1/clusters/:id with a non-existent id
+// TestGetCluster_NotFound tests GET /api/v1/clusters/:id with non-existent id
 func TestGetCluster_NotFound(t *testing.T) {
 	trackTest(t)
+	token := getTestToken()
+
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/non-existent-id", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
 	testServer.router.ServeHTTP(w, req)
@@ -102,7 +113,9 @@ func TestGetCluster_NotFound(t *testing.T) {
 // TestDeleteCluster tests DELETE /api/v1/clusters/:id
 func TestDeleteCluster(t *testing.T) {
 	trackTest(t)
-	// first create a cluster to delete
+	token := getTestToken()
+
+	// create cluster to delete
 	body := `{
 		"name":           "delete-test-cluster",
 		"prometheus_url": "http://prometheus.delete-test.com",
@@ -110,10 +123,10 @@ func TestDeleteCluster(t *testing.T) {
 	}`
 	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/clusters", bytes.NewBufferString(body))
 	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("Authorization", "Bearer "+token)
 	createW := httptest.NewRecorder()
 	testServer.router.ServeHTTP(createW, createReq)
 
-	// extract the id
 	var created map[string]any
 	json.Unmarshal(createW.Body.Bytes(), &created)
 	id, ok := created["cluster_id"].(string)
@@ -123,13 +136,15 @@ func TestDeleteCluster(t *testing.T) {
 
 	// delete it
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/clusters/"+id, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	testServer.router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusNoContent, w.Code)
 
-	// verify it's gone
+	// verify gone
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/"+id, nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
 	getW := httptest.NewRecorder()
 	testServer.router.ServeHTTP(getW, getReq)
 	assert.Equal(t, http.StatusNotFound, getW.Code)

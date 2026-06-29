@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/jackc/pgx/v5"
 )
@@ -44,6 +45,12 @@ func init() {
 	os.Chdir("../..")
 }
 
+// getTestToken generates a valid JWT token directly for use in tests.
+func getTestToken() string {
+	token, _ := auth.GenerateToken("test-user-id", "testauth@podoptix.io", "test-jwt-secret-key-for-testing")
+	return token
+}
+
 func TestMain(m *testing.M) {
 
 	// connects to PostgreSQL itself - the default "postgres" database
@@ -71,7 +78,7 @@ func TestMain(m *testing.M) {
 		panic("failed to connect to test database: " + err.Error())
 	}
 
-	testServer = NewServer(db)
+	testServer = NewServer(db, "test-jwt-secret-key-for-testing")
 
 	fmt.Println("\n  Running PodOptix API Tests...")
 	fmt.Println("  ──────────────────────────────────────")
