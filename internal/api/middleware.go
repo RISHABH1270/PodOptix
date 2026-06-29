@@ -10,14 +10,20 @@ import (
 )
 
 // RequestIDMiddleware assigns a unique request ID to every incoming request.
+// The ID is available to all handlers via the context and returned in the response header.
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// generate unique ID for this request
 		var requestID string
 		requestID = uuid.New().String()
 
+		// store it in context so handlers can read it
 		c.Set("request_id", requestID)
+
+		// add it to response header — standard practice (X-Request-ID)
 		c.Header("X-Request-ID", requestID)
 
+		// pass to next handler
 		c.Next()
 	}
 }
@@ -29,10 +35,10 @@ func JWTMiddleware(secret string) gin.HandlerFunc {
 		var requestID string
 		requestID = c.GetString("request_id")
 
-		// read Authorization header
-		var header string
-		header = c.GetHeader("Authorization")
-		if header == "" {
+		// read Authorization header — expected format: "Bearer <token>"
+		var authHeader string
+		authHeader = c.GetHeader("Authorization")
+		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error":      "Authorization header is required",
 				"request_id": requestID,
@@ -41,9 +47,9 @@ func JWTMiddleware(secret string) gin.HandlerFunc {
 			return
 		}
 
-		// expect format: "Bearer <token>"
+		// split into ["Bearer", "<token>"]
 		var parts []string
-		parts = strings.SplitN(header, " ", 2)
+		parts = strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error":      "Authorization header format must be: Bearer <token>",

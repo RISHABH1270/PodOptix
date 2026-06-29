@@ -15,7 +15,7 @@ type Server struct {
 	jwtSecret string       // used to sign and verify JWT tokens
 }
 
-// NewServer creates a new HTTP server and registers all routes.
+// // Constructor - NewServer creates a new HTTP server and registers all routes.
 func NewServer(st *store.Store, jwtSecret string) *Server {
 	var router *gin.Engine
 	router = gin.Default()
