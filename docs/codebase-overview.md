@@ -413,3 +413,64 @@ Same patterns as `cluster.go`.
 - `UpdateUserPassword` — UPDATE hash + updated_at (for future password change feature)
 
 ---
+
+## 25. `internal/collector/prometheus.go`
+
+Queries each cluster's Prometheus HTTP API and returns raw CPU + memory data per container.
+
+```
+ContainerMetrics struct (in memory)
+┌──────────────────────────────────────────────┐
+│ Namespace     "payments"      string         │
+│ PodName       "payment-api"   string         │
+│ ContainerName "api"           string         │
+│ CPUValues     [120.5, 115.2, 132.8, ...]     │ []float64 (millicores, 168 points for 7d)
+│ MemValues     [180.2, 178.9, 185.1, ...]     │ []float64 (MiB)
+└──────────────────────────────────────────────┘
+```
+
+**`Collector` struct:**
+- `prometheusURL` — cluster's Prometheus endpoint
+- `token` — auth token for this cluster
+- `httpClient` — reusable HTTP client with 30s timeout (fails fast if Prometheus unresponsive)
+
+**`Collect(ctx, lookbackWindow)`:**
+```
+"7d" → parseDuration → 7 days
+end = now, start = now - 7 days
+→ queryRange(CPU query, start, end)
+→ queryRange(Memory query, start, end)
+→ mergeMetrics(cpuData, memData) → []*ContainerMetrics
+```
+
+**PromQL queries:**
+```promql
+rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]) * 1000
+-- rate() = per-second rate (smooths spikes), * 1000 converts cores → millicores
+-- container!="" filters infrastructure, container!="POD" filters pause containers
+
+container_memory_working_set_bytes{container!="",container!="POD"} / 1048576
+-- working_set = actual memory in use (not cached), / 1048576 converts bytes → MiB
+```
+
+**`queryRange()`:**
+- Builds URL: `/api/v1/query_range?query=...&start=...&end=...&step=3600`
+- `step=3600` = one data point per hour (168 points for 7 days)
+- Attaches `Authorization: Bearer <token>` if token is set
+- `defer resp.Body.Close()` — always close to release network connection
+- `io.ReadAll` reads full body → `json.Unmarshal` parses into struct
+
+**`mergeMetrics()`:**
+- Indexes CPU results by `(namespace, pod, container)` key into a Go map (`unordered_map` in C++)
+- For each memory result — looks up matching CPU data from map
+- Returns one `ContainerMetrics` per container with both CPU and memory values
+
+**`extractValues()`:**
+- Prometheus returns `[[timestamp, "0.120"], ...]` — value is a string not a number
+- Type assertion `v[1].(string)` extracts it, `strconv.ParseFloat` converts to float64
+
+**`parseDuration()`:**
+- `"7d"` → last char = `'d'`, number = `7` → `7 * 24 * time.Hour`
+- Supports `d` (days), `h` (hours), `m` (minutes)
+
+---
