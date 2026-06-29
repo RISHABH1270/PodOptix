@@ -109,8 +109,8 @@ That's it. Register your workload clusters via the dashboard and recommendations
 - [x] REST API endpoints
 - [x] Automated integration tests
 - [x] Auth (JWT)
-- [ ] Prometheus metrics collector (Hub → PromQL API)
-- [ ] p99 computation engine
+- [x] Prometheus metrics collector (Hub → PromQL API)
+- [x] p99 computation engine
 - [ ] Recommendation engine
 - [ ] Scheduler (cron-based collection jobs)
 - [ ] Cache layer (Redis)
