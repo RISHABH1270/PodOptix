@@ -108,7 +108,7 @@ That's it. Register your workload clusters via the dashboard and recommendations
 - [x] HTTP server (Gin)
 - [x] REST API endpoints
 - [x] Automated integration tests
-- [ ] Auth (JWT)
+- [x] Auth (JWT)
 - [ ] Prometheus metrics collector (Hub → PromQL API)
 - [ ] p99 computation engine
 - [ ] Recommendation engine
