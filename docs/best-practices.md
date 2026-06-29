@@ -85,6 +85,8 @@ GET    /api/v1/clusters/:id/recommendations  get recommendations for a cluster
 | **No hardcoded secrets** | All secrets via environment variables or Kubernetes Secrets |
 | **Least privilege** | Hub's K8s ServiceAccount needs no cluster-wide RBAC — queries Prometheus over HTTP only |
 | **Request tracing** | Every request gets a unique `X-Request-ID` header — traceable end to end |
+| **Password hashing** | bcrypt only — never store plain text passwords. Cannot be reversed even if DB is stolen |
+| **JWT expiry** | Tokens expire in 24 hours — limits blast radius if a token is stolen |
 
 ---
 

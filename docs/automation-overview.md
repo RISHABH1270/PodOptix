@@ -210,6 +210,61 @@ Step 3 → GET /api/v1/clusters/{id}
 
 ---
 
+## `01_auth_test.go` — Walkthrough
+
+Auth tests run after health, before clusters. Order matters — register must work before login can be tested.
+
+```
+TestRegister               → POST /auth/register valid → 201 + token in response
+TestRegister_DuplicateEmail → register twice same email → 409 "already exists"
+TestRegister_MissingFields  → register without password → 400
+TestLogin                  → register then login → 200 + token
+TestLogin_WrongPassword    → login with wrong password → 401 "Invalid email or password"
+TestLogin_UnknownEmail     → login unknown email → 401 same message (prevents user enumeration)
+TestProtectedRoute_NoToken      → GET /api/v1/clusters no header → 401
+TestProtectedRoute_WrongFormat  → Authorization: wrongformat → 401
+TestProtectedRoute_InvalidToken → Authorization: Bearer fakejwt → 401
+TestProtectedRoute_WithToken    → register → extract token → use on protected route → 200
+```
+
+**Key patterns:**
+- Same error for wrong email AND wrong password — `"Invalid email or password"`. Prevents attacker from knowing if email exists
+- `TestProtectedRoute_WithToken` is end-to-end: register → parse token from JSON → attach to request → verify 200
+
+---
+
+## `02_clusters_test.go` — What changed after auth
+
+All cluster tests now call `getTestToken()` and attach the token to every request:
+
+```go
+token := getTestToken()
+req.Header.Set("Authorization", "Bearer "+token)
+```
+
+**`getTestToken()` in `setup_test.go`:**
+```go
+func getTestToken() string {
+    token, _ := auth.GenerateToken("test-user-id", "testauth@podoptix.io", "test-jwt-secret-key-for-testing")
+    return token
+}
+```
+Generates JWT directly — no HTTP call, no database. Avoids duplicate email issue (if it registered via HTTP, second call → 409 → no token → all cluster tests fail).
+
+---
+
+## Test File Order
+
+```
+00_health_test.go   → TestHealthz
+01_auth_test.go     → TestRegister, TestLogin, TestProtectedRoute_*
+02_clusters_test.go → TestCreateCluster, TestListClusters, TestGetCluster, TestDeleteCluster
+```
+
+Files prefixed with numbers ensure alphabetical = execution order.
+
+---
+
 ## Integration vs E2E
 
 | | Integration tests (current) | E2E tests (planned) |

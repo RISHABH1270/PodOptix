@@ -133,6 +133,86 @@ Same patterns as `cluster.go`. Two operations only — Save and List.
 
 ---
 
+## 21. `internal/api/auth.go`
+
+Handles user registration and login. Same Input DTO pattern as clusters.
+
+**`register` handler flow:**
+```
+1. Read + validate JSON body (email, password)
+2. HashPassword(password) → bcrypt hash — never store plain text
+3. Build User { UUID, email, hash, timestamps }
+4. CreateUser in database → 409 if email already exists
+5. GenerateToken immediately → user is logged in right after registering
+6. Return { token, user_id, email }
+```
+
+**`login` handler flow:**
+```
+1. Read + validate JSON body
+2. GetUserByEmail — if not found → 401 "Invalid email or password"
+3. CheckPassword(input, storedHash) — if wrong → 401 same message
+   (same error for wrong email OR wrong password — prevents user enumeration)
+4. GenerateToken
+5. Return { token, user_id, email }
+```
+
+- `409 Conflict` — specific HTTP status for duplicate resource (email already exists)
+- User enumeration prevention — attacker cannot tell if an email exists by trying login
+
+---
+
+## 22. `internal/api/middleware.go` — JWTMiddleware
+
+Protects all `/api/v1/*` routes. Runs before every handler in the group.
+
+```
+Authorization: Bearer eyJhbGci...
+      ↓
+SplitN by " " → ["Bearer", "eyJhbGci..."]
+      ↓
+ValidateToken(parts[1], secret)
+      ↓
+valid  → c.Set("user_id", ...) → c.Next() → handler runs
+invalid → 401 → c.Abort() → handler never runs
+```
+
+- `c.GetHeader("Authorization")` — reads the Authorization header
+- `strings.SplitN(header, " ", 2)` — splits into exactly 2 parts, enforces `Bearer <token>` format
+- `c.Abort()` — stops the middleware chain. Without it Gin would continue to the handler even after sending 401
+- `c.Set("user_id", claims.UserID)` — stores identity in context, available to all downstream handlers via `c.GetString("user_id")`
+
+---
+
+## 23. `internal/api/routes.go` (updated)
+
+```
+Public (no auth):
+  GET  /healthz
+  POST /auth/register
+  POST /auth/login
+
+Protected (JWT required):
+  v1 group with JWTMiddleware
+  GET    /api/v1/clusters
+  POST   /api/v1/clusters
+  GET    /api/v1/clusters/:id
+  DELETE /api/v1/clusters/:id
+  GET    /api/v1/clusters/:id/recommendations
+```
+
+`v1.Use(JWTMiddleware(...))` attaches JWT check to every route in the group automatically. Routes outside the group remain public.
+
+---
+
+## 24. `internal/api/server.go` (updated)
+
+Added `jwtSecret string` field — injected from `main.go` which reads it from `JWT_SECRET` env var. Passed to `JWTMiddleware` and `GenerateToken`. Never hardcoded.
+
+---
+
+---
+
 ## 8. `migrations/`
 
 SQL files run automatically on startup by `SyncSchema()`. Named `000001_...up.sql`, `000002_...up.sql` — golang-migrate runs them in numeric order.
@@ -266,5 +346,70 @@ Responds to Kubernetes liveness probes. Simplest possible handler.
 - `c *gin.Context` — Gin passes this to every handler. Contains the request and methods to send a response
 - `c.JSON(200, gin.H{"status":"ok"})` — sends `{"status":"ok"}` with HTTP 200
 - Kubernetes calls `/healthz` every few seconds. 200 = keep running. 500 or timeout = restart the pod automatically (liveness probe)
+
+---
+
+## 16. `pkg/models/user.go`
+
+Blueprint for a dashboard user.
+
+```
+User struct (in memory)
+┌─────────────────────────────────────────┐
+│ UserID       "a3f8-..."    string       │
+│ Email        "user@x.com" string       │
+│ PasswordHash "$2a$10$..." string (hidden)│
+│ CreatedAt    2026-06-28   time.Time    │
+│ UpdatedAt    2026-06-28   time.Time    │
+└─────────────────────────────────────────┘
+```
+
+- `json:"-"` on PasswordHash — never included in any API response even accidentally
+- Email has `UNIQUE` constraint in DB — one account per email
+
+---
+
+## 17. `migrations/000003_create_users.up.sql`
+
+- `TEXT` for password_hash — bcrypt produces ~60 chars but TEXT future-proofs it
+- `UNIQUE` on email — one account per email address
+- Same patterns as clusters/recommendations migrations
+
+---
+
+## 18. `internal/auth/password.go`
+
+Two functions — hash and verify. Never store plain text passwords.
+
+- `bcrypt.GenerateFromPassword(password, DefaultCost)` — hashes with cost=10 rounds. More rounds = slower = harder to brute force. Automatically adds random salt — same password hashed twice gives different results
+- `bcrypt.CompareHashAndPassword(hash, password)` — extracts salt from stored hash, re-hashes input with same salt, compares. Returns `nil` = match, error = wrong password. One-way — impossible to reverse
+
+---
+
+## 19. `internal/auth/jwt.go`
+
+Generates and validates JWT tokens.
+
+```
+type Claims struct {
+    UserID string            ← our custom payload
+    Email  string            ← our custom payload
+    jwt.RegisteredClaims     ← embedded (like C++ inheritance) — gives ExpiresAt, IssuedAt
+}
+```
+
+- `jwt.NewWithClaims(HS256, claims)` → `SignedString(secret)` — creates `header.payload.signature`
+- Token expires in 24 hours — after that ValidateToken returns error automatically
+- `ParseWithClaims` callback checks `t.Method.(*jwt.SigningMethodHMAC)` — prevents algorithm confusion attacks where attacker sends `"alg":"none"` to bypass verification. We explicitly require HMAC before returning the secret
+
+---
+
+## 20. `internal/store/user.go`
+
+Same patterns as `cluster.go`.
+
+- `CreateUser` — INSERT with all fields
+- `GetUserByEmail` — SELECT by email (used during login: fetch user → CheckPassword against stored hash)
+- `UpdateUserPassword` — UPDATE hash + updated_at (for future password change feature)
 
 ---
