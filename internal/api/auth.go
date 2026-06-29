@@ -72,7 +72,7 @@ func (s *Server) register(c *gin.Context) {
 	if err != nil {
 		log.Printf("ERROR [%s] register generate token: %v", requestID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":      "Account created but login failed, please log in",
+			"error":      "Account created. Please log in.",
 			"request_id": requestID,
 		})
 		return
