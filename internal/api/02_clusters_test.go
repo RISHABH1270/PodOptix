@@ -29,6 +29,7 @@ func TestCreateCluster(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 	assert.Contains(t, w.Body.String(), "test-cluster")
+	assert.Contains(t, w.Body.String(), "http://prometheus.test.com")
 }
 
 // TestCreateCluster_MissingFields tests POST /api/v1/clusters with missing fields
@@ -45,6 +46,7 @@ func TestCreateCluster_MissingFields(t *testing.T) {
 	testServer.router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "error")
 }
 
 // TestListClusters tests GET /api/v1/clusters
