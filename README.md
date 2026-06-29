@@ -112,7 +112,7 @@ That's it. Register your workload clusters via the dashboard and recommendations
 - [x] Prometheus metrics collector (Hub → PromQL API)
 - [x] p99 computation engine
 - [x] Recommendation engine
-- [ ] Scheduler (cron-based collection jobs)
+- [x] Scheduler (cron-based collection jobs)
 - [ ] Cache layer (Redis)
 - [ ] Token encryption at rest (AES-256)
 - [ ] Central Hub with multi-cluster support
