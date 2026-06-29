@@ -265,6 +265,50 @@ Files prefixed with numbers ensure alphabetical = execution order.
 
 ---
 
+## `internal/collector/01_prometheus_test.go` — Walkthrough
+
+Tests for the Prometheus collector. No real Prometheus needed — uses `httptest.NewServer` (a fake HTTP server) to simulate Prometheus responses.
+
+**What IS tested with real logic (no mock):**
+```
+TestParseDuration_Days/Hours/Minutes  → real parseDuration function
+TestParseDuration_Invalid/UnknownUnit → error handling in parseDuration
+TestExtractValues_Valid               → parses [[ts, "0.120"]] → [0.120]
+TestExtractValues_Empty               → returns empty slice
+TestExtractValues_InvalidValue        → skips bad values, keeps valid ones
+```
+
+**What is tested with fake Prometheus server:**
+```
+TestCollect_Success       → fake server returns valid CPU + memory data
+                            verifies ContainerMetrics fields, values, count
+
+TestCollect_PrometheusError → fake server returns 500
+                              verifies error contains "prometheus returned status 500"
+
+TestCollect_EmptyResponse → fake server returns success but no containers
+                            verifies empty slice returned, no error
+
+TestCollect_WithToken     → fake server captures the Authorization header
+                            verifies "Bearer my-secret-token" was sent
+
+TestCollect_InvalidDuration → no server needed
+                              verifies "7w" returns parse error
+```
+
+**`httptest.NewServer`** — creates a real HTTP server in memory on a random port. Our collector makes real HTTP calls to it. We're testing OUR code (request building, parsing, error handling) — not Prometheus itself.
+
+**`callCount`** in `TestCollect_Success` — tracks which call is CPU vs Memory. First call returns CPU data, second returns Memory data. Collector always queries CPU first then Memory.
+
+**`fakePrometheusResponse()`** — helper that builds a valid Prometheus JSON response structure with given container labels and values.
+
+**Why mocking is correct here:**
+- Unit/integration tests → mock external services (industry standard)
+- We test OUR parsing, error handling, auth — not Prometheus internals
+- E2E tests against real Prometheus → future, runs in CI/CD with Docker
+
+---
+
 ## Integration vs E2E
 
 | | Integration tests (current) | E2E tests (planned) |
