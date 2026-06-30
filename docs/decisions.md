@@ -518,6 +518,35 @@ Queue ensures ONE cluster is processed at a time. User gets immediate "queued" r
 **Recommendation response — per container:**
 Each recommendation object in the cache is per container. One pod with 3 containers = 3 separate objects. Customer sees exactly which container is over/under provisioned.
 
+---
+
+## 19. Token Encryption at Rest (AES-256)
+
+### Decision: **Encrypt Prometheus tokens with AES-256-GCM before storing in PostgreSQL**
+
+**Problem:** Prometheus auth tokens stored as plain text in the database. If the database is compromised, attackers get every cluster's token and can query any customer's Prometheus directly.
+
+**Solution — Encryption at rest:**
+```
+Register cluster:
+  plain token → AES-256-GCM encrypt(token, ENCRYPTION_KEY) → store in DB
+
+Use cluster (scheduler/collector):
+  fetch from DB → AES-256-GCM decrypt(token, ENCRYPTION_KEY) → use for Prometheus
+```
+
+**Why AES-256-GCM:**
+- AES-256 = industry standard, used by banks and governments
+- GCM mode = authenticated encryption — detects if ciphertext was tampered with
+- Symmetric — same key encrypts and decrypts
+- Key comes from `ENCRYPTION_KEY` env variable — never stored in database
+
+**Security guarantee:** Stolen database + no `ENCRYPTION_KEY` = useless encrypted tokens.
+
+**Key rules:** 32 bytes (256 bits) · never logged · stored as Kubernetes Secret in production · rotating the key invalidates all stored tokens
+
+---
+
 **User storage — Option B (chosen):** Full user table in PostgreSQL. Supports multiple users, proper registration and login. Passwords stored as bcrypt hashes — one-way function, cannot be reversed even if database is stolen.
 
 ```

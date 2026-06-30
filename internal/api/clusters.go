@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -57,12 +58,23 @@ func (s *Server) createCluster(c *gin.Context) {
 		req.LookbackWindow = "7d"
 	}
 
+	// encrypt token before storing — never save plain text to database
+	encryptedToken, err := auth.Encrypt(req.Token, s.encryptionKey)
+	if err != nil {
+		log.Printf("ERROR [%s] createCluster encrypt token: %v", requestID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to register cluster, please try again",
+			"request_id": requestID,
+		})
+		return
+	}
+
 	var cluster *models.Cluster
 	cluster = &models.Cluster{
 		ClusterID:      uuid.New().String(),
 		Name:           req.Name,
 		PrometheusURL:  req.PrometheusURL,
-		Token:          req.Token,
+		Token:          encryptedToken,
 		LookbackWindow: req.LookbackWindow,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),

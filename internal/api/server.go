@@ -11,14 +11,15 @@ import (
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	router    *gin.Engine
-	store     *store.Store // database connection injected from main
-	cache     *cache.Cache // Redis cache injected from main
-	jwtSecret string       // used to sign and verify JWT tokens
+	router        *gin.Engine
+	store         *store.Store // database connection injected from main
+	cache         *cache.Cache // Redis cache injected from main
+	jwtSecret     string       // used to sign and verify JWT tokens
+	encryptionKey string       // used to encrypt/decrypt cluster tokens at rest
 }
 
 // NewServer creates a new HTTP server and registers all routes.
-func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string) *Server {
+func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey string) *Server {
 	var router *gin.Engine
 	router = gin.Default()
 
@@ -26,10 +27,11 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string) *Server {
 
 	var server *Server
 	server = &Server{
-		router:    router,
-		store:     st,
-		cache:     ca,
-		jwtSecret: jwtSecret,
+		router:        router,
+		store:         st,
+		cache:         ca,
+		jwtSecret:     jwtSecret,
+		encryptionKey: encryptionKey,
 	}
 
 	server.registerRoutes()

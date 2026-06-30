@@ -77,7 +77,7 @@ func main() {
 
 	// step 4 — start HTTP server
 	var server *api.Server
-	server = api.NewServer(db, redisCache, cfg.JWTSecret)
+	server = api.NewServer(db, redisCache, cfg.JWTSecret, cfg.EncryptionKey)
 
 	// Bind the port first — if this succeeds the server is guaranteed to be up
 	listener, err := server.Listen(cfg.Port)
