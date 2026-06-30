@@ -115,7 +115,7 @@ That's it. Register your workload clusters via the dashboard and recommendations
 - [x] Scheduler (cron-based collection jobs)
 - [x] Cache layer (Redis)
 - [x] Token encryption at rest (AES-256)
-- [ ] Central Hub with multi-cluster support
+- [x] Central Hub with multi-cluster support
 - [ ] Web Dashboard
 - [ ] Docker image
 - [ ] Helm chart
