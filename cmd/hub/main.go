@@ -71,7 +71,7 @@ func main() {
 	fmt.Println(green + "  Redis    : " + reset + "Connected")
 
 	// start scheduler in background — runs once per day
-	sched := scheduler.New(db, 24*time.Hour)
+	sched := scheduler.New(db, 24*time.Hour, cfg.EncryptionKey)
 	go sched.Start(context.Background())
 	fmt.Println(green + "  Scheduler: " + reset + "Started — runs every 24 hours")
 
