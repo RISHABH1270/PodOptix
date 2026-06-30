@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/api"
+	"github.com/RISHABH1270/PodOptix/internal/cache"
 	"github.com/RISHABH1270/PodOptix/internal/config"
 	"github.com/RISHABH1270/PodOptix/internal/scheduler"
 	"github.com/RISHABH1270/PodOptix/internal/store"
@@ -59,7 +60,15 @@ func main() {
 	defer db.Close()
 	fmt.Println(green + "  Pool     : " + reset + "Connection pool ready")
 
-	// TODO: connect to Redis
+	// connect to Redis
+	var redisCache *cache.Cache
+	redisCache, err = cache.New(cfg.RedisURL)
+	if err != nil {
+		fmt.Println(red + "  Redis    : failed — " + err.Error() + reset)
+		log.Fatalf("failed to connect to redis: %v", err)
+	}
+	defer redisCache.Close()
+	fmt.Println(green + "  Redis    : " + reset + "Connected")
 
 	// start scheduler in background — runs once per day
 	sched := scheduler.New(db, 24*time.Hour)
@@ -68,7 +77,7 @@ func main() {
 
 	// step 4 — start HTTP server
 	var server *api.Server
-	server = api.NewServer(db, cfg.JWTSecret)
+	server = api.NewServer(db, redisCache, cfg.JWTSecret)
 
 	// Bind the port first — if this succeeds the server is guaranteed to be up
 	listener, err := server.Listen(cfg.Port)

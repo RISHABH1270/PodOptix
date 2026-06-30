@@ -491,7 +491,7 @@ Redis is a data structure store — not a single-purpose tool. Same Redis instan
 | Role | Key Pattern | TTL | Why |
 |------|------------|-----|-----|
 | **Recommendations cache** | `cluster:{id}:recommendations` | 1 hour | Dashboard reads frequently — serve from Redis not PostgreSQL every request |
-| **Distributed lock** | `lock:cluster:{id}:recalculate` | 5 min | Prevent duplicate recalculate jobs for same cluster |
+| **Distributed lock** | `lock:cluster:{id}:recalculate` | 10 min | Prevent duplicate recalculate jobs for same cluster |
 | **Job queue** | `recalculate-jobs` | no TTL | Sequential processing — one cluster at a time, prevents server overload |
 
 **Why cache recommendations (not raw metrics):**
