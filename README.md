@@ -113,9 +113,9 @@ That's it. Register your workload clusters via the dashboard and recommendations
 - [x] p99 computation engine
 - [x] Recommendation engine
 - [x] Scheduler (cron-based collection jobs)
-- [ ] Cache layer (Redis)
-- [ ] Token encryption at rest (AES-256)
-- [ ] Central Hub with multi-cluster support
+- [x] Cache layer (Redis)
+- [x] Token encryption at rest (AES-256)
+- [x] Central Hub with multi-cluster support
 - [ ] Web Dashboard
 - [ ] Docker image
 - [ ] Helm chart

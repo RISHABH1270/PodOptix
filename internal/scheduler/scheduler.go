@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
 	"github.com/RISHABH1270/PodOptix/internal/store"
@@ -12,16 +13,17 @@ import (
 
 // Scheduler runs the collection pipeline once per day for every registered cluster.
 type Scheduler struct {
-	store    *store.Store
-	interval time.Duration
+	store         *store.Store
+	interval      time.Duration
+	encryptionKey string
 }
 
 // New creates a new Scheduler.
-// interval is how often to run — use 24 * time.Hour for production.
-func New(st *store.Store, interval time.Duration) *Scheduler {
+func New(st *store.Store, interval time.Duration, encryptionKey string) *Scheduler {
 	return &Scheduler{
-		store:    st,
-		interval: interval,
+		store:         st,
+		interval:      interval,
+		encryptionKey: encryptionKey,
 	}
 }
 
@@ -63,7 +65,13 @@ func (s *Scheduler) runAll(ctx context.Context) {
 	}
 
 	for _, cluster := range clusters {
-		s.runForCluster(ctx, cluster.ClusterID, cluster.PrometheusURL, cluster.Token, cluster.LookbackWindow)
+		// decrypt token before using for Prometheus
+		plainToken, err := auth.Decrypt(cluster.Token, s.encryptionKey)
+		if err != nil {
+			log.Printf("ERROR scheduler decrypt token cluster=%s: %v", cluster.ClusterID, err)
+			continue
+		}
+		s.runForCluster(ctx, cluster.ClusterID, cluster.PrometheusURL, plainToken, cluster.LookbackWindow)
 	}
 }
 

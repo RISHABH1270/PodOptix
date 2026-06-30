@@ -4,19 +4,22 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/RISHABH1270/PodOptix/internal/cache"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/gin-gonic/gin"
 )
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	router    *gin.Engine
-	store     *store.Store // database connection injected from main
-	jwtSecret string       // used to sign and verify JWT tokens
+	router        *gin.Engine
+	store         *store.Store // database connection injected from main
+	cache         *cache.Cache // Redis cache injected from main
+	jwtSecret     string       // used to sign and verify JWT tokens
+	encryptionKey string       // used to encrypt/decrypt cluster tokens at rest
 }
 
-// // Constructor - NewServer creates a new HTTP server and registers all routes.
-func NewServer(st *store.Store, jwtSecret string) *Server {
+// NewServer creates a new HTTP server and registers all routes.
+func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey string) *Server {
 	var router *gin.Engine
 	router = gin.Default()
 
@@ -24,9 +27,11 @@ func NewServer(st *store.Store, jwtSecret string) *Server {
 
 	var server *Server
 	server = &Server{
-		router:    router,
-		store:     st,
-		jwtSecret: jwtSecret,
+		router:        router,
+		store:         st,
+		cache:         ca,
+		jwtSecret:     jwtSecret,
+		encryptionKey: encryptionKey,
 	}
 
 	server.registerRoutes()

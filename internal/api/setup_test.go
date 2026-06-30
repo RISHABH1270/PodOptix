@@ -78,7 +78,7 @@ func TestMain(m *testing.M) {
 		panic("failed to connect to test database: " + err.Error())
 	}
 
-	testServer = NewServer(db, "test-jwt-secret-key-for-testing")
+	testServer = NewServer(db, nil, "test-jwt-secret-key-for-testing", "test-32-byte-encryption-key!!!!1")
 
 	fmt.Println("\n  Running PodOptix API Tests...")
 	fmt.Println("  ──────────────────────────────────────")

@@ -20,5 +20,6 @@ func (s *Server) registerRoutes() {
 
 		// recommendations
 		v1.GET("/clusters/:id/recommendations", s.listRecommendations)
+		v1.POST("/clusters/:id/recalculate", s.recalculate)
 	}
 }
