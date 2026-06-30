@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"log"
 
+	"context"
+	"time"
+
 	"github.com/RISHABH1270/PodOptix/internal/api"
 	"github.com/RISHABH1270/PodOptix/internal/config"
+	"github.com/RISHABH1270/PodOptix/internal/scheduler"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 )
 
@@ -57,7 +61,10 @@ func main() {
 
 	// TODO: connect to Redis
 
-	// TODO: start scheduler
+	// start scheduler in background — runs once per day
+	sched := scheduler.New(db, 24*time.Hour)
+	go sched.Start(context.Background())
+	fmt.Println(green + "  Scheduler: " + reset + "Started — runs every 24 hours")
 
 	// step 4 — start HTTP server
 	var server *api.Server
