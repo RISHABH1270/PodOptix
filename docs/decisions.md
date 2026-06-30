@@ -480,6 +480,44 @@ Attacker modifies payload → recomputes signature without secret → MISMATCH �
 
 **`JWT_SECRET` rules:** 32+ random characters · never logged · never committed to Git · stored as Kubernetes Secret in production
 
+---
+
+## 18. Redis — Purpose and Design
+
+### Decision: **Redis as cache + distributed lock + job queue**
+
+Redis is a data structure store — not a single-purpose tool. Same Redis instance serves three roles in PodOptix:
+
+| Role | Key Pattern | TTL | Why |
+|------|------------|-----|-----|
+| **Recommendations cache** | `cluster:{id}:recommendations` | 1 hour | Dashboard reads frequently — serve from Redis not PostgreSQL every request |
+| **Distributed lock** | `lock:cluster:{id}:recalculate` | 5 min | Prevent duplicate recalculate jobs for same cluster |
+| **Job queue** | `recalculate-jobs` | no TTL | Sequential processing — one cluster at a time, prevents server overload |
+
+**Why cache recommendations (not raw metrics):**
+Recommendations are already computed and stored in PostgreSQL by the scheduler. The dashboard reads them on every page load. Caching the final result in Redis means the dashboard never hits PostgreSQL directly — just Redis (sub-millisecond).
+
+**Recommendations cache flow:**
+```
+GET /api/v1/clusters/:id/recommendations
+        ↓
+Redis HIT  → return cached JSON instantly (< 1ms)
+Redis MISS → query PostgreSQL → cache in Redis TTL 1hr → return
+```
+
+After scheduler runs or recalculate completes → invalidate `cluster:{id}:recommendations` → next request fetches fresh data.
+
+**Why job queue for recalculate:**
+100 clusters × 1000 pods = 100,000 containers to process. If all triggered simultaneously:
+- 200 concurrent Prometheus HTTP calls
+- 100,000 p99 computations
+- 100,000 DB upserts → server crash
+
+Queue ensures ONE cluster is processed at a time. User gets immediate "queued" response.
+
+**Recommendation response — per container:**
+Each recommendation object in the cache is per container. One pod with 3 containers = 3 separate objects. Customer sees exactly which container is over/under provisioned.
+
 **User storage — Option B (chosen):** Full user table in PostgreSQL. Supports multiple users, proper registration and login. Passwords stored as bcrypt hashes — one-way function, cannot be reversed even if database is stolen.
 
 ```
