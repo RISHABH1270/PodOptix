@@ -14,10 +14,8 @@ function Sidebar({ active }: { active: string }) {
   }
 
   const nav = [
-    { label: 'Overview',        icon: '⊞' },
-    { label: 'Clusters',        icon: '◈' },
-    { label: 'Recommendations', icon: '✦' },
-    { label: 'Settings',        icon: '⚙' },
+    { label: 'Overview', icon: '⊞' },
+    { label: 'Clusters', icon: '◈' },
   ]
 
   return (
@@ -31,6 +29,9 @@ function Sidebar({ active }: { active: string }) {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {nav.map(item => (
           <button key={item.label}
+            onClick={() => {
+              if (item.label === 'Overview') navigate('/overview')
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left
               ${active === item.label
                 ? 'bg-green-500/10 text-green-400 font-medium'
@@ -199,15 +200,6 @@ export default function ClustersPage() {
                 <label className="text-gray-400 text-sm block mb-1">Auth Token</label>
                 <input type="password" value={token} onChange={e => setToken(e.target.value)} required
                   className="w-full bg-gray-800 border border-gray-700 focus:border-green-500 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none" />
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm block mb-1">Lookback Window</label>
-                <select value={window} onChange={e => setWindow(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 focus:border-green-500 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none">
-                  <option value="7d">7 days</option>
-                  <option value="14d">14 days</option>
-                  <option value="30d">30 days</option>
-                </select>
               </div>
               {formError && <p className="text-red-400 text-sm">{formError}</p>}
               <div className="flex gap-3 pt-2">

@@ -15,8 +15,6 @@ function Sidebar({ active }: { active: string }) {
   const nav = [
     { label: 'Overview',        icon: '⊞' },
     { label: 'Clusters',        icon: '◈' },
-    { label: 'Recommendations', icon: '✦' },
-    { label: 'Settings',        icon: '⚙' },
   ]
 
   return (
