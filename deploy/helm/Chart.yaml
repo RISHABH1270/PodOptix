@@ -1,0 +1,13 @@
+apiVersion: v2
+name: podoptix
+description: Kubernetes resource right-sizing powered by p99 metrics
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - kubernetes
+  - resource-optimization
+  - prometheus
+  - right-sizing
+maintainers:
+  - name: Rishabh Singh

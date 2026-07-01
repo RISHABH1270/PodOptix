@@ -1,3 +1,5 @@
+# To build and test: docker build -t podoptix/hub:v0.1.0 .
+
 # ── Stage 1: Build React frontend ────────────────────────────────────────────
 FROM node:24-alpine AS frontend-builder
 
