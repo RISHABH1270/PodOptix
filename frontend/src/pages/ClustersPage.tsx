@@ -158,7 +158,9 @@ export default function ClustersPage() {
                     <p className="text-gray-500 text-xs truncate mt-0.5">{c.prometheus_url}</p>
                   </div>
                   <span className="text-xs font-mono text-gray-600 bg-gray-800 px-2 py-0.5 rounded">{c.lookback_window}</span>
-                  <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">Healthy</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${c.status === 'unhealthy' ? 'text-red-400 bg-red-400/10' : 'text-green-400 bg-green-400/10'}`}>
+                    {c.status === 'unhealthy' ? 'Unhealthy' : 'Healthy'}
+                  </span>
                   <div className="flex items-center gap-3">
                     <button onClick={() => navigate(`/clusters/${c.cluster_id}`)}
                       className="text-green-500 hover:text-green-400 text-sm font-medium transition-colors">

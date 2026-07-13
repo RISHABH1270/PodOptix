@@ -25,12 +25,14 @@ export const register = (email: string, password: string) =>
 // ── Clusters ─────────────────────────────────────────────────────────────────
 
 export interface Cluster {
-  cluster_id:      string
-  name:            string
-  prometheus_url:  string
-  lookback_window: string
-  created_at:      string
-  updated_at:      string
+  cluster_id:        string
+  name:              string
+  prometheus_url:    string
+  lookback_window:   string
+  status:            'healthy' | 'unhealthy'
+  last_collected_at: string | null
+  created_at:        string
+  updated_at:        string
 }
 
 export interface CreateClusterPayload {

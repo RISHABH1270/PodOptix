@@ -8,6 +8,7 @@ import (
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
+	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 )
 
@@ -84,6 +85,8 @@ func (s *Scheduler) runForCluster(ctx context.Context, clusterID, prometheusURL,
 	metrics, err := c.Collect(ctx, lookbackWindow)
 	if err != nil {
 		log.Printf("ERROR scheduler collect cluster=%s: %v", clusterID, err)
+		// mark cluster as unhealthy — Prometheus unreachable
+		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusUnhealthy, time.Now())
 		return
 	}
 
@@ -109,4 +112,7 @@ func (s *Scheduler) runForCluster(ctx context.Context, clusterID, prometheusURL,
 
 	log.Printf("INFO  scheduler saved %d/%d recommendations for cluster=%s",
 		saved, len(recommendations), clusterID)
+
+	// mark cluster as healthy — collection succeeded
+	s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusHealthy, time.Now())
 }
