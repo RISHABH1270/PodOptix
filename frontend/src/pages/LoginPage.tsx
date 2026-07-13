@@ -22,7 +22,7 @@ const [error, setError]           = useState('')
       localStorage.setItem('email', response.data.email)
       navigate('/clusters')
     } catch {
-      setError(isRegister ? 'Registration failed. Try a different email.' : 'Invalid email or password')
+      setError(isRegister ? 'Account with this email id already present. Try a different email.' : 'Invalid email or password')
     } finally {
       setLoading(false)
     }
@@ -50,7 +50,7 @@ const [error, setError]           = useState('')
             {isRegister ? 'Create account' : 'Welcome back'}
           </h2>
           <p className="text-gray-500 text-sm mb-6">
-            {isRegister ? 'Register a new PodOptix account' : 'Sign in to your PodOptix account'}
+            {isRegister ? 'Register a new PodOptix user account' : 'Sign in to your PodOptix user account'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">

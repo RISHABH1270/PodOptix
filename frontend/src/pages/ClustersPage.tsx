@@ -135,7 +135,7 @@ export default function ClustersPage() {
         {/* Cluster health table */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-            <h2 className="font-semibold text-white">Cluster Health</h2>
+            <h2 className="font-semibold text-white">Connected Clusters</h2>
             <span className="text-gray-600 text-xs">{clusters.length} registered</span>
           </div>
 
