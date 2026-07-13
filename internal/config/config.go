@@ -69,7 +69,7 @@ func mustGetEnv(key string) (string, error) {
 	var value string
 	value = os.Getenv(key)
 	if value == "" {
-		return "", fmt.Errorf("required environment variable %q is not set", key)
+		return "", fmt.Errorf("Required environment variable %q is not set", key)
 	}
 	return value, nil
 }
