@@ -7,7 +7,7 @@ import (
 
 // Config holds all configuration values for the Hub.
 // All values are read from environment variables — never hardcoded.
-// Values differ per environment: local (.env file), staging/production (Kubernetes Secrets).
+// Values differ per environment: local (.env file), production (Kubernetes Secrets via Helm).
 type Config struct {
 	Port          string
 	DatabaseURL   string
