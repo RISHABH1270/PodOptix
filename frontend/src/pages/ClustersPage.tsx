@@ -58,7 +58,7 @@ function Sidebar({ active }: { active: string }) {
   )
 }
 
-// formats last_collected_at into "2 hours ago", "3 days ago" etc.
+// formats last_synced_at into "2 hours ago", "3 days ago" etc.
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return 'Never'
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -171,7 +171,7 @@ export default function ClustersPage() {
                     <p className="text-gray-500 text-xs truncate mt-0.5">{c.prometheus_url}</p>
                   </div>
                   <span className="text-xs text-gray-600 font-mono">
-                    Last synced: {timeAgo(c.last_collected_at)}
+                    Last synced: {timeAgo(c.last_synced_at)}
                   </span>
                   <span className="text-xs font-mono text-gray-600 bg-gray-800 px-2 py-0.5 rounded">{c.lookback_window}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${c.status === 'unhealthy' ? 'text-red-400 bg-red-400/10' : 'text-green-400 bg-green-400/10'}`}>
