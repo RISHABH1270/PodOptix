@@ -10,10 +10,10 @@ import (
 // Values differ per environment: local (.env file), production (Kubernetes Secrets via Helm).
 type Config struct {
 	Port          string
-	DatabaseURL   string
-	RedisURL      string
-	JWTSecret     string
-	EncryptionKey string // 32-byte key for AES-256 token encryption at rest
+	DatabaseURL   string // postgres://user:password@host:port/dbname?sslmode=disable
+	RedisURL      string // redis://host:port
+	JWTSecret     string // long random string — signs and verifies JWT tokens
+	EncryptionKey string // exactly 32 bytes — AES-256 key for token encryption at rest
 }
 
 // Load reads environment variables and returns a Config.
