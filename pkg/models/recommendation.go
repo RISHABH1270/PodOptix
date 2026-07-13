@@ -4,7 +4,7 @@ import "time"
 
 // Recommendation status values
 const (
-	RecommendationStatusNewService = "new_service" // not enough data yet — check back after 7 days
+	RecommendationStatusNewService = "new_service"  // not enough data yet — check back after 7 days
 	RecommendationStatusReady      = "ready"        // p99 computed — recommendation is available
 )
 
@@ -19,16 +19,16 @@ type Recommendation struct {
 	ContainerName    string `json:"container_name"    db:"container_name"`
 	Status           string `json:"status"            db:"status"`
 
-	CurrentCPULimit int `json:"current_cpu_limit" db:"current_cpu_limit"` // millicores
-	CurrentMemLimit int `json:"current_mem_limit" db:"current_mem_limit"` // MiB
+	CurrentCPULimit  int    `json:"current_cpu_limit" db:"current_cpu_limit"` // millicores
+	CurrentMemLimit  int    `json:"current_mem_limit" db:"current_mem_limit"` // MiB
 
-	P99CPU float64 `json:"p99_cpu" db:"p99_cpu"` // millicores
-	P99Mem float64 `json:"p99_mem" db:"p99_mem"` // MiB
+	P99CPU           float64 `json:"p99_cpu" db:"p99_cpu"` // millicores
+	P99Mem           float64 `json:"p99_mem" db:"p99_mem"` // MiB
 
 	RecommendedCPULimit int `json:"recommended_cpu_limit" db:"recommended_cpu_limit"` // p99 x 2
 	RecommendedMemLimit int `json:"recommended_mem_limit" db:"recommended_mem_limit"` // p99 x 2
 
-	LookbackWindow string    `json:"lookback_window" db:"lookback_window"`
-	CreatedAt      time.Time `json:"created_at"      db:"created_at"` // when first generated
-	UpdatedAt      time.Time `json:"updated_at"      db:"updated_at"` // last recalculated
+	LookbackWindow   string    `json:"lookback_window" db:"lookback_window"`
+	CreatedAt        time.Time `json:"created_at"      db:"created_at"` // when first generated
+	UpdatedAt        time.Time `json:"updated_at"      db:"updated_at"` // last recalculated
 }

@@ -329,7 +329,12 @@ Storing raw strings makes comparison and math impossible.
 
 The customer always sees human-readable values. Internally everything is a clean integer.
 
-This is clearly labeled as an estimate, not a real recommendation.
+**Why not store in cores and GB directly?**
+Storing as cores and GB would mean floats (`0.12 cores`, `0.18 GB`) — introduces floating point precision issues. `120 × 2 = 240` is exact. `0.12 × 2 = 0.24` has potential precision loss at scale.
+
+Kubernetes itself uses millicores internally. Prometheus returns millicores. We stay aligned with the ecosystem.
+
+**Rule:** millicores/MiB in storage → human-readable only in the display layer (`fmtCPU()`, `fmtMem()` in frontend).
 
 ---
 
