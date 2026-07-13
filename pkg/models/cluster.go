@@ -16,7 +16,7 @@ type Cluster struct {
 	Token           string     `json:"-"                 db:"token"`            // AES-256-GCM encrypted at rest - never exposed in API response
 	LookbackWindow  string     `json:"lookback_window"   db:"lookback_window"`  // how far back to look e.g. "7d"
 	Status          string     `json:"status"            db:"status"`           // healthy | unhealthy
-	LastSyncedAt *time.Time `json:"last_synced_at" db:"last_synced_at"` // nil if never collected
+	LastSyncedAt    *time.Time `json:"last_synced_at"    db:"last_synced_at"`   // nil if never collected
 	CreatedAt       time.Time  `json:"created_at"        db:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"        db:"updated_at"`
 }

@@ -24,7 +24,7 @@ func TestGenerate_Success(t *testing.T) {
 	assert.Equal(t, "payments", rec.Namespace)
 	assert.Equal(t, "payment-api", rec.PodName)
 	assert.Equal(t, "api", rec.ContainerName)
-	assert.Equal(t, models.StatusReady, rec.Status)
+	assert.Equal(t, models.RecommendationStatusReady, rec.Status)
 	assert.Equal(t, "7d", rec.LookbackWindow)
 	assert.Equal(t, 1000, rec.CurrentCPULimit)
 	assert.Equal(t, 1024, rec.CurrentMemLimit)
@@ -102,8 +102,8 @@ func TestGenerateAll_MixedData(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(recs))
-	assert.Equal(t, models.StatusReady, recs[0].Status)
-	assert.Equal(t, models.StatusNewService, recs[1].Status)
+	assert.Equal(t, models.RecommendationStatusReady, recs[0].Status)
+	assert.Equal(t, models.RecommendationStatusNewService, recs[1].Status)
 }
 
 func TestGenerateAll_Empty(t *testing.T) {

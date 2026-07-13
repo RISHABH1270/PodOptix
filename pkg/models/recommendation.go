@@ -2,8 +2,11 @@ package models
 
 import "time"
 
-const StatusNewService = "new_service" // not enough data yet — check back after 7 days
-const StatusReady = "ready"            // p99 computed — recommendation is available
+// Recommendation status values
+const (
+	RecommendationStatusNewService = "new_service" // not enough data yet — check back after 7 days
+	RecommendationStatusReady      = "ready"        // p99 computed — recommendation is available
+)
 
 // Recommendation represents a resource limit recommendation for a single container.
 // One row per container — updated in place every day by the scheduler.
