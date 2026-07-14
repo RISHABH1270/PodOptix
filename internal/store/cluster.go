@@ -11,8 +11,8 @@ import (
 // SaveCluster inserts a new cluster into the database.
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
-		INSERT INTO clusters (cluster_id, name, prometheus_url, token, lookback_window, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO clusters (cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := s.pool.Exec(ctx, query,
 		c.ClusterID,
@@ -20,7 +20,8 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 		c.PrometheusURL,
 		c.Token,
 		c.LookbackWindow,
-		models.ClusterStatusHealthy, // new clusters start as healthy
+		models.ClusterStatusPending, // new clusters start as pending — never synced yet
+		nil,                         // last_synced_at NULL — never synced yet
 		c.CreatedAt,
 		c.UpdatedAt,
 	)

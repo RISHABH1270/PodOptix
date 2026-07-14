@@ -4,8 +4,9 @@ import "time"
 
 // Cluster health status values
 const (
-	ClusterStatusHealthy   = "healthy"   // last collection succeeded
-	ClusterStatusUnhealthy = "unhealthy" // last collection failed — Prometheus unreachable
+	ClusterStatusPending   = "pending"   // newly registered — never synced yet
+	ClusterStatusHealthy   = "healthy"   // last sync succeeded
+	ClusterStatusUnhealthy = "unhealthy" // last sync failed — Prometheus unreachable
 )
 
 // Cluster represents a registered Kubernetes cluster whose Prometheus endpoint the Hub will query.
