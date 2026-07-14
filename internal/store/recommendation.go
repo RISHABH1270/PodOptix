@@ -7,6 +7,8 @@ import (
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
+// ── Create / Update (Upsert) ──────────────────────────────────────────────────
+
 // UpsertRecommendation inserts a new recommendation or updates the existing one.
 // One row per container — updated in place every time the scheduler runs.
 func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendation) error {
@@ -17,7 +19,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
 			lookback_window, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
 		ON CONFLICT (cluster_id, namespace, pod_name, container_name)
 		DO UPDATE SET
 			status                = EXCLUDED.status,
@@ -27,7 +29,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 			p99_mem               = EXCLUDED.p99_mem,
 			recommended_cpu_limit = EXCLUDED.recommended_cpu_limit,
 			recommended_mem_limit = EXCLUDED.recommended_mem_limit,
-			updated_at            = EXCLUDED.updated_at
+			updated_at            = NOW()
 	`
 	_, err := s.pool.Exec(ctx, query,
 		r.RecommendationID,
@@ -44,7 +46,6 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 		r.RecommendedMemLimit,
 		r.LookbackWindow,
 		r.CreatedAt,
-		r.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert recommendation: %w", err)
@@ -52,7 +53,9 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 	return nil
 }
 
-// ListByCluster fetches all recommendations for a given cluster.
+// ── Read ──────────────────────────────────────────────────────────────────────
+
+// ListByCluster fetches all recommendations for a given cluster ordered by namespace → pod → container.
 func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.Recommendation, error) {
 	query := `
 		SELECT
