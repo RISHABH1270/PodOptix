@@ -8,7 +8,7 @@ import (
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
-// note: time imported for UpdateClusterHealth parameter
+// ── Create ────────────────────────────────────────────────────────────────────
 
 // SaveCluster inserts a new cluster into the database.
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
@@ -32,6 +32,8 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	}
 	return nil
 }
+
+// ── Read ──────────────────────────────────────────────────────────────────────
 
 // GetCluster fetches a single cluster by its ID.
 func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, error) {
@@ -60,7 +62,7 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 	return c, nil
 }
 
-// ListClusters fetches all registered clusters.
+// ListClusters fetches all registered clusters ordered by newest first.
 func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	query := `
 		SELECT cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at
@@ -95,15 +97,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	return clusters, nil
 }
 
-// DeleteCluster removes a cluster by its ID.
-func (s *Store) DeleteCluster(ctx context.Context, id string) error {
-	query := `DELETE FROM clusters WHERE cluster_id = $1`
-	_, err := s.pool.Exec(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("delete cluster: %w", err)
-	}
-	return nil
-}
+// ── Update ────────────────────────────────────────────────────────────────────
 
 // UpdateCluster updates cluster details.
 func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
@@ -135,6 +129,18 @@ func (s *Store) UpdateClusterHealth(ctx context.Context, clusterID string, statu
 	_, err := s.pool.Exec(ctx, query, status, collectedAt, clusterID)
 	if err != nil {
 		return fmt.Errorf("update cluster health: %w", err)
+	}
+	return nil
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+
+// DeleteCluster removes a cluster by its ID.
+func (s *Store) DeleteCluster(ctx context.Context, id string) error {
+	query := `DELETE FROM clusters WHERE cluster_id = $1`
+	_, err := s.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete cluster: %w", err)
 	}
 	return nil
 }
