@@ -8,6 +8,8 @@ import (
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
+// note: time imported for UpdateClusterHealth parameter
+
 // SaveCluster inserts a new cluster into the database.
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
@@ -107,15 +109,14 @@ func (s *Store) DeleteCluster(ctx context.Context, id string) error {
 func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
 		UPDATE clusters
-		SET name = $1, prometheus_url = $2, token = $3, lookback_window = $4, updated_at = $5
-		WHERE cluster_id = $6
+		SET name = $1, prometheus_url = $2, token = $3, lookback_window = $4, updated_at = NOW()
+		WHERE cluster_id = $5
 	`
 	_, err := s.pool.Exec(ctx, query,
 		c.Name,
 		c.PrometheusURL,
 		c.Token,
 		c.LookbackWindow,
-		time.Now(),
 		c.ClusterID,
 	)
 	if err != nil {
@@ -128,10 +129,10 @@ func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 func (s *Store) UpdateClusterHealth(ctx context.Context, clusterID string, status string, collectedAt time.Time) error {
 	query := `
 		UPDATE clusters
-		SET status = $1, last_synced_at = $2, updated_at = $3
-		WHERE cluster_id = $4
+		SET status = $1, last_synced_at = $2, updated_at = NOW()
+		WHERE cluster_id = $3
 	`
-	_, err := s.pool.Exec(ctx, query, status, collectedAt, time.Now(), clusterID)
+	_, err := s.pool.Exec(ctx, query, status, collectedAt, clusterID)
 	if err != nil {
 		return fmt.Errorf("update cluster health: %w", err)
 	}
