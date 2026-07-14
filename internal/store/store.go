@@ -17,7 +17,7 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-// Constructor - New connects to PostgreSQL and returns a Store with a connection pool.
+// New connects to PostgreSQL and returns a Store with a connection pool.
 func New(databaseURL string) (*Store, error) {
 	// configure the connection pool
 	config, err := pgxpool.ParseConfig(databaseURL)

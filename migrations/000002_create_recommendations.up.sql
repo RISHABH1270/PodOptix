@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS recommendations (
     created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
-    -- ensures one recommendation per container per cluster
+    -- ensures one recommendation per container per cluster all the time
     UNIQUE (cluster_id, namespace, pod_name, container_name)
 );
 
