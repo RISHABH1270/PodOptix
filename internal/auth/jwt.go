@@ -59,9 +59,5 @@ func ValidateToken(tokenString string, secret string) (*Claims, error) {
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
 
-	if !token.Valid {
-		return nil, fmt.Errorf("token is not valid")
-	}
-
 	return &claims, nil
 }
