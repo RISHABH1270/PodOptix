@@ -144,7 +144,6 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 - [ ] Web Dashboard
 - [ ] Docker image
 - [ ] Helm chart
-- [ ] GitHub Actions CI
 
 ---
 
