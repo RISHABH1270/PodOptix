@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a0f00"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </radialGradient>
+    <linearGradient id="orange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="200" height="200" fill="url(#bg)" rx="32"/>
+
+  <!-- Outer ring — large arc representing over-provisioned limit -->
+  <circle cx="100" cy="108" r="62" fill="none" stroke="#f97316" stroke-width="3" stroke-opacity="0.2" stroke-dasharray="290 100"/>
+
+  <!-- Middle arc — the right-sized recommended limit -->
+  <circle cx="100" cy="108" r="46" fill="none" stroke="#fb923c" stroke-width="4" stroke-opacity="0.5"
+    stroke-dasharray="200 90" stroke-dashoffset="-10"/>
+
+  <!-- Inner core — the optimal zone -->
+  <circle cx="100" cy="108" r="30" fill="none" stroke="url(#orange)" stroke-width="5"
+    stroke-dasharray="130 80" stroke-dashoffset="-5"/>
+
+  <!-- Center dot — the precision point -->
+  <circle cx="100" cy="108" r="8" fill="url(#amber)"/>
+  <circle cx="100" cy="108" r="3.5" fill="#0a0a0a"/>
+
+  <!-- Upward tick — optimization indicator -->
+  <line x1="100" y1="46" x2="100" y2="58" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Side ticks -->
+  <line x1="38" y1="108" x2="50" y2="108" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.6"/>
+  <line x1="150" y1="108" x2="162" y2="108" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.6"/>
+
+</svg>
