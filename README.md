@@ -60,7 +60,7 @@ The Hub connects directly to each cluster's Prometheus HTTP API, queries p99 met
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         HUB                                 │
-│       Master Control Plane · REST API                       │
+│       Master Control Plane · Dashboard · REST API           │
 │        Queries p99 · Generates Recommendations              │
 └──────────┬──────────────────┬──────────────────┬────────────┘
            │ PromQL API       │ PromQL API       │ PromQL API
