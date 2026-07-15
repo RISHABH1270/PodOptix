@@ -22,7 +22,7 @@ type Cache struct {
 	client *redis.Client
 }
 
-// Constructor - New connects to Redis and returns a Cache.
+// New connects to Redis and returns a Cache.
 func New(redisURL string) (*Cache, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
