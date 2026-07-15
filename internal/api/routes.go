@@ -4,7 +4,8 @@ package api
 func (s *Server) registerRoutes() {
 
 	// public routes — no auth required
-	s.router.GET("/healthz", s.handleHealthz)
+	s.router.GET("/healthz", s.handleHealthz)  // liveness  — is process alive?
+	s.router.GET("/readyz", s.handleReadyz)    // readiness — are dependencies ready?
 	s.router.POST("/auth/register", s.register)
 	s.router.POST("/auth/login", s.login)
 

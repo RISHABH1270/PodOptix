@@ -45,6 +45,11 @@ func (c *Cache) Close() error {
 	return c.client.Close()
 }
 
+// Ping verifies the Redis connection is alive — used by readiness probe.
+func (c *Cache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}
+
 // ── Recommendations cache ────────────────────────────────────────────────────
 
 // SetRecommendations caches recommendations for a cluster as JSON.

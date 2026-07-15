@@ -51,6 +51,11 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
+// Ping verifies the database connection is alive — used by readiness probe.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.pool.Ping(ctx)
+}
+
 // EnsureDatabase creates the database if it does not already exist.
 func EnsureDatabase(databaseURL string) error {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
