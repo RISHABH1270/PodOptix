@@ -93,8 +93,6 @@ helm install podoptix podoptix/hub \
 
 Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and register your first cluster.
 
-> Helm chart coming soon — track progress in the [Roadmap](#roadmap).
-
 ---
 
 ## API
