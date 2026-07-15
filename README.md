@@ -13,7 +13,6 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 [![JWT](https://img.shields.io/badge/Auth-JWT-F59E0B?style=for-the-badge&logo=jsonwebtokens&logoColor=white)](https://jwt.io)
-[![Tests](https://img.shields.io/badge/Tests-Passing-22C55E?style=for-the-badge&logo=go&logoColor=white)]()
 
 </div>
 
