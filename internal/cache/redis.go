@@ -22,7 +22,7 @@ type Cache struct {
 	client *redis.Client
 }
 
-// Constructor - New connects to Redis and returns a Cache.
+// New connects to Redis and returns a Cache.
 func New(redisURL string) (*Cache, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
@@ -43,6 +43,11 @@ func New(redisURL string) (*Cache, error) {
 // Close shuts down the Redis connection.
 func (c *Cache) Close() error {
 	return c.client.Close()
+}
+
+// Ping verifies the Redis connection is alive — used by readiness probe.
+func (c *Cache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
 }
 
 // ── Recommendations cache ────────────────────────────────────────────────────

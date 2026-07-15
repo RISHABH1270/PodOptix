@@ -14,7 +14,7 @@ import (
 // Generate takes raw container metrics and produces a Recommendation.
 // It computes p99 for CPU and memory, multiplies by 2, and returns
 // a Recommendation ready to be upserted into the database.
-func Generate(
+func generate(
 	clusterID string,
 	lookbackWindow string,
 	currentCPULimit int,
@@ -52,7 +52,7 @@ func Generate(
 		Namespace:           metrics.Namespace,
 		PodName:             metrics.PodName,
 		ContainerName:       metrics.ContainerName,
-		Status:              models.StatusReady,
+		Status:              models.RecommendationStatusReady,
 		CurrentCPULimit:     currentCPULimit,
 		CurrentMemLimit:     currentMemLimit,
 		P99CPU:              p99CPU,
@@ -85,7 +85,7 @@ func GenerateAll(
 				Namespace:        m.Namespace,
 				PodName:          m.PodName,
 				ContainerName:    m.ContainerName,
-				Status:           models.StatusNewService,
+				Status:           models.RecommendationStatusNewService,
 				LookbackWindow:   lookbackWindow,
 				CreatedAt:        now,
 				UpdatedAt:        now,
@@ -93,7 +93,7 @@ func GenerateAll(
 			continue
 		}
 
-		rec, err := Generate(clusterID, lookbackWindow, 0, 0, m)
+		rec, err := generate(clusterID, lookbackWindow, 0, 0, m)
 		if err != nil {
 			return nil, fmt.Errorf("generate recommendation: %w", err)
 		}

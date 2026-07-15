@@ -17,14 +17,14 @@ func TestGenerate_Success(t *testing.T) {
 		MemValues:     []float64{200, 210, 220, 205, 215},
 	}
 
-	rec, err := Generate("cluster-123", "7d", 1000, 1024, metrics)
+	rec, err := generate("cluster-123", "7d", 1000, 1024, metrics)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "cluster-123", rec.ClusterID)
 	assert.Equal(t, "payments", rec.Namespace)
 	assert.Equal(t, "payment-api", rec.PodName)
 	assert.Equal(t, "api", rec.ContainerName)
-	assert.Equal(t, models.StatusReady, rec.Status)
+	assert.Equal(t, models.RecommendationStatusReady, rec.Status)
 	assert.Equal(t, "7d", rec.LookbackWindow)
 	assert.Equal(t, 1000, rec.CurrentCPULimit)
 	assert.Equal(t, 1024, rec.CurrentMemLimit)
@@ -36,7 +36,7 @@ func TestGenerate_Success(t *testing.T) {
 }
 
 func TestGenerate_NilMetrics(t *testing.T) {
-	_, err := Generate("cluster-123", "7d", 0, 0, nil)
+	_, err := generate("cluster-123", "7d", 0, 0, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "metrics cannot be nil")
 }
@@ -49,7 +49,7 @@ func TestGenerate_EmptyCPU(t *testing.T) {
 		CPUValues:     []float64{}, // empty
 		MemValues:     []float64{200, 210},
 	}
-	_, err := Generate("cluster-123", "7d", 0, 0, metrics)
+	_, err := generate("cluster-123", "7d", 0, 0, metrics)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "compute p99 cpu")
 }
@@ -62,7 +62,7 @@ func TestGenerate_EmptyMem(t *testing.T) {
 		CPUValues:     []float64{100, 110},
 		MemValues:     []float64{}, // empty
 	}
-	_, err := Generate("cluster-123", "7d", 0, 0, metrics)
+	_, err := generate("cluster-123", "7d", 0, 0, metrics)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "compute p99 mem")
 }
@@ -76,7 +76,7 @@ func TestGenerate_RecommendationIsDoubleP99(t *testing.T) {
 		MemValues:     []float64{100},
 	}
 
-	rec, err := Generate("cluster-1", "7d", 0, 0, metrics)
+	rec, err := generate("cluster-1", "7d", 0, 0, metrics)
 	assert.NoError(t, err)
 	// p99 of single value = 50, recommended = 50*2 = 100
 	assert.Equal(t, 100, rec.RecommendedCPULimit)
@@ -102,8 +102,8 @@ func TestGenerateAll_MixedData(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(recs))
-	assert.Equal(t, models.StatusReady, recs[0].Status)
-	assert.Equal(t, models.StatusNewService, recs[1].Status)
+	assert.Equal(t, models.RecommendationStatusReady, recs[0].Status)
+	assert.Equal(t, models.RecommendationStatusNewService, recs[1].Status)
 }
 
 func TestGenerateAll_Empty(t *testing.T) {

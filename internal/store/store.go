@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,7 +19,7 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-// Constructor - New connects to PostgreSQL and returns a Store with a connection pool.
+// New connects to PostgreSQL and returns a Store with a connection pool.
 func New(databaseURL string) (*Store, error) {
 	// configure the connection pool
 	config, err := pgxpool.ParseConfig(databaseURL)
@@ -49,6 +51,11 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
+// Ping verifies the database connection is alive — used by readiness probe.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.pool.Ping(ctx)
+}
+
 // EnsureDatabase creates the database if it does not already exist.
 func EnsureDatabase(databaseURL string) error {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
@@ -74,10 +81,13 @@ func EnsureDatabase(databaseURL string) error {
 
 	_, err = conn.Exec(context.Background(), "CREATE DATABASE "+dbName)
 	if err != nil {
-		// ignore "already exists" — that's fine
-		if err.Error() != "ERROR: database \""+dbName+"\" already exists (SQLSTATE 42P04)" {
-			return fmt.Errorf("create database: %w", err)
+		// check PostgreSQL error code — 42P04 = "database already exists"
+		// using error code not message string — stable across PostgreSQL versions and locales
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42P04" {
+			return nil // database already exists — that's fine
 		}
+		return fmt.Errorf("create database: %w", err)
 	}
 
 	return nil

@@ -44,10 +44,9 @@ func GenerateToken(userID string, email string, secret string) (string, error) {
 // Returns the claims if valid, error if expired or tampered.
 func ValidateToken(tokenString string, secret string) (*Claims, error) {
 	var claims Claims
-	var token *jwt.Token
 	var err error
 
-	token, err = jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (interface{}, error) {
+	_, err = jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (interface{}, error) {
 		// verify signing algorithm — prevents algorithm confusion attacks
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -57,10 +56,6 @@ func ValidateToken(tokenString string, secret string) (*Claims, error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %w", err)
-	}
-
-	if !token.Valid {
-		return nil, fmt.Errorf("token is not valid")
 	}
 
 	return &claims, nil

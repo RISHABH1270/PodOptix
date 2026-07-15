@@ -7,28 +7,54 @@ import (
 
 // Config holds all configuration values for the Hub.
 // All values are read from environment variables — never hardcoded.
+// Values differ per environment: local (.env file), production (Kubernetes Secrets via Helm).
 type Config struct {
 	Port          string
-	DatabaseURL   string
-	RedisURL      string
-	JWTSecret     string
-	EncryptionKey string // 32-byte key for AES-256 token encryption at rest
+	DatabaseURL   string // postgres://user:password@host:port/dbname?sslmode=disable
+	RedisURL      string // redis://host:port
+	JWTSecret     string // long random string — signs and verifies JWT tokens
+	EncryptionKey string // exactly 32 bytes — AES-256 key for token encryption at rest
 }
 
 // Load reads environment variables and returns a Config.
-// If a required variable is missing, the app panics — it cannot start without it.
+// Returns an error if any required variable is missing — the app must not start without them.
 func Load() (*Config, error) {
-	var cfg *Config
-	cfg = &Config{
-		Port:          getEnv("PORT", "8080"),
-		DatabaseURL:   mustGetEnv("DATABASE_URL"),
-		RedisURL:      mustGetEnv("REDIS_URL"),
-		JWTSecret:     mustGetEnv("JWT_SECRET"),
-		EncryptionKey: mustGetEnv("ENCRYPTION_KEY"),
+	var err error
+
+	var databaseURL string
+	databaseURL, err = mustGetEnv("DATABASE_URL")
+	if err != nil {
+		return nil, err
 	}
-	return cfg, nil
+
+	var redisURL string
+	redisURL, err = mustGetEnv("REDIS_URL")
+	if err != nil {
+		return nil, err
+	}
+
+	var jwtSecret string
+	jwtSecret, err = mustGetEnv("JWT_SECRET")
+	if err != nil {
+		return nil, err
+	}
+
+	var encryptionKey string
+	encryptionKey, err = mustGetEnv("ENCRYPTION_KEY")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Port:          getEnv("PORT", "8080"),
+		DatabaseURL:   databaseURL,
+		RedisURL:      redisURL,
+		JWTSecret:     jwtSecret,
+		EncryptionKey: encryptionKey,
+	}, nil
 }
 
+// getEnv reads an env variable — returns fallback if not set.
 func getEnv(key string, fallback string) string {
 	var value string
 	value = os.Getenv(key)
@@ -38,12 +64,12 @@ func getEnv(key string, fallback string) string {
 	return fallback
 }
 
-func mustGetEnv(key string) string {
+// mustGetEnv reads an env variable — returns an error if not set.
+func mustGetEnv(key string) (string, error) {
 	var value string
 	value = os.Getenv(key)
 	if value == "" {
-		// The app cannot start without required variables.
-		panic(fmt.Sprintf("Required environment variable %q is not set", key))
+		return "", fmt.Errorf("Required environment variable %q is not set", key)
 	}
-	return value
+	return value, nil
 }

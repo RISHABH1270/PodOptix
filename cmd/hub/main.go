@@ -1,10 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
-
-	"context"
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/api"
@@ -24,11 +23,10 @@ const (
 )
 
 func main() {
-
-	// load config first — everything depends on it
 	var cfg *config.Config
 	var err error
 
+	// 1. load config — everything else depends on it
 	cfg, err = config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
@@ -36,21 +34,21 @@ func main() {
 
 	printBanner(cfg.Port)
 
-	// ensure database exists
+	// 2. ensure database exists — creates it if first time
 	if err = store.EnsureDatabase(cfg.DatabaseURL); err != nil {
 		fmt.Println(red + "  Database : failed — " + err.Error() + reset)
 		log.Fatalf("failed to ensure database: %v", err)
 	}
 	fmt.Println(green + "  Database : " + reset + "Database ready")
 
-	// sync schema
+	// 3. sync schema — run migrations
 	if err = store.SyncSchema(cfg.DatabaseURL); err != nil {
 		fmt.Println(red + "  Schema   : failed — " + err.Error() + reset)
 		log.Fatalf("schema sync failed: %v", err)
 	}
 	fmt.Println(green + "  Schema   : " + reset + "Schema synced")
 
-	// step 3 — open connection pool
+	// 4. open connection pool
 	var db *store.Store
 	db, err = store.New(cfg.DatabaseURL)
 	if err != nil {
@@ -60,7 +58,7 @@ func main() {
 	defer db.Close()
 	fmt.Println(green + "  Pool     : " + reset + "Connection pool ready")
 
-	// connect to Redis
+	// 5. connect to Redis
 	var redisCache *cache.Cache
 	redisCache, err = cache.New(cfg.RedisURL)
 	if err != nil {
@@ -70,28 +68,25 @@ func main() {
 	defer redisCache.Close()
 	fmt.Println(green + "  Redis    : " + reset + "Connected")
 
-	// start scheduler in background — runs once per day
+	// 6. start scheduler in background — runs once per day
 	sched := scheduler.New(db, 24*time.Hour, cfg.EncryptionKey)
 	go sched.Start(context.Background())
 	fmt.Println(green + "  Scheduler: " + reset + "Started — runs every 24 hours")
 
-	// step 4 — start HTTP server
+	// 7. start HTTP server
 	var server *api.Server
 	server = api.NewServer(db, redisCache, cfg.JWTSecret, cfg.EncryptionKey)
 
-	// Bind the port first — if this succeeds the server is guaranteed to be up
 	listener, err := server.Listen(cfg.Port)
 	if err != nil {
 		fmt.Println(red + "  Server   : failed to bind port " + cfg.Port + " — " + err.Error() + reset)
 		log.Fatalf("server failed: %v", err)
 	}
 
-	// Port is bound — safe to confirm server is up
 	fmt.Println(green + "  Server   : " + reset + "Up and running on port " + cfg.Port)
 	fmt.Println(yellow + "  ──────────────────────────────────────────────────────────────" + reset)
 	fmt.Println()
 
-	// Start accepting requests — blocks here
 	if err = server.Serve(listener); err != nil {
 		fmt.Println(red + "  ERROR    : Server stopped — " + err.Error() + reset)
 		log.Fatalf("server stopped: %v", err)

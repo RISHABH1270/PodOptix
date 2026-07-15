@@ -27,7 +27,7 @@ type Collector struct {
 	httpClient    *http.Client
 }
 
-// Constructor - New creates a new Collector for the given Prometheus endpoint.
+// New creates a new Collector for the given Prometheus endpoint.
 func New(prometheusURL string, token string) *Collector {
 	return &Collector{
 		prometheusURL: prometheusURL,

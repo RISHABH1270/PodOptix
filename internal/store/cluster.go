@@ -8,11 +8,13 @@ import (
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
+// ── Create ────────────────────────────────────────────────────────────────────
+
 // SaveCluster inserts a new cluster into the database.
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
-		INSERT INTO clusters (cluster_id, name, prometheus_url, token, lookback_window, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO clusters (cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := s.pool.Exec(ctx, query,
 		c.ClusterID,
@@ -20,6 +22,8 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 		c.PrometheusURL,
 		c.Token,
 		c.LookbackWindow,
+		models.ClusterStatusPending, // new clusters start as pending — never synced yet
+		nil,                         // last_synced_at NULL — never synced yet
 		c.CreatedAt,
 		c.UpdatedAt,
 	)
@@ -29,10 +33,12 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	return nil
 }
 
+// ── Read ──────────────────────────────────────────────────────────────────────
+
 // GetCluster fetches a single cluster by its ID.
 func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, error) {
 	query := `
-		SELECT cluster_id, name, prometheus_url, token, lookback_window, created_at, updated_at
+		SELECT cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at
 		FROM clusters
 		WHERE cluster_id = $1
 	`
@@ -45,6 +51,8 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 		&c.PrometheusURL,
 		&c.Token,
 		&c.LookbackWindow,
+		&c.Status,
+		&c.LastSyncedAt,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 	)
@@ -54,10 +62,10 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 	return c, nil
 }
 
-// ListClusters fetches all registered clusters.
+// ListClusters fetches all registered clusters ordered by newest first.
 func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	query := `
-		SELECT cluster_id, name, prometheus_url, token, lookback_window, created_at, updated_at
+		SELECT cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at
 		FROM clusters
 		ORDER BY created_at DESC
 	`
@@ -76,6 +84,8 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 			&c.PrometheusURL,
 			&c.Token,
 			&c.LookbackWindow,
+			&c.Status,
+			&c.LastSyncedAt,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		)
@@ -87,33 +97,50 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	return clusters, nil
 }
 
-// DeleteCluster removes a cluster by its ID.
-func (s *Store) DeleteCluster(ctx context.Context, id string) error {
-	query := `DELETE FROM clusters WHERE cluster_id = $1`
-	_, err := s.pool.Exec(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("delete cluster: %w", err)
-	}
-	return nil
-}
+// ── Update ────────────────────────────────────────────────────────────────────
 
-// UpdateCluster updates the updated_at timestamp when a cluster is modified.
+// UpdateCluster updates cluster details.
 func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
 		UPDATE clusters
-		SET name = $1, prometheus_url = $2, token = $3, lookback_window = $4, updated_at = $5
-		WHERE cluster_id = $6
+		SET name = $1, prometheus_url = $2, token = $3, lookback_window = $4, updated_at = NOW()
+		WHERE cluster_id = $5
 	`
 	_, err := s.pool.Exec(ctx, query,
 		c.Name,
 		c.PrometheusURL,
 		c.Token,
 		c.LookbackWindow,
-		time.Now(),
 		c.ClusterID,
 	)
 	if err != nil {
 		return fmt.Errorf("update cluster: %w", err)
+	}
+	return nil
+}
+
+// UpdateClusterHealth updates status and last_synced_at after a collection run.
+func (s *Store) UpdateClusterHealth(ctx context.Context, clusterID string, status string, collectedAt time.Time) error {
+	query := `
+		UPDATE clusters
+		SET status = $1, last_synced_at = $2, updated_at = NOW()
+		WHERE cluster_id = $3
+	`
+	_, err := s.pool.Exec(ctx, query, status, collectedAt, clusterID)
+	if err != nil {
+		return fmt.Errorf("update cluster health: %w", err)
+	}
+	return nil
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+
+// DeleteCluster removes a cluster by its ID.
+func (s *Store) DeleteCluster(ctx context.Context, id string) error {
+	query := `DELETE FROM clusters WHERE cluster_id = $1`
+	_, err := s.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete cluster: %w", err)
 	}
 	return nil
 }

@@ -19,6 +19,14 @@ type CreateClusterRequest struct {
 	LookbackWindow string `json:"lookback_window"`
 }
 
+// UpdateClusterRequest defines the expected JSON body for updating a cluster.
+// All fields optional — only provided fields are updated.
+type UpdateClusterRequest struct {
+	Name          string `json:"name"`
+	PrometheusURL string `json:"prometheus_url"`
+	Token         string `json:"token"`
+}
+
 // listClusters returns all registered clusters.
 func (s *Server) listClusters(c *gin.Context) {
 	var requestID string
@@ -109,6 +117,67 @@ func (s *Server) getCluster(c *gin.Context) {
 		})
 		return
 	}
+	c.JSON(http.StatusOK, cluster)
+}
+
+// updateCluster updates an existing cluster's details.
+func (s *Server) updateCluster(c *gin.Context) {
+	var requestID string
+	requestID = c.GetString("request_id")
+
+	var id string
+	id = c.Param("id")
+
+	// fetch existing cluster
+	cluster, err := s.store.GetCluster(c.Request.Context(), id)
+	if err != nil {
+		log.Printf("ERROR [%s] updateCluster not found id=%s: %v", requestID, id, err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":      "Cluster not found",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	var req UpdateClusterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("ERROR [%s] updateCluster invalid request: %v", requestID, err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid request body",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// apply only the fields that were provided
+	if req.Name != "" {
+		cluster.Name = req.Name
+	}
+	if req.PrometheusURL != "" {
+		cluster.PrometheusURL = req.PrometheusURL
+	}
+	if req.Token != "" {
+		encryptedToken, err := auth.Encrypt(req.Token, s.encryptionKey)
+		if err != nil {
+			log.Printf("ERROR [%s] updateCluster encrypt token: %v", requestID, err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":      "Failed to update cluster, please try again",
+				"request_id": requestID,
+			})
+			return
+		}
+		cluster.Token = encryptedToken
+	}
+
+	if err := s.store.UpdateCluster(c.Request.Context(), cluster); err != nil {
+		log.Printf("ERROR [%s] updateCluster save id=%s: %v", requestID, id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to update cluster, please try again",
+			"request_id": requestID,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, cluster)
 }
 

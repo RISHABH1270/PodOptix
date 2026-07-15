@@ -116,9 +116,9 @@ That's it. Register your workload clusters via the dashboard and recommendations
 - [x] Cache layer (Redis)
 - [x] Token encryption at rest (AES-256)
 - [x] Central Hub with multi-cluster support
-- [ ] Web Dashboard
-- [ ] Docker image
-- [ ] Helm chart
+- [x] Web Dashboard
+- [x] Docker image
+- [x] Helm chart
 
 ---
 
