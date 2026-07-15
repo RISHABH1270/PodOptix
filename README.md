@@ -74,6 +74,29 @@ Register a cluster with its Prometheus URL + auth token. Recommendations are gen
 
 ---
 
+## Quick Start
+
+Deploy PodOptix Hub in your management or ops Kubernetes cluster:
+
+```bash
+helm repo add podoptix https://charts.podoptix.io
+helm repo update
+
+helm install podoptix podoptix/hub \
+  --namespace podoptix \
+  --create-namespace \
+  --set secrets.databaseURL="postgres://..." \
+  --set secrets.redisURL="redis://..." \
+  --set secrets.jwtSecret="your-secret" \
+  --set secrets.encryptionKey="your-32-byte-key"
+```
+
+Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and register your first cluster.
+
+> Helm chart coming soon — track progress in the [Roadmap](#roadmap).
+
+---
+
 ## API
 
 | Method | Endpoint | Auth | Description |
