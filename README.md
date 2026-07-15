@@ -70,7 +70,7 @@ The Hub connects directly to each cluster's Prometheus HTTP API, queries p99 met
     └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-Onboarding a cluster: register its Prometheus URL + auth token. The scheduler collects data daily and recommendations appear within 24 hours.
+Register a cluster with its Prometheus URL + auth token. Recommendations are generated on startup and refreshed every 24 hours.
 
 ---
 
