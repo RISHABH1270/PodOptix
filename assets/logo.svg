@@ -1,21 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fb923c"/>
-      <stop offset="100%" stop-color="#f59e0b"/>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="amberDim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.1"/>
     </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="200" height="200" fill="#111111" rx="28"/>
+  <!-- Background — deep slate -->
+  <rect width="200" height="200" fill="#0F172A" rx="28"/>
 
-  <!-- Bold P lettermark -->
-  <rect x="58" y="48" width="12" height="104" rx="6" fill="url(#grad)"/>
-  <path d="M70 48 L118 48 Q148 48 148 84 Q148 120 118 120 L70 120"
-        fill="none" stroke="url(#grad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Outer subtle ring -->
+  <circle cx="100" cy="100" r="78" fill="none" stroke="#F59E0B" stroke-width="1" stroke-opacity="0.12"/>
 
-  <!-- Small optimization spark -->
-  <circle cx="148" cy="152" r="8" fill="#f97316"/>
-  <circle cx="148" cy="152" r="4" fill="#111111"/>
+  <!-- Hexagon — Kubernetes nod -->
+  <polygon points="100,32 158,66 158,134 100,168 42,134 42,66"
+           fill="url(#amberDim)" stroke="url(#amber)" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <!-- Bold P -->
+  <text x="75" y="128" font-family="'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-size="82" font-weight="800" fill="url(#amber)" letter-spacing="-2">P</text>
+
+  <!-- Subscript dot — precision indicator -->
+  <circle cx="134" cy="140" r="6" fill="#FBBF24"/>
 
 </svg>
