@@ -17,7 +17,7 @@ func TestGenerate_Success(t *testing.T) {
 		MemValues:     []float64{200, 210, 220, 205, 215},
 	}
 
-	rec, err := Generate("cluster-123", "7d", 1000, 1024, metrics)
+	rec, err := generate("cluster-123", "7d", 1000, 1024, metrics)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "cluster-123", rec.ClusterID)
@@ -36,7 +36,7 @@ func TestGenerate_Success(t *testing.T) {
 }
 
 func TestGenerate_NilMetrics(t *testing.T) {
-	_, err := Generate("cluster-123", "7d", 0, 0, nil)
+	_, err := generate("cluster-123", "7d", 0, 0, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "metrics cannot be nil")
 }
@@ -49,7 +49,7 @@ func TestGenerate_EmptyCPU(t *testing.T) {
 		CPUValues:     []float64{}, // empty
 		MemValues:     []float64{200, 210},
 	}
-	_, err := Generate("cluster-123", "7d", 0, 0, metrics)
+	_, err := generate("cluster-123", "7d", 0, 0, metrics)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "compute p99 cpu")
 }
@@ -62,7 +62,7 @@ func TestGenerate_EmptyMem(t *testing.T) {
 		CPUValues:     []float64{100, 110},
 		MemValues:     []float64{}, // empty
 	}
-	_, err := Generate("cluster-123", "7d", 0, 0, metrics)
+	_, err := generate("cluster-123", "7d", 0, 0, metrics)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "compute p99 mem")
 }
@@ -76,7 +76,7 @@ func TestGenerate_RecommendationIsDoubleP99(t *testing.T) {
 		MemValues:     []float64{100},
 	}
 
-	rec, err := Generate("cluster-1", "7d", 0, 0, metrics)
+	rec, err := generate("cluster-1", "7d", 0, 0, metrics)
 	assert.NoError(t, err)
 	// p99 of single value = 50, recommended = 50*2 = 100
 	assert.Equal(t, 100, rec.RecommendedCPULimit)
