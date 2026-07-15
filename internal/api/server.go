@@ -36,7 +36,6 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey
 	}
 
 	server.registerRoutes()
-	server.serveFrontend() // serve embedded React app for all non-API routes
 
 	return server
 }
