@@ -120,8 +120,8 @@ func (s *Server) recalculate(c *gin.Context) {
 		log.Printf("INFO  recalculate started cluster=%s", clusterID)
 
 		// collect metrics
-		c := collector.New(cluster.PrometheusURL, plainToken)
-		metrics, err := c.Collect(ctx, cluster.LookbackWindow)
+		col := collector.New(cluster.PrometheusURL, plainToken)
+		metrics, err := col.Collect(ctx, cluster.LookbackWindow)
 		if err != nil {
 			log.Printf("ERROR recalculate collect cluster=%s: %v", clusterID, err)
 			return
