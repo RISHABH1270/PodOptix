@@ -13,8 +13,7 @@ import (
 var FrontendFS embed.FS
 
 // serveFrontend registers a catch-all route that serves the React SPA.
-// Any URL not matched by API routes returns index.html —
-// React Router handles client-side navigation from there.
+// Any URL not matched by API routes returns index.html — React Router handles client-side navigation from there.
 func (s *Server) serveFrontend() {
 	distFS, err := fs.Sub(FrontendFS, "frontend/dist")
 	if err != nil {
