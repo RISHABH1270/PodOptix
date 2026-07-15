@@ -20,19 +20,21 @@
 
 ## The Problem
 
-Most Kubernetes and infra teams set pod resource limits by **guesswork or copy-paste** — either picking numbers that "feel right" with no data, or copying limits from another workload that has nothing to do with theirs.
+**3:12 AM. PagerDuty fires. `payment-api` is OOMKilled in production.**
 
-The result?
+The root cause? Someone copied resource limits from a batch job six months ago. The fix takes 2 minutes. Finding it took 40. It will happen again.
 
-- Pods get OOMKilled at midnight
-- Clusters are 40-60% over-provisioned
-- Cloud bills keep growing with no visibility
-- Engineers waste hours manually tuning limits with no real data
-- Limits copied from one service cause cascading failures in another
-- Teams are afraid to reduce limits because they don't know actual usage
-- Finance has no insight into which team or service is burning the most cost
-- No single view across multiple clusters to understand total waste
-- The problem gets worse as the number of microservices grows
+This is what happens when 150 containers across 50 microservices all have limits set by guesswork:
+
+| Symptom | Reality |
+|---------|---------|
+| Pods OOMKilled at midnight | Limits set too low with no data |
+| Cloud bill up 40-60% | Limits set too high — paying for unused capacity |
+| Engineers afraid to reduce limits | Nobody knows actual usage |
+| Cascading failures | Limits copied from unrelated workloads |
+| Finance blind to cost drivers | No per-service visibility across clusters |
+
+**Every new microservice makes it worse. The problem compounds.**
 
 ---
 
