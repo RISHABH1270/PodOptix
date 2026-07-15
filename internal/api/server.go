@@ -11,7 +11,7 @@ import (
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	router        *gin.Engine
+	router        *gin.Engine  // Gin router — knows all routes and middleware
 	store         *store.Store // database connection injected from main
 	cache         *cache.Cache // Redis cache injected from main
 	jwtSecret     string       // used to sign and verify JWT tokens
@@ -23,6 +23,7 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey
 	var router *gin.Engine
 	router = gin.Default()
 
+	// Attaches our custom middleware - assigns a X-Request-ID header.
 	router.Use(RequestIDMiddleware())
 
 	var server *Server

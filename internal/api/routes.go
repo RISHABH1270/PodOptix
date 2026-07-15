@@ -16,6 +16,7 @@ func (s *Server) registerRoutes() {
 		v1.GET("/clusters", s.listClusters)
 		v1.POST("/clusters", s.createCluster)
 		v1.GET("/clusters/:id", s.getCluster)
+		v1.PUT("/clusters/:id", s.updateCluster)
 		v1.DELETE("/clusters/:id", s.deleteCluster)
 
 		// recommendations
