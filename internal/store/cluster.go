@@ -20,7 +20,7 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 		c.ClusterID,
 		c.Name,
 		c.PrometheusURL,
-		c.Token,
+		c.PrometheusToken,
 		c.LookbackWindow,
 		models.ClusterStatusPending, // new clusters start as pending — never synced yet
 		nil,                         // last_synced_at NULL — never synced yet
@@ -49,7 +49,7 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 		&c.ClusterID,
 		&c.Name,
 		&c.PrometheusURL,
-		&c.Token,
+		&c.PrometheusToken,
 		&c.LookbackWindow,
 		&c.Status,
 		&c.LastSyncedAt,
@@ -82,7 +82,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 			&c.ClusterID,
 			&c.Name,
 			&c.PrometheusURL,
-			&c.Token,
+			&c.PrometheusToken,
 			&c.LookbackWindow,
 			&c.Status,
 			&c.LastSyncedAt,
@@ -109,7 +109,7 @@ func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 	_, err := s.pool.Exec(ctx, query,
 		c.Name,
 		c.PrometheusURL,
-		c.Token,
+		c.PrometheusToken,
 		c.LookbackWindow,
 		c.ClusterID,
 	)
