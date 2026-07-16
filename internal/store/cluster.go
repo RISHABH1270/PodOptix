@@ -18,7 +18,7 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	`
 	_, err := s.pool.Exec(ctx, query,
 		c.ClusterID,
-		c.Name,
+		c.ClusterName,
 		c.PrometheusURL,
 		c.PrometheusToken,
 		c.LookbackWindow,
@@ -47,7 +47,7 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 	c := &models.Cluster{}
 	err := row.Scan(
 		&c.ClusterID,
-		&c.Name,
+		&c.ClusterName,
 		&c.PrometheusURL,
 		&c.PrometheusToken,
 		&c.LookbackWindow,
@@ -80,7 +80,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 		c := &models.Cluster{}
 		err := rows.Scan(
 			&c.ClusterID,
-			&c.Name,
+			&c.ClusterName,
 			&c.PrometheusURL,
 			&c.PrometheusToken,
 			&c.LookbackWindow,
@@ -107,7 +107,7 @@ func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 		WHERE cluster_id = $5
 	`
 	_, err := s.pool.Exec(ctx, query,
-		c.Name,
+		c.ClusterName,
 		c.PrometheusURL,
 		c.PrometheusToken,
 		c.LookbackWindow,

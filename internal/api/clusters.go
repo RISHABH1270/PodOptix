@@ -13,7 +13,7 @@ import (
 
 // CreateClusterRequest defines the expected JSON body for registering a cluster.
 type CreateClusterRequest struct {
-	Name           string `json:"name"            binding:"required"`
+	ClusterName    string `json:"cluster_name"     binding:"required"`
 	PrometheusURL  string `json:"prometheus_url"  binding:"required"`
 	PrometheusToken string `json:"prometheus_token" binding:"required"`
 	LookbackWindow string `json:"lookback_window"`
@@ -22,7 +22,7 @@ type CreateClusterRequest struct {
 // UpdateClusterRequest defines the expected JSON body for updating a cluster.
 // All fields optional — only provided fields are updated.
 type UpdateClusterRequest struct {
-	Name          string `json:"name"`
+	ClusterName   string `json:"cluster_name"`
 	PrometheusURL string `json:"prometheus_url"`
 	PrometheusToken string `json:"prometheus_token"`
 }
@@ -80,7 +80,7 @@ func (s *Server) createCluster(c *gin.Context) {
 	var cluster *models.Cluster
 	cluster = &models.Cluster{
 		ClusterID:      uuid.New().String(),
-		Name:           req.Name,
+		ClusterName:    req.ClusterName,
 		PrometheusURL:  req.PrometheusURL,
 		PrometheusToken: encryptedToken,
 		LookbackWindow: req.LookbackWindow,
@@ -150,8 +150,8 @@ func (s *Server) updateCluster(c *gin.Context) {
 	}
 
 	// apply only the fields that were provided
-	if req.Name != "" {
-		cluster.Name = req.Name
+	if req.ClusterName != "" {
+		cluster.ClusterName = req.ClusterName
 	}
 	if req.PrometheusURL != "" {
 		cluster.PrometheusURL = req.PrometheusURL

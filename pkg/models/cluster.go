@@ -2,11 +2,11 @@ package models
 
 import "time"
 
-// Cluster health status values
+// Cluster connection status values
 const (
-	ClusterStatusPending   = "pending"   // newly registered — never synced yet
+	ClusterStatusPending      = "pending"      // newly registered — never synced yet
 	ClusterStatusConnected    = "connected"    // last sync succeeded — Prometheus reachable
-	ClusterStatusUnhealthy = "unhealthy" // last sync failed — Prometheus unreachable
+	ClusterStatusDisconnected = "disconnected" // last sync failed — Prometheus unreachable
 )
 
 // Cluster represents a registered Kubernetes cluster whose Prometheus endpoint the Hub will query.
