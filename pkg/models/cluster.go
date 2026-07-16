@@ -5,14 +5,14 @@ import "time"
 // Cluster health status values
 const (
 	ClusterStatusPending   = "pending"   // newly registered — never synced yet
-	ClusterStatusHealthy   = "healthy"   // last sync succeeded
+	ClusterStatusConnected    = "connected"    // last sync succeeded — Prometheus reachable
 	ClusterStatusUnhealthy = "unhealthy" // last sync failed — Prometheus unreachable
 )
 
 // Cluster represents a registered Kubernetes cluster whose Prometheus endpoint the Hub will query.
 type Cluster struct {
 	ClusterID       string     `json:"cluster_id"        db:"cluster_id"`
-	ClusterName     string     `json:"cluster_name"       db:"cluster_name"`
+	ClusterName     string     `json:"cluster_name"      db:"cluster_name"`
 	PrometheusURL   string     `json:"prometheus_url"    db:"prometheus_url"`
 	PrometheusToken string     `json:"-"                 db:"prometheus_token"`            // AES-256-GCM encrypted at rest - never exposed in API response
 	LookbackWindow  string     `json:"lookback_window"   db:"lookback_window"`  // how far back to look e.g. "7d"
