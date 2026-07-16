@@ -13,7 +13,7 @@ import (
 // SaveCluster inserts a new cluster into the database.
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
-		INSERT INTO clusters (cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at)
+		INSERT INTO clusters (cluster_id, name, prometheus_url, prometheus_prometheus_token, lookback_window, status, last_synced_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := s.pool.Exec(ctx, query,
@@ -38,7 +38,7 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 // GetCluster fetches a single cluster by its ID.
 func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, error) {
 	query := `
-		SELECT cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at
+		SELECT cluster_id, name, prometheus_url, prometheus_prometheus_token, lookback_window, status, last_synced_at, created_at, updated_at
 		FROM clusters
 		WHERE cluster_id = $1
 	`
@@ -65,7 +65,7 @@ func (s *Store) GetCluster(ctx context.Context, id string) (*models.Cluster, err
 // ListClusters fetches all registered clusters ordered by newest first.
 func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	query := `
-		SELECT cluster_id, name, prometheus_url, token, lookback_window, status, last_synced_at, created_at, updated_at
+		SELECT cluster_id, name, prometheus_url, prometheus_prometheus_token, lookback_window, status, last_synced_at, created_at, updated_at
 		FROM clusters
 		ORDER BY created_at DESC
 	`
@@ -103,7 +103,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 func (s *Store) UpdateCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
 		UPDATE clusters
-		SET name = $1, prometheus_url = $2, token = $3, lookback_window = $4, updated_at = NOW()
+		SET name = $1, prometheus_url = $2, prometheus_token = $3, lookback_window = $4, updated_at = NOW()
 		WHERE cluster_id = $5
 	`
 	_, err := s.pool.Exec(ctx, query,
