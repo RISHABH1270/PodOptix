@@ -97,7 +97,7 @@ func (s *Server) recalculate(c *gin.Context) {
 	}
 
 	// decrypt token before using for Prometheus
-	plainToken, err := auth.Decrypt(cluster.Token, s.encryptionKey)
+	plainToken, err := auth.Decrypt(cluster.PrometheusToken, s.encryptionKey)
 	if err != nil {
 		log.Printf("ERROR [%s] recalculate decrypt token cluster=%s: %v", requestID, clusterID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{

@@ -67,7 +67,7 @@ func (s *Scheduler) runAll(ctx context.Context) {
 
 	for _, cluster := range clusters {
 		// decrypt token before using for Prometheus
-		plainToken, err := auth.Decrypt(cluster.Token, s.encryptionKey)
+		plainToken, err := auth.Decrypt(cluster.PrometheusToken, s.encryptionKey)
 		if err != nil {
 			log.Printf("ERROR scheduler decrypt token cluster=%s: %v", cluster.ClusterID, err)
 			continue
@@ -86,7 +86,7 @@ func (s *Scheduler) runForCluster(ctx context.Context, clusterID, prometheusURL,
 	if err != nil {
 		log.Printf("ERROR scheduler collect cluster=%s: %v", clusterID, err)
 		// mark cluster as unhealthy — Prometheus unreachable
-		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusUnhealthy, time.Now())
+		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now())
 		return
 	}
 
@@ -114,5 +114,5 @@ func (s *Scheduler) runForCluster(ctx context.Context, clusterID, prometheusURL,
 		saved, len(recommendations), clusterID)
 
 	// mark cluster as healthy — collection succeeded
-	s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusHealthy, time.Now())
+	s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
 }
