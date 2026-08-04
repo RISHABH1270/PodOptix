@@ -13,18 +13,18 @@ import (
 
 // CreateClusterRequest defines the expected JSON body for registering a cluster.
 type CreateClusterRequest struct {
-	Name           string `json:"name"            binding:"required"`
+	ClusterName    string `json:"cluster_name"     binding:"required"`
 	PrometheusURL  string `json:"prometheus_url"  binding:"required"`
-	Token          string `json:"token"           binding:"required"`
+	PrometheusToken string `json:"prometheus_token" binding:"required"`
 	LookbackWindow string `json:"lookback_window"`
 }
 
 // UpdateClusterRequest defines the expected JSON body for updating a cluster.
 // All fields optional — only provided fields are updated.
 type UpdateClusterRequest struct {
-	Name          string `json:"name"`
+	ClusterName   string `json:"cluster_name"`
 	PrometheusURL string `json:"prometheus_url"`
-	Token         string `json:"token"`
+	PrometheusToken string `json:"prometheus_token"`
 }
 
 // listClusters returns all registered clusters.
@@ -67,7 +67,7 @@ func (s *Server) createCluster(c *gin.Context) {
 	}
 
 	// encrypt token before storing — never save plain text to database
-	encryptedToken, err := auth.Encrypt(req.Token, s.encryptionKey)
+	encryptedToken, err := auth.Encrypt(req.PrometheusToken, s.encryptionKey)
 	if err != nil {
 		log.Printf("ERROR [%s] createCluster encrypt token: %v", requestID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -80,9 +80,9 @@ func (s *Server) createCluster(c *gin.Context) {
 	var cluster *models.Cluster
 	cluster = &models.Cluster{
 		ClusterID:      uuid.New().String(),
-		Name:           req.Name,
+		ClusterName:    req.ClusterName,
 		PrometheusURL:  req.PrometheusURL,
-		Token:          encryptedToken,
+		PrometheusToken: encryptedToken,
 		LookbackWindow: req.LookbackWindow,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
@@ -150,14 +150,14 @@ func (s *Server) updateCluster(c *gin.Context) {
 	}
 
 	// apply only the fields that were provided
-	if req.Name != "" {
-		cluster.Name = req.Name
+	if req.ClusterName != "" {
+		cluster.ClusterName = req.ClusterName
 	}
 	if req.PrometheusURL != "" {
 		cluster.PrometheusURL = req.PrometheusURL
 	}
-	if req.Token != "" {
-		encryptedToken, err := auth.Encrypt(req.Token, s.encryptionKey)
+	if req.PrometheusToken != "" {
+		encryptedToken, err := auth.Encrypt(req.PrometheusToken, s.encryptionKey)
 		if err != nil {
 			log.Printf("ERROR [%s] updateCluster encrypt token: %v", requestID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -166,7 +166,7 @@ func (s *Server) updateCluster(c *gin.Context) {
 			})
 			return
 		}
-		cluster.Token = encryptedToken
+		cluster.PrometheusToken = encryptedToken
 	}
 
 	if err := s.store.UpdateCluster(c.Request.Context(), cluster); err != nil {

@@ -19,7 +19,7 @@
 
 ## The Problem
 
-**3:12 AM. PagerDuty fires. `payment-api` is OOMKilled in production.**
+**3:12 AM. PagerDuty fires. The on-call engineer gets paged. `payment-api` is OOMKilled in production.**
 
 The root cause? Someone copied resource limits from an unrelated service six months ago. The fix takes 2 minutes. Finding it took 40. It will happen again.
 
