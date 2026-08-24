@@ -11,14 +11,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Generate takes raw container metrics and produces a Recommendation.
-// It computes p99 for CPU and memory, multiplies by 2, and returns
-// a Recommendation ready to be upserted into the database.
+// generate computes p99 CPU/memory from usage history and pairs it with the container's
+// current resource limits (from kube-state-metrics via ContainerMetrics).
 func generate(
 	clusterID string,
 	lookbackWindow string,
-	currentCPULimit int,
-	currentMemLimit int,
 	metrics *collector.ContainerMetrics,
 ) (*models.Recommendation, error) {
 
@@ -26,23 +23,17 @@ func generate(
 		return nil, fmt.Errorf("metrics cannot be nil")
 	}
 
-	// compute p99 for CPU (millicores)
 	p99CPU, err := compute.ComputeP99(metrics.CPUValues)
 	if err != nil {
 		return nil, fmt.Errorf("compute p99 cpu for %s/%s: %w",
 			metrics.PodName, metrics.ContainerName, err)
 	}
 
-	// compute p99 for memory (MiB)
 	p99Mem, err := compute.ComputeP99(metrics.MemValues)
 	if err != nil {
 		return nil, fmt.Errorf("compute p99 mem for %s/%s: %w",
 			metrics.PodName, metrics.ContainerName, err)
 	}
-
-	// recommended limit = p99 × 2, rounded up to nearest integer
-	recommendedCPU := int(math.Ceil(p99CPU * 2))
-	recommendedMem := int(math.Ceil(p99Mem * 2))
 
 	now := time.Now()
 
@@ -53,12 +44,12 @@ func generate(
 		PodName:             metrics.PodName,
 		ContainerName:       metrics.ContainerName,
 		Status:              models.RecommendationStatusReady,
-		CurrentCPULimit:     currentCPULimit,
-		CurrentMemLimit:     currentMemLimit,
+		CurrentCPULimit:     metrics.CPULimit,
+		CurrentMemLimit:     metrics.MemLimit,
 		P99CPU:              p99CPU,
 		P99Mem:              p99Mem,
-		RecommendedCPULimit: recommendedCPU,
-		RecommendedMemLimit: recommendedMem,
+		RecommendedCPULimit: int(math.Ceil(p99CPU * 2)),
+		RecommendedMemLimit: int(math.Ceil(p99Mem * 2)),
 		LookbackWindow:      lookbackWindow,
 		CreatedAt:           now,
 		UpdatedAt:           now,
@@ -93,7 +84,7 @@ func GenerateAll(
 			continue
 		}
 
-		rec, err := generate(clusterID, lookbackWindow, 0, 0, m)
+		rec, err := generate(clusterID, lookbackWindow, m)
 		if err != nil {
 			return nil, fmt.Errorf("generate recommendation: %w", err)
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
@@ -140,6 +141,9 @@ func (s *Server) recalculate(c *gin.Context) {
 				log.Printf("ERROR recalculate upsert cluster=%s: %v", clusterID, err)
 			}
 		}
+
+		// update last_synced_at so the client sees a fresh timestamp
+		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
 
 		// invalidate cache — next request fetches fresh data
 		if s.cache != nil {
