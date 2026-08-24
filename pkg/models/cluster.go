@@ -24,7 +24,7 @@ type Cluster struct {
 	PrometheusToken string     `json:"-"                 db:"prometheus_token"` // AES-256-GCM encrypted at rest — never exposed in API response
 	LookbackWindow  string     `json:"lookback_window"   db:"lookback_window"`  // how far back to query Prometheus — 7d | 10d | 30d
 	Status          string     `json:"status"            db:"status"`           // connected | disconnected
-	CreatedBy       string     `json:"created_by"        db:"created_by"`       // user_id of the registering user
+	CreatedBy       string     `json:"created_by"        db:"created_by"`       // email of the registering user
 	LastSyncedAt    *time.Time `json:"last_synced_at"    db:"last_synced_at"`   // nil if never synced
 	CreatedAt       time.Time  `json:"created_at"        db:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"        db:"updated_at"`

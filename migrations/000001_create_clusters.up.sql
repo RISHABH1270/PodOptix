@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS clusters (
     prometheus_token TEXT          NOT NULL,                       -- AES-256-GCM encrypted token
     lookback_window  VARCHAR(10)   NOT NULL DEFAULT '7d',          -- 7d | 10d | 30d
     status           VARCHAR(20)   NOT NULL DEFAULT 'disconnected',-- connected | disconnected
-    created_by       VARCHAR(36),                                  -- user_id audit trail (nullable for legacy)
+    created_by       VARCHAR(255),                                 -- email audit trail (nullable for legacy)
     last_synced_at   TIMESTAMPTZ,                                  -- NULL until first sync
     created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),

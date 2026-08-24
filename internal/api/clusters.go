@@ -119,7 +119,7 @@ func (s *Server) createCluster(c *gin.Context) {
 		PrometheusToken: encryptedToken,
 		LookbackWindow:  req.LookbackWindow,
 		Status:          status,
-		CreatedBy:       c.GetString("user_id"),
+		CreatedBy:       c.GetString("email"),
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 	}
