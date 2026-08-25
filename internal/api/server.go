@@ -11,24 +11,20 @@ import (
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	router        *gin.Engine  // Gin router — knows all routes and middleware
-	store         *store.Store // database connection injected from main
-	cache         *cache.Cache // Redis cache injected from main
-	jwtSecret     string       // used to sign and verify JWT tokens
-	encryptionKey string       // used to encrypt/decrypt cluster tokens at rest
+	Router        *gin.Engine  // exported — allows test packages to call Router.ServeHTTP directly
+	store         *store.Store
+	cache         *cache.Cache
+	jwtSecret     string
+	encryptionKey string
 }
 
 // NewServer creates a new HTTP server and registers all routes.
 func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey string) *Server {
-	var router *gin.Engine
-	router = gin.Default()
-
-	// Attaches our custom middleware - assigns a X-Request-ID header.
+	router := gin.Default()
 	router.Use(RequestIDMiddleware())
 
-	var server *Server
-	server = &Server{
-		router:        router,
+	server := &Server{
+		Router:        router,
 		store:         st,
 		cache:         ca,
 		jwtSecret:     jwtSecret,
@@ -41,7 +37,6 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey
 }
 
 // Listen binds the TCP port. Returns the listener if successful.
-// Caller can print "server is up" after this returns without error.
 func (s *Server) Listen(port string) (net.Listener, error) {
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -50,9 +45,7 @@ func (s *Server) Listen(port string) (net.Listener, error) {
 	return listener, nil
 }
 
-// Serve starts accepting HTTP requests on the given listener.
-// Blocking call — returns only on error.
+// Serve starts accepting HTTP requests on the given listener. Blocking call.
 func (s *Server) Serve(listener net.Listener) error {
-	return s.router.RunListener(listener)
+	return s.Router.RunListener(listener)
 }
-

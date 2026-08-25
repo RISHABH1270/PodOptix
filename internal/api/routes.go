@@ -4,13 +4,13 @@ package api
 func (s *Server) registerRoutes() {
 
 	// public routes — no auth required
-	s.router.GET("/healthz", s.handleHealthz)  // liveness  — is process alive?
-	s.router.GET("/readyz", s.handleReadyz)    // readiness — are dependencies ready?
-	s.router.POST("/auth/register", s.register)
-	s.router.POST("/auth/login", s.login)
+	s.Router.GET("/healthz", s.handleHealthz)  // liveness  — is process alive?
+	s.Router.GET("/readyz", s.handleReadyz)    // readiness — are dependencies ready?
+	s.Router.POST("/auth/register", s.register)
+	s.Router.POST("/auth/login", s.login)
 
 	// protected routes — JWT required
-	v1 := s.router.Group("/api/v1")
+	v1 := s.Router.Group("/api/v1")
 	v1.Use(JWTMiddleware(s.jwtSecret))
 	{
 		// clusters
