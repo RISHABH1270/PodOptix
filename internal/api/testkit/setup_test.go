@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +16,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var srv *api.Server
+var (
+	ts     *httptest.Server // real TCP listener — tests make actual HTTP requests
+	client = &http.Client{}
+)
 
 const (
 	adminURL  = "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
@@ -34,22 +38,42 @@ func testToken() string {
 	return t
 }
 
-// do fires a request against the test server and returns the recorder.
-func do(t *testing.T, method, path, body, token string) *httptest.ResponseRecorder {
+// do fires a real HTTP request against the test server and returns the response.
+func do(t *testing.T, method, path, body, token string) *http.Response {
 	t.Helper()
-	var req *http.Request
+
+	var reqBody io.Reader
 	if body != "" {
-		req = httptest.NewRequest(method, path, bytes.NewBufferString(body))
+		reqBody = bytes.NewBufferString(body)
+	}
+
+	req, err := http.NewRequest(method, ts.URL+path, reqBody)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
-	} else {
-		req = httptest.NewRequest(method, path, nil)
 	}
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	w := httptest.NewRecorder()
-	srv.Router.ServeHTTP(w, req)
-	return w
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("execute request: %v", err)
+	}
+	return resp
+}
+
+// readBody reads and returns the response body as string.
+func readBody(t *testing.T, resp *http.Response) string {
+	t.Helper()
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	return string(b)
 }
 
 func TestMain(m *testing.M) {
@@ -70,13 +94,18 @@ func TestMain(m *testing.M) {
 		panic("failed to connect to test database: " + err.Error())
 	}
 
-	srv = api.NewServer(db, nil, jwtSecret, encKey)
+	srv := api.NewServer(db, nil, jwtSecret, encKey)
+
+	// real TCP listener on a random port — tests make actual HTTP requests
+	ts = httptest.NewServer(srv)
 
 	fmt.Println("\n  Running PodOptix API Tests...")
+	fmt.Printf("  Server: %s\n", ts.URL)
 	fmt.Println("  ──────────────────────────────────────")
 
 	code := m.Run()
 
+	ts.Close()
 	db.Close()
 	conn, _ = pgx.Connect(context.Background(), adminURL)
 	conn.Exec(context.Background(), "DROP DATABASE IF EXISTS podoptix_test WITH (FORCE)")

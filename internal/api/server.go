@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net"
+	"net/http"
 
 	"github.com/RISHABH1270/PodOptix/internal/cache"
 	"github.com/RISHABH1270/PodOptix/internal/store"
@@ -11,7 +12,7 @@ import (
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	Router        *gin.Engine  // exported — allows test packages to call Router.ServeHTTP directly
+	router        *gin.Engine
 	store         *store.Store
 	cache         *cache.Cache
 	jwtSecret     string
@@ -24,7 +25,7 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey
 	router.Use(RequestIDMiddleware())
 
 	server := &Server{
-		Router:        router,
+		router:        router,
 		store:         st,
 		cache:         ca,
 		jwtSecret:     jwtSecret,
@@ -47,5 +48,10 @@ func (s *Server) Listen(port string) (net.Listener, error) {
 
 // Serve starts accepting HTTP requests on the given listener. Blocking call.
 func (s *Server) Serve(listener net.Listener) error {
-	return s.Router.RunListener(listener)
+	return s.router.RunListener(listener)
+}
+
+// ServeHTTP implements http.Handler — used by httptest.NewServer in tests to start a real TCP listener.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r)
 }
