@@ -1,1929 +1,600 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PodOptix — Engineering Documentation</title>
-<meta name="description" content="Complete engineering documentation for PodOptix — Kubernetes right-sizing optimizer">
-<meta property="og:title" content="PodOptix Engineering Docs">
-<meta property="og:description" content="System architecture, data flow, API reference, and runbooks">
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<title>PodOptix — Cluster Architecture</title>
 <style>
-/* ── CSS Variables ── */
-:root {
-  --bg:        #0a0f1e;
-  --bg2:       #0d1526;
-  --bg3:       #111827;
-  --surface:   rgba(255,255,255,0.04);
-  --surface2:  rgba(255,255,255,0.07);
-  --border:    rgba(255,255,255,0.08);
-  --border2:   rgba(255,255,255,0.14);
-  --text:      #e2e8f0;
-  --text2:     #94a3b8;
-  --text3:     #64748b;
-  --accent:    #00d4ff;
-  --accent2:   #7c3aed;
-  --accent3:   #f59e0b;
-  --green:     #10b981;
-  --red:       #ef4444;
-  --orange:    #f97316;
-  --sidebar-w: 272px;
-  --radius:    10px;
-  --radius2:   6px;
-  --font-mono: 'SFMono-Regular','Cascadia Code',Consolas,monospace;
-  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
-}
-[data-theme="light"] {
-  --bg:       #f8fafc;
-  --bg2:      #ffffff;
-  --bg3:      #f1f5f9;
-  --surface:  rgba(0,0,0,0.03);
-  --surface2: rgba(0,0,0,0.06);
-  --border:   rgba(0,0,0,0.08);
-  --border2:  rgba(0,0,0,0.14);
-  --text:     #0f172a;
-  --text2:    #475569;
-  --text3:    #94a3b8;
-}
-
-/* ── Reset & Base ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,sans-serif;
-  font-size:15px;
-  line-height:1.7;
-  overflow-x:hidden;
+
+:root{
+  --bg:      #05080f;
+  --bg2:     #080d1a;
+  --bg3:     #0c1226;
+  --cyan:    #00d4ff;
+  --purple:  #7c3aed;
+  --green:   #00e676;
+  --amber:   #fbbf24;
+  --red:     #ff4d6d;
+  --text:    #c8d8e8;
+  --dim:     #4a6070;
+  --border:  rgba(0,212,255,0.1);
+  --sw:      260px;
 }
 
-/* Grid background */
-body::before{
-  content:'';
-  position:fixed;
-  inset:0;
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(0,212,255,0.05) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(124,58,237,0.05) 0%, transparent 50%),
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
-  pointer-events:none;
-  z-index:0;
-}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;overflow-x:hidden}
 
-/* ── Layout ── */
+
+/* layout */
 .layout{display:flex;min-height:100vh;position:relative;z-index:1}
 
-/* ── Sidebar ── */
+/* ── sidebar ── */
 .sidebar{
-  width:var(--sidebar-w);
-  flex-shrink:0;
-  background:var(--bg2);
+  width:var(--sw);flex-shrink:0;
+  background:rgba(8,13,26,0.96);
   border-right:1px solid var(--border);
-  position:sticky;
-  top:0;
-  height:100vh;
+  backdrop-filter:blur(20px);
+  position:sticky;top:0;height:100vh;
   overflow-y:auto;
-  overflow-x:hidden;
-  display:flex;
-  flex-direction:column;
-  scrollbar-width:thin;
-  scrollbar-color:var(--border2) transparent;
+  display:flex;flex-direction:column;
 }
-.sidebar::-webkit-scrollbar{width:4px}
-.sidebar::-webkit-scrollbar-track{background:transparent}
-.sidebar::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
-/* Sidebar header */
-.sb-header{
-  padding:20px 20px 16px;
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-}
 .sb-logo{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin-bottom:14px;
+  padding:22px 20px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
 }
-.sb-logo-icon{
-  width:36px;height:36px;border-radius:9px;flex-shrink:0;
-  background:linear-gradient(135deg,#0a0f1e 0%,#1e293b 100%);
-  border:1px solid rgba(0,212,255,0.3);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 12px rgba(0,212,255,0.2);
-}
-.sb-logo-name{font-size:15px;font-weight:700;letter-spacing:-0.3px;line-height:1}
-.sb-logo-name span{background:linear-gradient(90deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.sb-logo-tag{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.sb-logo svg{flex-shrink:0;border-radius:8px}
+.sb-logo-text{font-size:16px;font-weight:700;background:linear-gradient(90deg,var(--cyan),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sb-logo-sub{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
 
-/* Search */
-.sb-search{
-  position:relative;
-}
-.sb-search input{
-  width:100%;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius2);
-  padding:7px 10px 7px 32px;
-  font-size:13px;
-  color:var(--text);
-  outline:none;
-  transition:var(--transition);
-}
-.sb-search input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,0.1)}
-.sb-search input::placeholder{color:var(--text3)}
-.sb-search-icon{
-  position:absolute;left:9px;top:50%;transform:translateY(-50%);
-  color:var(--text3);font-size:13px;pointer-events:none;
-}
+.sb-section-label{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);padding:20px 20px 6px}
 
-/* Nav */
-.sb-nav{flex:1;padding:8px 0 20px}
-.sb-group-label{
-  font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--text3);padding:14px 20px 6px;
+.sb-group-toggle{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 20px;
+  font-size:13.5px;font-weight:600;color:var(--text);
+  cursor:pointer;user-select:none;transition:color .18s;
 }
-.sb-group{
-  overflow:hidden;
-  transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-.sb-group-header{
-  display:flex;align-items:center;gap:6px;
-  padding:7px 20px;font-size:13.5px;font-weight:600;
-  color:var(--text2);cursor:pointer;user-select:none;
-  transition:var(--transition);border-radius:0;
-}
-.sb-group-header:hover{background:var(--surface);color:var(--text)}
-.sb-group-arrow{
-  margin-left:auto;font-size:10px;color:var(--text3);
-  transition:transform 0.2s;
-}
-.sb-group.open .sb-group-arrow{transform:rotate(90deg)}
-.sb-group-items{padding-left:12px;overflow:hidden}
+.sb-group-toggle:hover{color:var(--cyan)}
+.sb-arrow{font-size:12px;color:var(--dim);transition:transform .2s}
+.sb-arrow.open{transform:rotate(90deg)}
+
+.sb-items{display:flex;flex-direction:column;padding-bottom:4px}
+.sb-items.hidden{display:none}
 
 .sb-item{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 20px 6px 28px;
-  font-size:13px;color:var(--text2);
+  display:flex;align-items:center;gap:9px;
+  padding:6px 20px 6px 34px;
+  font-size:12.5px;color:var(--dim);
   text-decoration:none;
   border-left:2px solid transparent;
-  transition:var(--transition);
-  border-radius:0 4px 4px 0;
-  position:relative;
+  transition:all .18s;
 }
-.sb-item:hover{background:var(--surface);color:var(--text);border-left-color:var(--border2)}
-.sb-item.active{
-  background:rgba(0,212,255,0.08);
-  color:var(--accent);
-  font-weight:600;
-  border-left-color:var(--accent);
-}
-.sb-item-num{
-  font-size:10px;font-weight:700;color:var(--text3);
-  background:var(--surface2);border-radius:3px;
-  padding:1px 5px;font-family:var(--font-mono);
-  flex-shrink:0;
-}
-.sb-item.active .sb-item-num{background:rgba(0,212,255,0.15);color:var(--accent)}
+.sb-item:hover{color:var(--text);background:rgba(0,212,255,0.04)}
+.sb-item.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(0,212,255,0.06)}
 
-/* Sidebar footer */
-.sb-footer{
-  padding:14px 20px;border-top:1px solid var(--border);flex-shrink:0;
-  display:flex;align-items:center;justify-content:space-between;
-}
-.sb-version{font-size:11px;color:var(--text3);font-family:var(--font-mono)}
-.theme-btn{
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:20px;padding:4px 10px;font-size:12px;
-  color:var(--text2);cursor:pointer;transition:var(--transition);
-  display:flex;align-items:center;gap:5px;
-}
-.theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.d1{background:var(--purple)} .d2{background:var(--amber)} .d3{background:var(--cyan)}
+.d4{background:var(--purple)} .d5{background:var(--green)} .d6{background:var(--red)}
 
-/* ── Main ── */
-.main{
-  flex:1;
-  padding:0;
-  max-width:860px;
-  min-width:0;
-}
+.sb-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.sb-status{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
 
-/* ── Section ── */
-.doc-section{
-  padding:56px 64px 48px;
-  border-bottom:1px solid var(--border);
-  opacity:0;
-  transform:translateY(24px);
-  transition:opacity 0.5s ease, transform 0.5s ease;
-}
-.doc-section.visible{opacity:1;transform:translateY(0)}
+/* ── main ── */
+.main{flex:1;padding:48px 56px 80px;max-width:860px;margin:0 auto}
 
-/* Section header */
-.sec-eyebrow{
-  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
-  color:var(--accent);margin-bottom:10px;
-  display:flex;align-items:center;gap:8px;
-}
-.sec-eyebrow::before{content:'';display:block;width:24px;height:1px;background:var(--accent)}
-.sec-num{
-  font-family:var(--font-mono);font-size:11px;
-  color:var(--text3);
-}
-.sec-title{
-  font-size:30px;font-weight:800;letter-spacing:-0.6px;
-  line-height:1.2;margin-bottom:12px;
-  background:linear-gradient(135deg,var(--text) 0%,var(--text2) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
-.sec-desc{
-  font-size:15px;color:var(--text2);
-  margin-bottom:36px;max-width:640px;line-height:1.7;
-}
+.page-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.page-eyebrow::before{content:'';display:block;width:20px;height:1px;background:var(--cyan)}
+.page-title{font-size:32px;font-weight:700;color:#fff;letter-spacing:-0.5px;margin-bottom:8px}
+.page-title span{color:var(--cyan)}
+.page-desc{font-size:14px;color:var(--dim);margin-bottom:32px;max-width:100%}
 
-/* Sub-headings */
-.sub-h{
-  font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--text3);margin:32px 0 14px;
-  padding-bottom:8px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:8px;
-}
-.sub-h-icon{font-size:14px}
-h3.inline-h{
-  font-size:16px;font-weight:700;color:var(--text);
-  margin:24px 0 10px;
-}
-
-/* ── Cards ── */
-.card{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:20px 24px;
-  margin-bottom:16px;
-  transition:var(--transition);
-}
-.card:hover{
-  border-color:var(--border2);
-  background:var(--surface2);
-  transform:translateY(-2px);
-  box-shadow:0 8px 32px rgba(0,0,0,0.3);
-}
-.card-title{
-  font-size:14px;font-weight:700;color:var(--text);
-  margin-bottom:6px;display:flex;align-items:center;gap:8px;
-}
-.card-body{font-size:13.5px;color:var(--text2);line-height:1.6}
-
-/* Card grid */
-.card-grid{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:12px;
-  margin-bottom:24px;
-}
-.card-grid .card{margin-bottom:0}
-
-/* Stat cards */
-.stat-card{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:18px 20px;
-  text-align:center;
-  transition:var(--transition);
-}
-.stat-card:hover{border-color:var(--accent);box-shadow:0 0 20px rgba(0,212,255,0.1)}
-.stat-val{
-  font-size:28px;font-weight:800;letter-spacing:-1px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  display:block;
-}
-.stat-label{font-size:12px;color:var(--text3);margin-top:4px;font-weight:500}
-
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
-
-/* ── Table ── */
-.tbl-wrap{
-  overflow:hidden;
-  border-radius:var(--radius);
-  border:1px solid var(--border);
-  margin-bottom:24px;
-}
-table{width:100%;border-collapse:collapse;background:var(--surface)}
-thead tr{background:var(--surface2);border-bottom:1px solid var(--border2)}
-th{
-  font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  color:var(--text3);padding:11px 16px;text-align:left;
-}
-td{
-  padding:12px 16px;border-bottom:1px solid var(--border);
-  font-size:13.5px;color:var(--text2);vertical-align:top;
-}
-tr:last-child td{border-bottom:none}
-tbody tr{transition:var(--transition)}
-tbody tr:hover{background:var(--surface2)}
-.td-mono{font-family:var(--font-mono);font-size:13px;color:var(--accent);font-weight:600}
-.td-type{font-family:var(--font-mono);font-size:12.5px;color:var(--text2)}
-.td-note{font-size:13.5px;color:var(--text2);line-height:1.5}
-
-/* ── Tags / Badges ── */
-.badge{
-  display:inline-flex;align-items:center;
-  padding:2px 8px;border-radius:4px;
-  font-size:10.5px;font-weight:700;letter-spacing:0.4px;
-  font-family:var(--font-mono);text-transform:uppercase;
-  vertical-align:middle;margin:0 2px;
-}
-.badge-pk{background:rgba(0,212,255,0.12);color:var(--accent);border:1px solid rgba(0,212,255,0.25)}
-.badge-fk{background:rgba(124,58,237,0.12);color:#a78bfa;border:1px solid rgba(124,58,237,0.25)}
-.badge-unique{background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.25)}
-.badge-null{background:rgba(100,116,139,0.15);color:var(--text3);border:1px solid var(--border2)}
-.badge-enc{background:rgba(245,158,11,0.12);color:var(--accent3);border:1px solid rgba(245,158,11,0.25)}
-.badge-hidden{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.25)}
-.badge-def{background:rgba(16,185,129,0.08);color:#6ee7b7;border:1px solid rgba(16,185,129,0.2)}
-
-/* HTTP method badges */
-.method{
-  display:inline-flex;align-items:center;
-  padding:3px 10px;border-radius:4px;
-  font-size:11px;font-weight:800;font-family:var(--font-mono);
-  letter-spacing:0.5px;text-transform:uppercase;
-  min-width:60px;justify-content:center;flex-shrink:0;
-}
-.method-get   {background:rgba(16,185,129,0.15);color:var(--green);border:1px solid rgba(16,185,129,0.3)}
-.method-post  {background:rgba(0,212,255,0.12);color:var(--accent);border:1px solid rgba(0,212,255,0.25)}
-.method-put   {background:rgba(245,158,11,0.12);color:var(--accent3);border:1px solid rgba(245,158,11,0.25)}
-.method-delete{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.25)}
-.method-patch {background:rgba(124,58,237,0.12);color:#a78bfa;border:1px solid rgba(124,58,237,0.25)}
-
-/* Status badges */
-.status{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600;
-}
-.status-ok  {background:rgba(16,185,129,0.12);color:var(--green)}
-.status-err {background:rgba(239,68,68,0.12);color:var(--red)}
-.status-warn{background:rgba(245,158,11,0.12);color:var(--accent3)}
-.status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
-
-/* ── Code ── */
-.code-block{
-  position:relative;
-  border-radius:var(--radius);
-  margin-bottom:20px;
-  overflow:hidden;
-  border:1px solid var(--border);
-}
-.code-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:8px 16px;
-  background:rgba(0,0,0,0.4);
-  border-bottom:1px solid var(--border);
-}
-.code-lang{font-size:11px;color:var(--text3);font-family:var(--font-mono);font-weight:600;letter-spacing:0.5px}
-.code-dots{display:flex;gap:6px}
-.code-dot{width:10px;height:10px;border-radius:50%}
-.copy-btn{
-  background:var(--surface2);border:1px solid var(--border);
-  color:var(--text3);font-size:11px;padding:3px 10px;
-  border-radius:4px;cursor:pointer;transition:var(--transition);
-  font-family:var(--font-mono);
-}
-.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
-.copy-btn.copied{border-color:var(--green);color:var(--green)}
-.code-block pre{margin:0}
-.code-block code{font-size:13px;line-height:1.6;padding:18px!important;display:block;overflow-x:auto}
-
-/* Inline code */
-code:not(.hljs){
-  font-family:var(--font-mono);font-size:12.5px;
-  background:var(--surface2);color:var(--accent);
-  padding:1px 6px;border-radius:4px;
-  border:1px solid var(--border);
-}
-
-/* ── Pipeline / Data Flow ── */
-.pipeline{
-  display:flex;align-items:center;gap:0;
-  margin:24px 0;flex-wrap:wrap;
-}
-.pipe-step{
-  display:flex;flex-direction:column;align-items:center;
-  text-align:center;position:relative;
-  flex:1;min-width:120px;
-}
-.pipe-box{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:14px 16px;
-  width:100%;
-  transition:var(--transition);
-  cursor:default;
-}
-.pipe-box:hover{border-color:var(--accent);box-shadow:0 0 16px rgba(0,212,255,0.15)}
-.pipe-icon{font-size:22px;margin-bottom:6px;display:block}
-.pipe-name{font-size:13px;font-weight:700;color:var(--text)}
-.pipe-tech{font-size:11px;color:var(--text3);margin-top:2px}
-.pipe-arrow{
-  color:var(--text3);font-size:18px;flex-shrink:0;
-  margin:0 8px;position:relative;top:-8px;
-}
-.pipe-arrow.animated{animation:flow 1.5s linear infinite}
-@keyframes flow{
-  0%{color:var(--text3);transform:translateX(-4px)}
-  50%{color:var(--accent);transform:translateX(4px)}
-  100%{color:var(--text3);transform:translateX(-4px)}
-}
-
-/* ── Sequence diagram wrapper ── */
-.diagram-wrap{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:24px;
-  margin-bottom:24px;
-  overflow-x:auto;
-}
-.diagram-wrap .mermaid svg{max-width:100%}
-.diagram-label{
-  font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  color:var(--text3);text-align:center;margin-top:12px;
-}
-
-/* ── Endpoint cards ── */
-.endpoint{
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  overflow:hidden;
-  margin-bottom:14px;
-  transition:var(--transition);
-}
-.endpoint:hover{border-color:var(--border2)}
-.ep-header{
+.flow-bar{
   display:flex;align-items:center;gap:12px;
-  padding:13px 18px;
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
+  padding:12px 18px;margin-bottom:36px;
+  background:rgba(0,212,255,0.04);
+  border:1px solid var(--border);border-radius:8px;
+}
+.flow-label{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+.flow-btn{
+  padding:6px 16px;border:1px solid var(--cyan);border-radius:5px;
+  background:rgba(0,212,255,0.08);color:var(--cyan);
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;
+  font-family:inherit;
+}
+.flow-btn:hover{background:rgba(0,212,255,0.16)}
+.reset-btn{
+  padding:6px 12px;border:1px solid var(--border);border-radius:5px;
+  background:transparent;color:var(--dim);font-size:12px;cursor:pointer;
+  font-family:inherit;transition:all .18s;
+}
+.reset-btn:hover{color:var(--text);border-color:var(--dim)}
+.step-dots{display:flex;gap:6px;margin-left:auto}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);transition:all .3s}
+.sdot.done{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.sdot.active{background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px var(--amber)}
+
+/* ── pipeline ── */
+#pipeline{display:flex;flex-direction:column;gap:0;align-items:stretch}
+
+/* connector */
+.connector{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 0;width:100%;text-align:center}
+.conn-line{width:2px;height:40px;background:linear-gradient(to bottom,var(--border),rgba(0,212,255,0.25));position:relative;overflow:hidden;margin:0 auto}
+.conn-line::after{content:'';position:absolute;width:100%;height:20px;background:linear-gradient(to bottom,transparent,var(--cyan),transparent);animation:pktflow 2s ease-in-out infinite;top:-20px}
+@keyframes pktflow{0%{top:-20px}100%{top:40px}}
+.conn-arrow{color:var(--cyan);font-size:14px;opacity:.6;margin-top:-4px;display:block;text-align:center}
+.conn-label{font-size:10px;color:var(--dim);margin:2px 0;letter-spacing:.5px}
+
+/* node card */
+.node-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  transition:border-color .25s,box-shadow .25s;
   cursor:pointer;
+  scroll-margin-top:32px;
 }
-.ep-path{font-family:var(--font-mono);font-size:14px;color:var(--text);font-weight:700}
-.ep-desc{font-size:12.5px;color:var(--text3);margin-left:auto}
-.ep-body{padding:6px 18px 14px;background:var(--bg)}
-.ep-toggle{color:var(--text3);font-size:12px;transition:transform 0.2s;margin-left:8px}
-.ep-body.hidden{display:none}
-.endpoint.open .ep-toggle{transform:rotate(180deg)}
+.node-card:hover{border-color:rgba(0,212,255,0.3)}
+.node-card.flow-active{border-color:var(--cyan);box-shadow:0 0 24px rgba(0,212,255,0.15)}
+.node-card.open{border-color:rgba(0,212,255,0.25)}
 
-/* Steps */
-.steps{margin-top:10px}
-.step{
-  display:flex;gap:14px;padding:9px 0;
-  border-bottom:1px solid var(--border);
-  align-items:flex-start;
-}
-.step:last-child{border-bottom:none}
-.step-num{
-  font-size:10px;color:var(--text3);font-weight:700;
-  min-width:20px;text-align:right;flex-shrink:0;
-  font-family:var(--font-mono);margin-top:2px;
-}
-.step-body{font-size:13.5px;color:var(--text2);flex:1;line-height:1.55}
-.s-fn{font-family:var(--font-mono);font-size:12.5px;color:var(--accent);font-weight:700}
-.s-arrow{color:var(--text3);margin:0 5px;font-size:11px}
-.s-ok{font-family:var(--font-mono);font-size:12px;color:var(--green);font-weight:700;background:rgba(16,185,129,0.1);padding:1px 6px;border-radius:3px}
-.s-err{font-family:var(--font-mono);font-size:12px;color:var(--red);font-weight:700;background:rgba(239,68,68,0.1);padding:1px 6px;border-radius:3px}
-.s-bg{font-size:13px;color:#7c3aed;font-style:italic}
+.node-header{display:flex;align-items:center;gap:14px;padding:16px 20px}
+.node-icon{font-size:20px;flex-shrink:0}
+.node-info{flex:1;min-width:0}
+.node-tag{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.node-title{font-size:15px;font-weight:600;color:#fff}
+.node-path{font-size:11px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;margin-top:1px}
+.node-badges{display:flex;gap:6px;flex-shrink:0}
+.node-chev{font-size:11px;color:var(--dim);transition:transform .2s;flex-shrink:0}
+.node-card.open .node-chev{transform:rotate(180deg)}
 
-/* ── Info box ── */
-.info-box{
-  display:flex;gap:12px;
-  padding:14px 18px;
-  border-radius:var(--radius);
-  border:1px solid;
-  margin-bottom:20px;
-}
-.info-box.note{background:rgba(0,212,255,0.06);border-color:rgba(0,212,255,0.2)}
-.info-box.warn{background:rgba(245,158,11,0.06);border-color:rgba(245,158,11,0.2)}
-.info-box.danger{background:rgba(239,68,68,0.06);border-color:rgba(239,68,68,0.2)}
-.info-box.tip{background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2)}
-.info-icon{font-size:16px;flex-shrink:0;margin-top:1px}
-.info-body{font-size:13.5px;color:var(--text2);line-height:1.55}
-.info-body strong{color:var(--text)}
+.badge{padding:3px 9px;border-radius:12px;font-size:10.5px;font-weight:600;font-family:'SF Mono',Consolas,monospace}
+.b1{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
+.b2{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.3)}
+.b3{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.25)}
+.b4{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
+.b5{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.25)}
+.b6{background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.25)}
 
-/* ── Tree ── */
-.tree{
-  font-family:var(--font-mono);font-size:13px;
-  color:var(--text2);line-height:2;
-  padding:18px 20px;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  margin-bottom:20px;
-}
-.tree-dir{color:var(--accent);font-weight:600}
-.tree-file{color:var(--text2)}
-.tree-comment{color:var(--text3)}
+/* drawer */
+.node-drawer{display:none;padding:0 20px 20px}
+.node-card.open .node-drawer{display:block}
+.drawer-sep{border:none;border-top:1px solid var(--border);margin-bottom:16px}
 
-/* ── Env var list ── */
-.env-item{
-  display:grid;
-  grid-template-columns:220px 1fr;
-  gap:0;
-  border-bottom:1px solid var(--border);
-  padding:11px 0;
-  align-items:start;
-}
-.env-item:last-child{border-bottom:none}
-.env-key{font-family:var(--font-mono);font-size:13px;color:var(--accent);font-weight:600}
-.env-info{font-size:13.5px;color:var(--text2)}
-.env-example{font-family:var(--font-mono);font-size:12px;color:var(--text3);margin-top:2px}
+/* tables */
+.ftable{width:100%;border-collapse:collapse;font-size:12.5px}
+.ftable th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);padding:6px 10px;border-bottom:1px solid var(--border);text-align:left}
+.ftable td{padding:8px 10px;border-bottom:1px solid rgba(0,212,255,0.05);vertical-align:top}
+.ftable tr:last-child td{border-bottom:none}
+.ftable tr:hover td{background:rgba(0,212,255,0.03)}
+.fname{font-family:'SF Mono',Consolas,monospace;color:var(--cyan);font-size:12px}
+.ftype{font-family:'SF Mono',Consolas,monospace;color:#a78bfa;font-size:11.5px}
+.fnote{color:var(--dim);font-size:12px}
+.ctag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(0,212,255,.1);color:var(--cyan);margin-right:4px;font-family:monospace}
+.locktag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(251,191,36,.1);color:var(--amber);margin-right:4px}
 
-/* ── Troubleshoot ── */
-.trouble-item{
-  padding:16px 20px;
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  margin-bottom:12px;
-  transition:var(--transition);
-}
-.trouble-item:hover{border-color:var(--border2)}
-.trouble-title{
-  font-size:14px;font-weight:700;color:var(--text);
-  margin-bottom:8px;display:flex;align-items:center;gap:8px;
-}
-.trouble-symptom{font-size:13px;color:var(--text2);margin-bottom:8px}
-.trouble-fix{font-size:13px;color:var(--text2)}
+/* fn list */
+.fn-list{display:flex;flex-direction:column;gap:8px}
+.fn-item{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:rgba(0,212,255,0.03);border:1px solid rgba(0,212,255,0.07)}
+.fn-item.accent{background:rgba(124,58,237,0.06);border-color:rgba(124,58,237,0.2)}
+.method{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:'SF Mono',Consolas,monospace;flex-shrink:0;margin-top:1px;letter-spacing:.5px}
+.m-sql{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
+.m-get{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.25)}
+.m-post{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.25)}
+.m-put{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.25)}
+.m-delete{background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.25)}
+.fn-sig{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:#fff;margin-bottom:3px}
+.fn-desc{font-size:12px;color:var(--dim);line-height:1.6}
 
-/* ── Command ── */
-.cmd{
-  display:flex;align-items:center;gap:10px;
-  background:rgba(0,0,0,0.5);
-  border:1px solid var(--border);
-  border-radius:var(--radius2);
-  padding:10px 14px;
-  margin:8px 0;
-  font-family:var(--font-mono);font-size:13px;
-  color:var(--green);
-}
-.cmd-prompt{color:var(--text3)}
+/* code block */
+.code-block{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:14px 16px;font-family:'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto}
+.kw{color:#a78bfa} .sn{color:var(--cyan)} .tp{color:#fbbf24} .tg{color:var(--dim)} .cm{color:#3a5060} .br{color:var(--text)} .ind{display:block;padding-left:20px}
 
-/* ── Connector ── */
-.connector{
-  display:flex;align-items:center;
-  gap:10px;padding:8px 64px;
-  color:var(--text3);font-size:12px;
-}
-.connector::before,.connector::after{
-  content:'';flex:1;height:1px;
-  background:linear-gradient(90deg,transparent,var(--border),transparent);
-}
-.connector-dot{
-  width:6px;height:6px;border-radius:50%;
-  background:var(--accent);flex-shrink:0;
-  animation:pulse 2s infinite;
-}
-@keyframes pulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,0.4)}
-  50%{box-shadow:0 0 0 6px rgba(0,212,255,0)}
-}
+/* constants */
+.const-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{padding:5px 12px;border-radius:20px;font-size:11.5px;font-family:'SF Mono',Consolas,monospace}
+.chip-status{background:rgba(0,230,118,.08);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.chip-window{background:rgba(0,212,255,.08);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
+.chip-default{background:rgba(251,191,36,.08);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
 
-/* ── Mermaid theme override ── */
-.mermaid{text-align:center}
+/* endpoints */
+.ep-row{display:flex;gap:14px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:rgba(0,212,255,0.02);border:1px solid rgba(0,212,255,0.07);margin-bottom:8px}
+.ep-row:last-of-type{margin-bottom:12px}
+.ep-left{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:200px}
+.ep-path{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:#fff}
+.ep-code{font-size:11px;color:var(--dim)}
+.ep-title{font-size:12.5px;color:var(--text);margin-bottom:3px}
+.ep-flow{font-size:11.5px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;line-height:1.6}
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+/* goroutine box */
+.go-box{margin-top:12px;padding:14px 16px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.25);border-radius:8px}
+.go-lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a78bfa;margin-bottom:10px}
+.go-step{display:flex;align-items:flex-start;gap:10px;padding:5px 0;font-size:12px;color:var(--dim);border-bottom:1px solid rgba(124,58,237,0.1)}
+.go-step:last-child{border-bottom:none}
+.go-num{color:#a78bfa;font-weight:700;flex-shrink:0}
 
-/* ── Animations ── */
-@keyframes fadeUp{
-  from{opacity:0;transform:translateY(16px)}
-  to{opacity:1;transform:translateY(0)}
-}
-.stagger>*{animation:fadeUp 0.4s ease both}
-.stagger>*:nth-child(1){animation-delay:0.05s}
-.stagger>*:nth-child(2){animation-delay:0.10s}
-.stagger>*:nth-child(3){animation-delay:0.15s}
-.stagger>*:nth-child(4){animation-delay:0.20s}
-.stagger>*:nth-child(5){animation-delay:0.25s}
-.stagger>*:nth-child(6){animation-delay:0.30s}
+/* dsec */
+.dsec-title{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
 
-/* ── Print ── */
-@media print{
-  .sidebar,.theme-btn{display:none}
-  .main{max-width:100%;padding:20px}
-  .doc-section{opacity:1;transform:none;break-inside:avoid}
-}
-
-/* ── Responsive ── */
-@media(max-width:768px){
-  .layout{flex-direction:column}
-  .sidebar{width:100%;height:auto;position:relative}
-  .main{padding:0}
-  .doc-section{padding:32px 24px}
-  .card-grid{grid-template-columns:1fr}
-  .stats-row{grid-template-columns:repeat(2,1fr)}
-}
-
-/* light mode overrides */
-[data-theme="light"] .code-block{background:#f8f9fa}
-[data-theme="light"] tbody tr:hover{background:#f1f5f9}
-[data-theme="light"] .cmd{background:#f1f5f9}
+/* tooltip */
+.tooltip{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--cyan);border-radius:10px;padding:16px 18px;max-width:320px;z-index:999;box-shadow:0 0 30px rgba(0,212,255,.15);display:none}
+.tooltip.show{display:block}
+.tt-num{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--cyan);text-transform:uppercase;margin-bottom:6px}
+.tt-title{font-size:14px;font-weight:600;color:#fff;margin-bottom:6px}
+.tt-body{font-size:12.5px;color:var(--dim);line-height:1.65}
 </style>
 </head>
 <body>
-
 <div class="layout">
-<!-- ═══════════════ SIDEBAR ═══════════════ -->
-<nav class="sidebar" id="sidebar">
-  <div class="sb-header">
-    <div class="sb-logo">
-      <div class="sb-logo-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 6v6l4 2"/>
-        </svg>
-      </div>
-      <div>
-        <div class="sb-logo-name">Pod<span>Optix</span></div>
-        <div class="sb-logo-tag">Engineering Docs</div>
-      </div>
-    </div>
-    <div class="sb-search">
-      <span class="sb-search-icon">⌕</span>
-      <input type="text" placeholder="Search docs..." id="search-input" oninput="filterNav(this.value)">
+
+<!-- ══ SIDEBAR ══ -->
+<nav class="sidebar">
+  <div class="sb-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="38" height="38">
+      <defs><linearGradient id="g" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#FBBF24"/></linearGradient></defs>
+      <rect width="200" height="200" fill="#0F172A" rx="28"/>
+      <path d="M 36 140 A 72 72 0 0 1 164 140" fill="none" stroke="#334155" stroke-width="10" stroke-linecap="round"/>
+      <path d="M 36 140 A 72 72 0 0 1 120 55" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round"/>
+      <line x1="100" y1="132" x2="118" y2="58" stroke="#FBBF24" stroke-width="4.5" stroke-linecap="round"/>
+      <circle cx="100" cy="132" r="8" fill="#FBBF24"/>
+      <circle cx="100" cy="132" r="3.5" fill="#0F172A"/>
+    </svg>
+    <div>
+      <div class="sb-logo-text">PodOptix</div>
+      <div class="sb-logo-sub">Architecture Docs</div>
     </div>
   </div>
 
-  <div class="sb-nav" id="sb-nav">
-    <div class="sb-group-label">Documentation</div>
-
-    <div class="sb-group open" id="grp-overview">
-      <div class="sb-group-header" onclick="toggleGroup('grp-overview')">
-        <span>📋</span> Overview
-        <span class="sb-group-arrow">▶</span>
-      </div>
-      <div class="sb-group-items">
-        <a class="sb-item" href="#s01"><span class="sb-item-num">01</span>System Overview</a>
-        <a class="sb-item" href="#s02"><span class="sb-item-num">02</span>Architecture</a>
-        <a class="sb-item" href="#s03"><span class="sb-item-num">03</span>Data Flow</a>
-      </div>
-    </div>
-
-    <div class="sb-group open" id="grp-internals">
-      <div class="sb-group-header" onclick="toggleGroup('grp-internals')">
-        <span>⚙️</span> Internals
-        <span class="sb-group-arrow">▶</span>
-      </div>
-      <div class="sb-group-items">
-        <a class="sb-item" href="#s04"><span class="sb-item-num">04</span>Component Deep Dive</a>
-        <a class="sb-item" href="#s05"><span class="sb-item-num">05</span>Data Model</a>
-        <a class="sb-item" href="#s06"><span class="sb-item-num">06</span>API Reference</a>
-        <a class="sb-item" href="#s07"><span class="sb-item-num">07</span>Core Workflows</a>
-      </div>
-    </div>
-
-    <div class="sb-group open" id="grp-ops">
-      <div class="sb-group-header" onclick="toggleGroup('grp-ops')">
-        <span>🚀</span> Operations
-        <span class="sb-group-arrow">▶</span>
-      </div>
-      <div class="sb-group-items">
-        <a class="sb-item" href="#s08"><span class="sb-item-num">08</span>Infrastructure</a>
-        <a class="sb-item" href="#s09"><span class="sb-item-num">09</span>Deployment</a>
-        <a class="sb-item" href="#s10"><span class="sb-item-num">10</span>Config & Secrets</a>
-        <a class="sb-item" href="#s11"><span class="sb-item-num">11</span>Observability</a>
-      </div>
-    </div>
-
-    <div class="sb-group open" id="grp-reliability">
-      <div class="sb-group-header" onclick="toggleGroup('grp-reliability')">
-        <span>🛡️</span> Reliability
-        <span class="sb-group-arrow">▶</span>
-      </div>
-      <div class="sb-group-items">
-        <a class="sb-item" href="#s12"><span class="sb-item-num">12</span>Error Handling</a>
-        <a class="sb-item" href="#s13"><span class="sb-item-num">13</span>Security</a>
-        <a class="sb-item" href="#s14"><span class="sb-item-num">14</span>Scalability</a>
-        <a class="sb-item" href="#s15"><span class="sb-item-num">15</span>Troubleshooting</a>
-      </div>
-    </div>
-
-    <div class="sb-group open" id="grp-dev">
-      <div class="sb-group-header" onclick="toggleGroup('grp-dev')">
-        <span>💻</span> Development
-        <span class="sb-group-arrow">▶</span>
-      </div>
-      <div class="sb-group-items">
-        <a class="sb-item" href="#s16"><span class="sb-item-num">16</span>Development Guide</a>
-      </div>
-    </div>
+  <div class="sb-section-label">Entities</div>
+  <div class="sb-group-toggle" onclick="toggleCluster()">
+    <span class="sb-arrow open" id="sb-arrow">▶</span>
+    <span>Cluster</span>
+  </div>
+  <div class="sb-items" id="sb-items">
+    <a class="sb-item" href="#n1" onclick="scrollTo('n1')"><span class="sb-dot d1"></span>DB Foundation</a>
+    <a class="sb-item" href="#n2" onclick="scrollTo('n2')"><span class="sb-dot d2"></span>PostgreSQL Migration</a>
+    <a class="sb-item" href="#n3" onclick="scrollTo('n3')"><span class="sb-dot d3"></span>Go Data Model</a>
+    <a class="sb-item" href="#n4" onclick="scrollTo('n4')"><span class="sb-dot d4"></span>Data Access Layer</a>
+    <a class="sb-item" href="#n5" onclick="scrollTo('n5')"><span class="sb-dot d5"></span>HTTP API</a>
+    <a class="sb-item" href="#n6" onclick="scrollTo('n6')"><span class="sb-dot d6"></span>Response DTO</a>
   </div>
 
   <div class="sb-footer">
-    <span class="sb-version">v1.0.0 · Go 1.22</span>
-    <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀ Light</button>
+    <span class="sb-status"></span>
+    <span>Go 1.26 · PostgreSQL 16</span>
   </div>
 </nav>
 
-<!-- ═══════════════ MAIN ═══════════════ -->
+<!-- ══ MAIN ══ -->
 <main class="main">
 
-<!-- ═══ 01. SYSTEM OVERVIEW ═══ -->
-<div class="doc-section" id="s01">
-  <div class="sec-eyebrow"><span class="sec-num">01</span> System Overview</div>
-  <h1 class="sec-title">PodOptix — Kubernetes Right-Sizing Engine</h1>
-  <p class="sec-desc">PodOptix continuously analyzes Kubernetes workload resource usage via Prometheus and generates data-driven right-sizing recommendations — reducing cloud spend without touching application code.</p>
+  <h1 class="page-title">Cluster Entity <span>Pipeline</span></h1>
+  <p class="page-desc">End-to-end flow from the connection pool through the schema, Go model, data access layer, HTTP API, and into the client response.</p>
 
-  <div class="stats-row stagger">
-    <div class="stat-card"><span class="stat-val" data-count="0">0</span><div class="stat-label">Language</div><div style="font-size:12px;color:var(--accent);margin-top:4px;font-weight:700">Go 1.22</div></div>
-    <div class="stat-card"><span class="stat-val">REST</span><div class="stat-label">API Style</div></div>
-    <div class="stat-card"><span class="stat-val">PG 15</span><div class="stat-label">Database</div></div>
-    <div class="stat-card"><span class="stat-val">0</span><div class="stat-label">External SaaS Deps</div></div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📦</span>Tech Stack</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">runtime</td><td class="td-type">Go 1.22</td><td class="td-note">Compiled binary, single static executable</td></tr>
-        <tr><td class="td-mono">web</td><td class="td-type">Gin</td><td class="td-note">HTTP router and middleware chain</td></tr>
-        <tr><td class="td-mono">database</td><td class="td-type">PostgreSQL 15</td><td class="td-note">Cluster registry, recommendation storage</td></tr>
-        <tr><td class="td-mono">db-driver</td><td class="td-type">pgx/v5</td><td class="td-note">High-performance Postgres driver with connection pooling</td></tr>
-        <tr><td class="td-mono">migrations</td><td class="td-type">golang-migrate</td><td class="td-note">Versioned SQL migrations applied at startup</td></tr>
-        <tr><td class="td-mono">metrics-source</td><td class="td-type">Prometheus HTTP API</td><td class="td-note">Queries workload CPU/memory usage over lookback window</td></tr>
-        <tr><td class="td-mono">auth</td><td class="td-type">JWT (HS256)</td><td class="td-note">Stateless authentication for all API routes</td></tr>
-        <tr><td class="td-mono">encryption</td><td class="td-type">AES-256-GCM</td><td class="td-note">Prometheus token encryption at rest</td></tr>
-        <tr><td class="td-mono">container</td><td class="td-type">Docker</td><td class="td-note">Multi-stage build, &lt;20 MB final image</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🗂️</span>Repository Structure</div>
-  <div class="tree">
-<span class="tree-dir">podoptix/</span>
-├── <span class="tree-dir">cmd/server/</span>              <span class="tree-comment"># main.go — entry point, wires all components</span>
-├── <span class="tree-dir">internal/</span>
-│   ├── <span class="tree-dir">api/</span>                 <span class="tree-comment"># HTTP handlers per entity</span>
-│   │   ├── <span class="tree-file">clusters.go</span>
-│   │   ├── <span class="tree-file">recommendations.go</span>
-│   │   ├── <span class="tree-file">auth.go</span>
-│   │   └── <span class="tree-file">router.go</span>
-│   ├── <span class="tree-dir">store/</span>               <span class="tree-comment"># PostgreSQL data access layer</span>
-│   │   ├── <span class="tree-file">store.go</span>           <span class="tree-comment"># pool init, migrations</span>
-│   │   ├── <span class="tree-file">cluster.go</span>
-│   │   └── <span class="tree-file">recommendation.go</span>
-│   ├── <span class="tree-dir">collector/</span>           <span class="tree-comment"># Prometheus scraper + analyzer</span>
-│   │   ├── <span class="tree-file">client.go</span>
-│   │   └── <span class="tree-file">analyzer.go</span>
-│   ├── <span class="tree-dir">scheduler/</span>           <span class="tree-comment"># 24h background sync loop</span>
-│   └── <span class="tree-dir">auth/</span>                <span class="tree-comment"># JWT + AES-256-GCM</span>
-├── <span class="tree-dir">pkg/models/</span>              <span class="tree-comment"># Shared Go structs</span>
-├── <span class="tree-dir">migrations/</span>              <span class="tree-comment"># *.up.sql / *.down.sql</span>
-├── <span class="tree-file">Dockerfile</span>
-└── <span class="tree-file">docker-compose.yml</span>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🌐</span>System Boundaries</div>
-  <div class="diagram-wrap">
-    <div class="mermaid">
-flowchart LR
-    Client(["👤 Client\n(Browser / CLI)"]):::ext
-    API["🔷 PodOptix API\n(Go + Gin)"]:::svc
-    DB[("🗃️ PostgreSQL\nclusters & recs")]:::store
-    Prom(["📊 Prometheus\n(per cluster)"]):::ext
-    K8s(["☸️ Kubernetes\n(target clusters)"]):::ext
-
-    Client -->|"JWT REST"| API
-    API -->|"pgx pool"| DB
-    API -->|"HTTP API"| Prom
-    Prom -->|scrapes| K8s
-
-    classDef ext fill:#1e293b,stroke:#475569,color:#94a3b8
-    classDef svc fill:#0d2137,stroke:#00d4ff,color:#e2e8f0
-    classDef store fill:#130d2b,stroke:#7c3aed,color:#e2e8f0
-    </div>
-    <div class="diagram-label">System boundaries — external dependencies and internal services</div>
-  </div>
-</div>
-
-<!-- ═══ 02. ARCHITECTURE ═══ -->
-<div class="doc-section" id="s02">
-  <div class="sec-eyebrow"><span class="sec-num">02</span> Architecture</div>
-  <h2 class="sec-title">Component Architecture</h2>
-  <p class="sec-desc">PodOptix is a single Go binary with clearly separated layers: HTTP handlers → store → database, with a side-channel background scheduler for metric collection.</p>
-
-  <div class="diagram-wrap">
-    <div class="mermaid">
-graph TB
-    subgraph API["API Layer — internal/api/"]
-        Router["router.go\nGin router + middleware"]
-        CH["clusters.go\nCRUD handlers"]
-        RH["recommendations.go\nRead handlers"]
-        AH["auth.go\nlogin · refresh"]
-    end
-    subgraph Store["Store Layer — internal/store/"]
-        SS["store.go\npool init · migrations"]
-        CS["cluster.go\n6 SQL operations"]
-        RS["recommendation.go\nINSERT · SELECT"]
-    end
-    subgraph Async["Background — internal/scheduler/"]
-        Sched["scheduler.go\n24h ticker"]
-        Coll["collector/client.go\nPrometheus HTTP client"]
-        Anal["collector/analyzer.go\nP95 CPU · P95 mem"]
-    end
-    DB[("PostgreSQL")]
-
-    Router --> CH & RH & AH
-    CH & RS --> SS
-    CS & RS --> DB
-    Sched --> Coll --> Anal --> RS
-    SS --> DB
-
-    style API fill:#0d2137,stroke:#00d4ff,color:#e2e8f0
-    style Store fill:#130d2b,stroke:#7c3aed,color:#e2e8f0
-    style Async fill:#1a1207,stroke:#f59e0b,color:#e2e8f0
-    style DB fill:#0a1a0a,stroke:#10b981,color:#e2e8f0
-    </div>
-    <div class="diagram-label">Internal component architecture and dependencies</div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📐</span>Component Responsibilities</div>
-  <div class="card-grid stagger">
-    <div class="card">
-      <div class="card-title">🔷 API Layer</div>
-      <div class="card-body">HTTP routing, JWT validation, request parsing, response serialization. Each entity has its own handler file. No business logic — delegates to store.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🗃️ Store Layer</div>
-      <div class="card-body">All SQL lives here. Each function maps to exactly one query. Returns Go structs. Never talks to Prometheus — only the DB.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">📊 Collector</div>
-      <div class="card-body">Prometheus HTTP API client. Runs P95 PromQL queries over the cluster's lookback window. Produces raw metric structs for the Analyzer.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">⏰ Scheduler</div>
-      <div class="card-body">24-hour background ticker. Iterates all connected clusters, fires a goroutine per cluster (bounded concurrency), updates last_synced_at on completion.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🔐 Auth</div>
-      <div class="card-body">JWT HS256 issuance and validation. AES-256-GCM for Prometheus token encryption. Single responsibility — no HTTP layer coupling.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">📦 Models</div>
-      <div class="card-body">Shared Go structs (Cluster, Recommendation). json tags control API shape. Sensitive fields tagged <code>json:"-"</code> to prevent leakage.</div>
+  <div class="flow-bar">
+    <span class="flow-label">POST /clusters flow</span>
+    <button class="flow-btn" onclick="startFlow()">▶ Start</button>
+    <button class="reset-btn" onclick="prevStep()">← Prev</button>
+    <button class="reset-btn" onclick="nextStep()">Next →</button>
+    <button class="reset-btn" onclick="resetFlow()">↺ Reset</button>
+    <div class="step-dots">
+      <div class="sdot" id="sd0"></div>
+      <div class="sdot" id="sd1"></div>
+      <div class="sdot" id="sd2"></div>
+      <div class="sdot" id="sd3"></div>
+      <div class="sdot" id="sd4"></div>
     </div>
   </div>
-</div>
 
-<!-- ═══ 03. DATA FLOW ═══ -->
-<div class="doc-section" id="s03">
-  <div class="sec-eyebrow"><span class="sec-num">03</span> End-to-End Data Flow</div>
-  <h2 class="sec-title">Request & Data Lifecycle</h2>
-  <p class="sec-desc">Trace a log record from the moment a cluster is registered through metric collection, recommendation generation, and API response. Every hop is shown — including failure paths.</p>
+  <div id="pipeline">
 
-  <div class="sub-h"><span class="sub-h-icon">🔄</span>Pipeline Overview</div>
-  <div class="pipeline">
-    <div class="pipe-step">
-      <div class="pipe-box">
-        <span class="pipe-icon">👤</span>
-        <div class="pipe-name">Client</div>
-        <div class="pipe-tech">HTTP/JWT</div>
+  <!-- ══ LAYER 1: store.go ══ -->
+  <div class="node-card" id="n1" onclick="toggle('n1')">
+    <div class="node-header">
+      <div class="node-icon">🗃</div>
+      <div class="node-info">
+        <div class="node-tag">Layer 1 · DB Foundation</div>
+        <div class="node-title">Store — Connection Pool</div>
+        <div class="node-path">internal/store/store.go</div>
       </div>
+      <div class="node-badges"><span class="badge b1">pool min2 max10</span></div>
+      <span class="node-chev">▾</span>
     </div>
-    <div class="pipe-arrow animated">→</div>
-    <div class="pipe-step">
-      <div class="pipe-box">
-        <span class="pipe-icon">🔷</span>
-        <div class="pipe-name">Gin Router</div>
-        <div class="pipe-tech">JWT validate</div>
-      </div>
-    </div>
-    <div class="pipe-arrow animated">→</div>
-    <div class="pipe-step">
-      <div class="pipe-box">
-        <span class="pipe-icon">⚙️</span>
-        <div class="pipe-name">Handler</div>
-        <div class="pipe-tech">parse + validate</div>
-      </div>
-    </div>
-    <div class="pipe-arrow animated">→</div>
-    <div class="pipe-step">
-      <div class="pipe-box">
-        <span class="pipe-icon">🗃️</span>
-        <div class="pipe-name">Store</div>
-        <div class="pipe-tech">SQL via pgx</div>
-      </div>
-    </div>
-    <div class="pipe-arrow animated">→</div>
-    <div class="pipe-step">
-      <div class="pipe-box">
-        <span class="pipe-icon">🐘</span>
-        <div class="pipe-name">PostgreSQL</div>
-        <div class="pipe-tech">persisted</div>
+    <div class="node-drawer">
+      <hr class="drawer-sep">
+      <div class="fn-list">
+        <div class="fn-item"><span class="method m-sql">STEP 1</span><div><div class="fn-sig">EnsureDatabase(databaseURL)</div><div class="fn-desc">Connects to the default <code style="color:var(--cyan)">postgres</code> DB and runs <code style="color:var(--cyan)">CREATE DATABASE podoptix</code> if absent. Must run before SyncSchema — target DB may not exist yet.</div></div></div>
+        <div class="fn-item"><span class="method m-sql">STEP 2</span><div><div class="fn-sig">SyncSchema(databaseURL)</div><div class="fn-desc">Runs all migration files in sequence. Skips already-applied. Auto-fixes dirty state from a previous crash recovery.</div></div></div>
+        <div class="fn-item accent"><span class="method m-sql">STEP 3</span><div><div class="fn-sig">New(databaseURL) *Store</div><div class="fn-desc">Allocates <code style="color:#a78bfa">pgxpool.Pool</code> in heap. Returns <code style="color:var(--cyan)">*Store</code> — a pointer on the stack holding the heap address of the pool. Settings: MaxConns=10, MinConns=2, MaxConnLifetime=1h, MaxConnIdleTime=30m. Dead connections replaced automatically by pgxpool on next use.</div></div></div>
+        <div class="fn-item"><span class="method m-get">PROBE</span><div><div class="fn-sig">Ping(ctx) error</div><div class="fn-desc">Used by <code style="color:var(--cyan)">/readyz</code> readiness probe to verify the database is alive before the pod receives traffic.</div></div></div>
+        <div class="fn-item"><span class="method m-delete">CLOSE</span><div><div class="fn-sig">Close()</div><div class="fn-desc">Graceful shutdown called via <code style="color:var(--cyan)">defer db.Close()</code> in main.go.</div></div></div>
       </div>
     </div>
   </div>
 
-  <div class="sub-h"><span class="sub-h-icon">📊</span>Cluster Registration + Metric Collection Sequence</div>
-  <div class="diagram-wrap">
-    <div class="mermaid">
-sequenceDiagram
-    participant C as Client
-    participant H as Handler
-    participant A as Auth
-    participant S as Store
-    participant P as Prometheus
-    participant DB as PostgreSQL
+  <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
 
-    C->>H: POST /api/v1/clusters (JWT)
-    H->>A: ValidateJWT()
-    A-->>H: user_id ✓
-    H->>P: Ping(10s timeout)
-    alt reachable
-        P-->>H: 200 OK
-        H->>A: Encrypt(prometheusToken)
-        A-->>H: ciphertext
-        H->>S: SaveCluster(ctx, cluster)
-        S->>DB: INSERT INTO clusters
-        DB-->>S: cluster_id
-        H-->>C: 201 Created
-        Note over H: spawn goroutine (10min timeout)
-        H->>P: QueryRange(cpu_p95, mem_p95)
-        P-->>H: metric data
-        H->>S: UpsertRecommendations()
-        S->>DB: INSERT recommendations
-        H->>S: UpdateClusterHealth(connected, now)
-    else unreachable
-        P-->>H: timeout/error
-        H->>S: SaveCluster(status=disconnected)
-        H-->>C: 201 Created (status: disconnected)
-    end
+  <!-- ══ LAYER 2: Migration ══ -->
+  <div class="node-card" id="n2" onclick="toggle('n2')">
+    <div class="node-header">
+      <div class="node-icon">🗄</div>
+      <div class="node-info">
+        <div class="node-tag">Layer 2 · Schema</div>
+        <div class="node-title">PostgreSQL Migration</div>
+        <div class="node-path">migrations/000001_create_clusters.up.sql</div>
+      </div>
+      <div class="node-badges"><span class="badge b2">10 columns</span><span class="badge b2">2 constraints</span></div>
+      <span class="node-chev">▾</span>
     </div>
-    <div class="diagram-label">POST /clusters — full lifecycle including async metric collection</div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🔁</span>Background Scheduler Flow</div>
-  <div class="diagram-wrap">
-    <div class="mermaid">
-flowchart TD
-    T["⏰ 24h Ticker fires"]
-    L["ListClusters()\nall clusters from DB"]
-    F{For each\ncluster}
-    G["Spawn goroutine\n(bounded concurrency)"]
-    D{Status ==\nconnected?}
-    Pr["Decrypt prometheusToken\n(AES-256-GCM)"]
-    Q["QueryPrometheus()\nP95 CPU + Memory"]
-    An["Analyze()\ncompute recommendations"]
-    Up["UpsertRecommendations()\nbulk INSERT or UPDATE"]
-    Hc["UpdateClusterHealth(\nconnected, last_synced_at=now)"]
-    He["UpdateClusterHealth(\ndisconnected)"]
-
-    T-->L-->F-->G
-    G-->D
-    D-->|yes|Pr-->Q
-    Q-->|success|An-->Up-->Hc
-    Q-->|fail|He
-    D-->|no|He
-
-    style T fill:#1a1207,stroke:#f59e0b,color:#e2e8f0
-    style Hc fill:#0a1a0a,stroke:#10b981,color:#e2e8f0
-    style He fill:#1a0a0a,stroke:#ef4444,color:#e2e8f0
+    <div class="node-drawer">
+      <hr class="drawer-sep">
+      <div class="dsec-title">Table: clusters</div>
+      <table class="ftable">
+        <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><span class="fname">cluster_id</span></td><td><span class="ftype">VARCHAR(36)</span></td><td><span class="fnote"><span class="ctag">PK</span> UUID v4</span></td></tr>
+          <tr><td><span class="fname">cluster_name</span></td><td><span class="ftype">VARCHAR(100)</span></td><td><span class="fnote"><span class="ctag">NOT NULL</span><span class="ctag">UNIQUE</span></span></td></tr>
+          <tr><td><span class="fname">prometheus_url</span></td><td><span class="ftype">VARCHAR(500)</span></td><td><span class="fnote"><span class="ctag">NOT NULL</span></span></td></tr>
+          <tr><td><span class="fname">prometheus_token</span></td><td><span class="ftype">TEXT</span></td><td><span class="fnote"><span class="ctag">NOT NULL</span><span class="locktag">AES-256-GCM</span></span></td></tr>
+          <tr><td><span class="fname">lookback_window</span></td><td><span class="ftype">VARCHAR(10)</span></td><td><span class="fnote"><span class="ctag">DEFAULT '7d'</span> CHECK IN ('7d','10d','30d')</span></td></tr>
+          <tr><td><span class="fname">status</span></td><td><span class="ftype">VARCHAR(20)</span></td><td><span class="fnote"><span class="ctag">DEFAULT 'disconnected'</span> CHECK IN ('connected','disconnected')</span></td></tr>
+          <tr><td><span class="fname">created_by</span></td><td><span class="ftype">VARCHAR(255)</span></td><td><span class="fnote">Email audit trail — nullable</span></td></tr>
+          <tr><td><span class="fname">last_synced_at</span></td><td><span class="ftype">TIMESTAMPTZ</span></td><td><span class="fnote">NULL until first Prometheus sync</span></td></tr>
+          <tr><td><span class="fname">created_at</span></td><td><span class="ftype">TIMESTAMPTZ</span></td><td><span class="fnote"><span class="ctag">DEFAULT NOW()</span></span></td></tr>
+          <tr><td><span class="fname">updated_at</span></td><td><span class="ftype">TIMESTAMPTZ</span></td><td><span class="fnote"><span class="ctag">DEFAULT NOW()</span></span></td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="diagram-label">Background scheduler — runs every 24 hours, processes all clusters</div>
-  </div>
-</div>
-
-<!-- ═══ 04. COMPONENT DEEP DIVE ═══ -->
-<div class="doc-section" id="s04">
-  <div class="sec-eyebrow"><span class="sec-num">04</span> Component Deep Dive</div>
-  <h2 class="sec-title">Internal Modules</h2>
-  <p class="sec-desc">Every source file, its responsibility, and the key functions within it.</p>
-
-  <div class="sub-h"><span class="sub-h-icon">🏗️</span>internal/store/store.go</div>
-
-  <div class="info-box note">
-    <span class="info-icon">💡</span>
-    <div class="info-body"><strong>Startup sequence:</strong> EnsureDatabase → SyncSchema → New (pool init) → Ping. If any step fails, the server exits immediately — fail fast.</div>
   </div>
 
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th style="width:220px">Function</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">EnsureDatabase()</td><td class="td-note">Connects to <code>postgres</code> database first, runs <code>CREATE DATABASE IF NOT EXISTS</code> — safe on first boot</td></tr>
-        <tr><td class="td-mono">SyncSchema()</td><td class="td-note">Runs all migration files in sequence. Skips already-applied migrations. Auto-fixes dirty state from crash recovery</td></tr>
-        <tr><td class="td-mono">New(databaseURL)</td><td class="td-note">Allocates pgx connection pool on heap, returns <code>*Store</code>. Calls <code>Ping()</code> to fail fast if DB unreachable</td></tr>
-        <tr><td class="td-mono">Ping(ctx)</td><td class="td-note">Lightweight health check — called by <code>GET /readyz</code> readiness probe</td></tr>
-        <tr><td class="td-mono">Close()</td><td class="td-note">Graceful shutdown via <code>defer</code> in main.go. Returns all connections to the pool</td></tr>
-      </tbody>
-    </table>
-  </div>
+  <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
 
-  <div class="sub-h"><span class="sub-h-icon">🏊</span>Connection Pool Settings</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Setting</th><th>Value</th><th>Rationale</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">MaxConns</td><td class="td-type">10</td><td class="td-note">Maximum simultaneous DB connections. Size to your PostgreSQL <code>max_connections</code></td></tr>
-        <tr><td class="td-mono">MinConns</td><td class="td-type">2</td><td class="td-note">Always keep 2 warm connections ready — eliminates cold-start latency</td></tr>
-        <tr><td class="td-mono">MaxConnLifetime</td><td class="td-type">1 hour</td><td class="td-note">Recycle connections after one hour to prevent stale connections</td></tr>
-        <tr><td class="td-mono">MaxConnIdleTime</td><td class="td-type">30 min</td><td class="td-note">Close idle connections — prevents DB-side connection exhaustion</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">go · internal/store/store.go</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
+  <!-- ══ LAYER 3: Model ══ -->
+  <div class="node-card" id="n3" onclick="toggle('n3')">
+    <div class="node-header">
+      <div class="node-icon">📐</div>
+      <div class="node-info">
+        <div class="node-tag">Layer 3 · Data Model</div>
+        <div class="node-title">Go Struct &amp; Constants</div>
+        <div class="node-path">pkg/models/cluster.go</div>
+      </div>
+      <div class="node-badges"><span class="badge b3">10 fields</span><span class="badge b3">4 constants</span></div>
+      <span class="node-chev">▾</span>
     </div>
-    <pre><code class="language-go">type Store struct {
-    pool *pgxpool.Pool // heap-allocated pool, shared by all operations
-}
-
-func New(databaseURL string) (*Store, error) {
-    config, err := pgxpool.ParseConfig(databaseURL)
-    if err != nil {
-        return nil, fmt.Errorf("parse db url: %w", err)
-    }
-
-    config.MaxConns        = 10
-    config.MinConns        = 2
-    config.MaxConnLifetime = time.Hour
-    config.MaxConnIdleTime = 30 * time.Minute
-
-    pool, err := pgxpool.NewWithConfig(context.Background(), config)
-    if err != nil {
-        return nil, fmt.Errorf("create pool: %w", err)
-    }
-
-    s := &Store{pool: pool}
-    if err := s.Ping(context.Background()); err != nil {
-        return nil, fmt.Errorf("ping db: %w", err)
-    }
-    return s, nil
-}</code></pre>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📡</span>internal/store/cluster.go</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Function</th><th>SQL Operation</th><th>Notes</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">SaveCluster(ctx, c)</td><td class="td-type">INSERT</td><td class="td-note">All fields. <code>last_synced_at</code> always NULL on creation</td></tr>
-        <tr><td class="td-mono">GetCluster(ctx, id)</td><td class="td-type">SELECT by PK</td><td class="td-note">Returns error if no row found — never returns nil cluster</td></tr>
-        <tr><td class="td-mono">ListClusters(ctx)</td><td class="td-type">SELECT all</td><td class="td-note">Ordered by <code>created_at DESC</code></td></tr>
-        <tr><td class="td-mono">UpdateCluster(ctx, c)</td><td class="td-type">UPDATE 4 cols</td><td class="td-note">name · url · token · lookback. <code>RowsAffected == 0</code> returns error</td></tr>
-        <tr><td class="td-mono">UpdateClusterHealth(ctx, id, status, t)</td><td class="td-type">UPDATE 2 cols</td><td class="td-note">Sole owner of <code>status</code> and <code>last_synced_at</code></td></tr>
-        <tr><td class="td-mono">DeleteCluster(ctx, id)</td><td class="td-type">DELETE by PK</td><td class="td-note"><code>RowsAffected == 0</code> returns 404-able error</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ═══ 05. DATA MODEL ═══ -->
-<div class="doc-section" id="s05">
-  <div class="sec-eyebrow"><span class="sec-num">05</span> Data Model</div>
-  <h2 class="sec-title">Database Schema</h2>
-  <p class="sec-desc">PostgreSQL 15. Migrations are applied automatically at startup via golang-migrate. All timestamps are <code>TIMESTAMPTZ</code> (UTC).</p>
-
-  <div class="sub-h"><span class="sub-h-icon">📊</span>Entity Relationship</div>
-  <div class="diagram-wrap">
-    <div class="mermaid">
-erDiagram
-    CLUSTERS {
-        varchar cluster_id PK
-        varchar cluster_name UK
-        varchar prometheus_url
-        text    prometheus_token
-        varchar lookback_window
-        varchar status
-        varchar created_by
-        timestamptz last_synced_at
-        timestamptz created_at
-        timestamptz updated_at
-    }
-    RECOMMENDATIONS {
-        varchar rec_id PK
-        varchar cluster_id FK
-        varchar namespace
-        varchar workload_name
-        varchar workload_type
-        varchar container_name
-        float   current_cpu_req
-        float   rec_cpu_req
-        float   current_mem_req
-        float   rec_mem_req
-        float   potential_savings
-        timestamptz generated_at
-    }
-    CLUSTERS ||--o{ RECOMMENDATIONS : "has"
-    </div>
-    <div class="diagram-label">Entity relationship diagram</div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🗄️</span>Table: clusters</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Type</th><th>Constraints</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">cluster_id</td><td class="td-type">VARCHAR(36)</td><td><span class="badge badge-pk">PK</span> UUID generated on insert</td></tr>
-        <tr><td class="td-mono">cluster_name</td><td class="td-type">VARCHAR(100)</td><td>NOT NULL <span class="badge badge-unique">UNIQUE</span></td></tr>
-        <tr><td class="td-mono">prometheus_url</td><td class="td-type">VARCHAR(500)</td><td>NOT NULL</td></tr>
-        <tr><td class="td-mono">prometheus_token</td><td class="td-type">TEXT</td><td>NOT NULL <span class="badge badge-enc">AES-256-GCM</span> encrypted at rest</td></tr>
-        <tr><td class="td-mono">lookback_window</td><td class="td-type">VARCHAR(10)</td><td>NOT NULL <span class="badge badge-def">DEFAULT '7d'</span> CHECK IN (7d, 10d, 30d)</td></tr>
-        <tr><td class="td-mono">status</td><td class="td-type">VARCHAR(20)</td><td>NOT NULL <span class="badge badge-def">DEFAULT 'disconnected'</span></td></tr>
-        <tr><td class="td-mono">created_by</td><td class="td-type">VARCHAR(36)</td><td><span class="badge badge-null">nullable</span> user_id from JWT</td></tr>
-        <tr><td class="td-mono">last_synced_at</td><td class="td-type">TIMESTAMPTZ</td><td><span class="badge badge-null">nullable</span> NULL until first sync</td></tr>
-        <tr><td class="td-mono">created_at</td><td class="td-type">TIMESTAMPTZ</td><td>NOT NULL DEFAULT NOW()</td></tr>
-        <tr><td class="td-mono">updated_at</td><td class="td-type">TIMESTAMPTZ</td><td>NOT NULL DEFAULT NOW()</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🗄️</span>Table: recommendations</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">rec_id</td><td class="td-type">VARCHAR(36)</td><td><span class="badge badge-pk">PK</span></td></tr>
-        <tr><td class="td-mono">cluster_id</td><td class="td-type">VARCHAR(36)</td><td><span class="badge badge-fk">FK</span> → clusters.cluster_id ON DELETE CASCADE</td></tr>
-        <tr><td class="td-mono">namespace</td><td class="td-type">VARCHAR(253)</td><td>Kubernetes namespace</td></tr>
-        <tr><td class="td-mono">workload_name</td><td class="td-type">VARCHAR(253)</td><td>Deployment / StatefulSet name</td></tr>
-        <tr><td class="td-mono">workload_type</td><td class="td-type">VARCHAR(50)</td><td>Deployment · StatefulSet · DaemonSet</td></tr>
-        <tr><td class="td-mono">container_name</td><td class="td-type">VARCHAR(253)</td><td>Container within the pod spec</td></tr>
-        <tr><td class="td-mono">current_cpu_request</td><td class="td-type">NUMERIC(10,4)</td><td>Millicores (e.g. 250 = 250m)</td></tr>
-        <tr><td class="td-mono">recommended_cpu</td><td class="td-type">NUMERIC(10,4)</td><td>P95 CPU × 1.2 safety buffer</td></tr>
-        <tr><td class="td-mono">current_mem_request</td><td class="td-type">NUMERIC(15,2)</td><td>Bytes</td></tr>
-        <tr><td class="td-mono">recommended_mem</td><td class="td-type">NUMERIC(15,2)</td><td>P95 memory × 1.2 safety buffer</td></tr>
-        <tr><td class="td-mono">potential_savings</td><td class="td-type">NUMERIC(10,4)</td><td>Estimated USD/month reduction</td></tr>
-        <tr><td class="td-mono">generated_at</td><td class="td-type">TIMESTAMPTZ</td><td>When this recommendation was computed</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📝</span>Go Model: Cluster</div>
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">go · pkg/models/cluster.go</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
-    </div>
-    <pre><code class="language-go">const (
-    ClusterStatusConnected    = "connected"
-    ClusterStatusDisconnected = "disconnected"
-
-    LookbackWindow7d  = "7d"
-    LookbackWindow10d = "10d"
-    LookbackWindow30d = "30d"
-)
-
-type Cluster struct {
-    ClusterID       string     `json:"cluster_id"`
-    ClusterName     string     `json:"cluster_name"`
-    PrometheusURL   string     `json:"prometheus_url"`
-    PrometheusToken string     `json:"-"` // AES-256-GCM — NEVER in API response
-    LookbackWindow  string     `json:"lookback_window"`
-    Status          string     `json:"status"`
-    CreatedBy       string     `json:"created_by"`
-    LastSyncedAt    *time.Time `json:"last_synced_at"` // nil → "not yet synced"
-    CreatedAt       time.Time  `json:"created_at"`
-    UpdatedAt       time.Time  `json:"updated_at"`
-}</code></pre>
-  </div>
-</div>
-
-<!-- ═══ 06. API DOCUMENTATION ═══ -->
-<div class="doc-section" id="s06">
-  <div class="sec-eyebrow"><span class="sec-num">06</span> API Reference</div>
-  <h2 class="sec-title">REST API</h2>
-  <p class="sec-desc">All endpoints require <code>Authorization: Bearer &lt;jwt&gt;</code> except <code>POST /auth/login</code>. Base path: <code>/api/v1</code>. Click any endpoint to expand.</p>
-
-  <div class="info-box note">
-    <span class="info-icon">🔐</span>
-    <div class="info-body"><strong>Authentication:</strong> All non-auth routes pass through Gin middleware that validates the JWT HS256 token and injects <code>user_id</code> into the Gin context. Missing or invalid token → <span class="badge badge-hidden">401</span>.</div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">☸️</span>Clusters</div>
-
-  <!-- POST /clusters -->
-  <div class="endpoint open" id="ep-post-clusters">
-    <div class="ep-header" onclick="toggleEndpoint('ep-post-clusters')">
-      <span class="method method-post">POST</span>
-      <span class="ep-path">/api/v1/clusters</span>
-      <span class="ep-desc">Register a new cluster</span>
-      <span class="ep-toggle">▼</span>
-    </div>
-    <div class="ep-body">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">ShouldBindJSON()</span><span class="s-arrow">→</span>validates required fields (name · url · token) <span class="s-err">400 on failure</span></span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body">validates <code>lookback_window</code> via switch · defaults to <code>"7d"</code> if empty <span class="s-err">400 on invalid value</span></span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-body"><span class="s-fn">collector.Ping(ctx, 10s)</span><span class="s-arrow">→</span>status = <span class="s-ok">connected</span> or <span class="s-err">disconnected</span></span></div>
-        <div class="step"><span class="step-num">4</span><span class="step-body"><span class="s-fn">auth.Encrypt(token)</span><span class="s-arrow">→</span>AES-256-GCM ciphertext <span class="s-err">500 on failure</span></span></div>
-        <div class="step"><span class="step-num">5</span><span class="step-body">builds <code>models.Cluster</code> · assigns UUID · sets <code>created_by</code> from JWT</span></div>
-        <div class="step"><span class="step-num">6</span><span class="step-body"><span class="s-fn">store.SaveCluster(ctx, cluster)</span><span class="s-arrow">→</span>INSERT <span class="s-err">500 on failure</span></span></div>
-        <div class="step"><span class="step-num">7</span><span class="step-body"><span class="s-bg">if connected → goroutine (10min timeout): collect metrics → recommendations → UpdateClusterHealth(connected, now())</span></span></div>
-        <div class="step"><span class="step-num">8</span><span class="step-body"><span class="s-ok">201 Created</span> · ClusterResponse with <code>last_synced_at: "not yet synced"</code></span></div>
+    <div class="node-drawer">
+      <hr class="drawer-sep">
+      <div class="dsec-title" style="margin-bottom:10px">type Cluster struct</div>
+      <div class="code-block">
+        <span class="kw">type</span> <span class="sn">Cluster</span> <span class="kw">struct</span> <span class="br">{</span><br>
+        <span class="ind"><span class="sn">ClusterID</span>       <span class="tp">string</span>     <span class="tg">`json:"cluster_id"      db:"cluster_id"`</span></span>
+        <span class="ind"><span class="sn">ClusterName</span>     <span class="tp">string</span>     <span class="tg">`json:"cluster_name"    db:"cluster_name"`</span></span>
+        <span class="ind"><span class="sn">PrometheusURL</span>   <span class="tp">string</span>     <span class="tg">`json:"prometheus_url"  db:"prometheus_url"`</span></span>
+        <span class="ind"><span class="sn">PrometheusToken</span> <span class="tp">string</span>     <span class="tg">`json:"-"               db:"prometheus_token"`</span> <span class="cm">// never in JSON</span></span>
+        <span class="ind"><span class="sn">LookbackWindow</span>  <span class="tp">string</span>     <span class="tg">`json:"lookback_window" db:"lookback_window"`</span></span>
+        <span class="ind"><span class="sn">Status</span>          <span class="tp">string</span>     <span class="tg">`json:"status"          db:"status"`</span></span>
+        <span class="ind"><span class="sn">CreatedBy</span>       <span class="tp">string</span>     <span class="tg">`json:"created_by"      db:"created_by"`</span></span>
+        <span class="ind"><span class="sn">LastSyncedAt</span>    <span class="tp">*time.Time</span> <span class="tg">`json:"last_synced_at"  db:"last_synced_at"`</span> <span class="cm">// nil = never synced</span></span>
+        <span class="ind"><span class="sn">CreatedAt</span>       <span class="tp">time.Time</span>  <span class="tg">`json:"created_at"      db:"created_at"`</span></span>
+        <span class="ind"><span class="sn">UpdatedAt</span>       <span class="tp">time.Time</span>  <span class="tg">`json:"updated_at"      db:"updated_at"`</span></span>
+        <span class="br">}</span>
+      </div>
+      <div style="margin-top:16px">
+        <div class="dsec-title">Constants</div>
+        <div class="const-chips">
+          <span class="chip chip-status">ClusterStatusConnected = "connected"</span>
+          <span class="chip chip-status">ClusterStatusDisconnected = "disconnected"</span>
+          <span class="chip chip-window">LookbackWindow7d = "7d"</span>
+          <span class="chip chip-window">LookbackWindow10d = "10d"</span>
+          <span class="chip chip-window">LookbackWindow30d = "30d"</span>
+          <span class="chip chip-default">DefaultLookbackWindow = "7d"</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- GET /clusters -->
-  <div class="endpoint" id="ep-get-clusters">
-    <div class="ep-header" onclick="toggleEndpoint('ep-get-clusters')">
-      <span class="method method-get">GET</span>
-      <span class="ep-path">/api/v1/clusters</span>
-      <span class="ep-desc">List all clusters</span>
-      <span class="ep-toggle">▼</span>
+  <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- ══ LAYER 4: Store/cluster.go ══ -->
+  <div class="node-card" id="n4" onclick="toggle('n4')">
+    <div class="node-header">
+      <div class="node-icon">⚙</div>
+      <div class="node-info">
+        <div class="node-tag">Layer 4 · Data Access</div>
+        <div class="node-title">Store — cluster.go</div>
+        <div class="node-path">internal/store/cluster.go</div>
+      </div>
+      <div class="node-badges"><span class="badge b4">6 functions</span></div>
+      <span class="node-chev">▾</span>
     </div>
-    <div class="ep-body hidden">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">store.ListClusters(ctx)</span><span class="s-arrow">→</span><code>[]*models.Cluster</code> ordered by created_at DESC</span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body"><span class="s-fn">toClusterResponse()</span> maps each cluster · nil last_synced_at → <code>"not yet synced"</code></span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-body"><span class="s-ok">200 OK</span> · empty array <code>[]</code> when no clusters exist, never <code>null</code></span></div>
+    <div class="node-drawer">
+      <hr class="drawer-sep">
+      <div class="fn-list">
+        <div class="fn-item"><span class="method m-post">INSERT</span><div><div class="fn-sig">SaveCluster(ctx, *models.Cluster) error</div><div class="fn-desc">Inserts a new cluster row. Hard-codes <code style="color:var(--cyan)">last_synced_at = NULL</code> — sync state is owned entirely by UpdateClusterHealth.</div></div></div>
+        <div class="fn-item"><span class="method m-get">SELECT</span><div><div class="fn-sig">GetCluster(ctx, clusterID string) (*models.Cluster, error)</div><div class="fn-desc">Full row scan by primary key. Returns error if row absent so API can return 404.</div></div></div>
+        <div class="fn-item"><span class="method m-get">SELECT</span><div><div class="fn-sig">ListClusters(ctx) ([]*models.Cluster, error)</div><div class="fn-desc">All rows ordered <code style="color:var(--cyan)">created_at DESC</code>. Returns empty slice, never nil.</div></div></div>
+        <div class="fn-item"><span class="method m-put">UPDATE</span><div><div class="fn-sig">UpdateCluster(ctx, *models.Cluster) error</div><div class="fn-desc">Updates config only: name, url, token, lookback_window. Does NOT touch status or last_synced_at. RowsAffected == 0 → error.</div></div></div>
+        <div class="fn-item accent"><span class="method m-put">UPDATE</span><div><div class="fn-sig">UpdateClusterHealth(ctx, clusterID, status string, collectedAt time.Time) error</div><div class="fn-desc" style="color:var(--text)"><strong style="color:#a78bfa">Sole owner of status + last_synced_at.</strong> Called only by the background sync goroutine and re-ping path. No other code path sets these fields.</div></div></div>
+        <div class="fn-item"><span class="method m-delete">DELETE</span><div><div class="fn-sig">DeleteCluster(ctx, clusterID string) error</div><div class="fn-desc">Hard delete by primary key. RowsAffected == 0 → error → API returns 404.</div></div></div>
       </div>
     </div>
   </div>
 
-  <!-- GET /clusters/:id -->
-  <div class="endpoint" id="ep-get-cluster">
-    <div class="ep-header" onclick="toggleEndpoint('ep-get-cluster')">
-      <span class="method method-get">GET</span>
-      <span class="ep-path">/api/v1/clusters/:id</span>
-      <span class="ep-desc">Fetch a single cluster</span>
-      <span class="ep-toggle">▼</span>
+  <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- ══ LAYER 5: API ══ -->
+  <div class="node-card" id="n5" onclick="toggle('n5')">
+    <div class="node-header">
+      <div class="node-icon">🌐</div>
+      <div class="node-info">
+        <div class="node-tag">Layer 5 · HTTP API</div>
+        <div class="node-title">Clusters API — Gin</div>
+        <div class="node-path">internal/api/clusters.go</div>
+      </div>
+      <div class="node-badges"><span class="badge b5">5 endpoints</span></div>
+      <span class="node-chev">▾</span>
     </div>
-    <div class="ep-body hidden">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">store.GetCluster(ctx, clusterID)</span><span class="s-arrow">→</span><span class="s-err">404 if not found</span></span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body"><span class="s-fn">toClusterResponse()</span><span class="s-arrow">→</span><span class="s-ok">200 OK</span></span></div>
+    <div class="node-drawer">
+      <hr class="drawer-sep">
+      <div class="ep-row"><div class="ep-left"><span class="method m-post">POST</span><span class="ep-path">/clusters</span><span class="ep-code">201</span></div><div><div class="ep-title">createCluster</div><div class="ep-flow">ShouldBindJSON → validate lookback → collector.Ping(10s) → auth.Encrypt → uuid.New() → store.SaveCluster → go backgroundSync()</div></div></div>
+      <div class="ep-row"><div class="ep-left"><span class="method m-get">GET</span><span class="ep-path">/clusters</span><span class="ep-code">200</span></div><div><div class="ep-title">listClusters</div><div class="ep-flow">store.ListClusters → toClusterResponse() → [] never null</div></div></div>
+      <div class="ep-row"><div class="ep-left"><span class="method m-get">GET</span><span class="ep-path">/clusters/:id</span><span class="ep-code">200/404</span></div><div><div class="ep-title">getCluster</div><div class="ep-flow">store.GetCluster → toClusterResponse()</div></div></div>
+      <div class="ep-row"><div class="ep-left"><span class="method m-put">PUT</span><span class="ep-path">/clusters/:id</span><span class="ep-code">200/404</span></div><div><div class="ep-title">updateCluster — fetch-then-update</div><div class="ep-flow">GetCluster → apply patch → re-encrypt if token changed → UpdateCluster → re-ping if url/token changed → UpdateClusterHealth</div></div></div>
+      <div class="ep-row"><div class="ep-left"><span class="method m-delete">DELETE</span><span class="ep-path">/clusters/:id</span><span class="ep-code">204/404</span></div><div><div class="ep-title">deleteCluster</div><div class="ep-flow">store.DeleteCluster → c.Status(204) · 404 if RowsAffected == 0</div></div></div>
+      <div class="go-box">
+        <div class="go-lbl">go func() — background sync</div>
+        <div class="go-step"><span class="go-num">1</span><span>Forked from createCluster only when <code style="color:var(--green)">status == "connected"</code> — 10 min context timeout</span></div>
+        <div class="go-step"><span class="go-num">2</span><span><code style="color:var(--cyan)">collector.Collect(ctx, lookbackWindow)</code> — queries Prometheus for CPU + memory + current limits</span></div>
+        <div class="go-step"><span class="go-num">3</span><span><code style="color:var(--cyan)">recommender.GenerateAll(clusterID, metrics)</code> → p99 × 2 = recommended limits</span></div>
+        <div class="go-step"><span class="go-num">4</span><span><code style="color:var(--cyan)">store.UpsertRecommendation(rec)</code> for each container — idempotent</span></div>
+        <div class="go-step"><span class="go-num">5</span><span><code style="color:#a78bfa">store.UpdateClusterHealth("connected", time.Now())</code> — stamps last_synced_at</span></div>
       </div>
     </div>
   </div>
 
-  <!-- PUT /clusters/:id -->
-  <div class="endpoint" id="ep-put-cluster">
-    <div class="ep-header" onclick="toggleEndpoint('ep-put-cluster')">
-      <span class="method method-put">PUT</span>
-      <span class="ep-path">/api/v1/clusters/:id</span>
-      <span class="ep-desc">Update cluster configuration</span>
-      <span class="ep-toggle">▼</span>
-    </div>
-    <div class="ep-body hidden">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">store.GetCluster(ctx, id)</span><span class="s-arrow">→</span>fetch current state <span class="s-err">404 if not found</span></span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body">parse body · apply only provided fields (fetch-then-update pattern)</span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-body">if token changed → <span class="s-fn">auth.Encrypt(newToken)</span> <span class="s-err">500 on failure</span></span></div>
-        <div class="step"><span class="step-num">4</span><span class="step-body"><span class="s-fn">store.UpdateCluster(ctx, c)</span> · <code>RowsAffected == 0</code> → error</span></div>
-        <div class="step"><span class="step-num">5</span><span class="step-body">if url or token changed → <span class="s-fn">collector.Ping(10s)</span> → <span class="s-fn">UpdateClusterHealth(newStatus)</span></span></div>
-        <div class="step"><span class="step-num">6</span><span class="step-body"><span class="s-ok">200 OK</span> · updated ClusterResponse</span></div>
+  <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+  <!-- ══ LAYER 6: Response DTO ══ -->
+  <div class="node-card" id="n6" onclick="toggle('n6')">
+    <div class="node-header">
+      <div class="node-icon">📡</div>
+      <div class="node-info">
+        <div class="node-tag">Layer 6 · Response</div>
+        <div class="node-title">ClusterResponse DTO</div>
+        <div class="node-path">internal/api/clusters.go · toClusterResponse()</div>
       </div>
+      <div class="node-badges"><span class="badge b6">client-safe</span></div>
+      <span class="node-chev">▾</span>
+    </div>
+    <div class="node-drawer">
+      <hr class="drawer-sep">
+      <table class="ftable">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><span class="fname">cluster_id</span></td><td><span class="ftype">string</span></td><td><span class="fnote">UUID</span></td></tr>
+          <tr><td><span class="fname">cluster_name</span></td><td><span class="ftype">string</span></td><td></td></tr>
+          <tr><td><span class="fname">prometheus_url</span></td><td><span class="ftype">string</span></td><td></td></tr>
+          <tr><td><span class="fname">lookback_window</span></td><td><span class="ftype">string</span></td><td><span class="fnote">7d · 10d · 30d</span></td></tr>
+          <tr><td><span class="fname">status</span></td><td><span class="ftype">string</span></td><td><span class="fnote">connected · disconnected</span></td></tr>
+          <tr><td><span class="fname">created_by</span></td><td><span class="ftype">string</span></td><td><span class="fnote">email audit</span></td></tr>
+          <tr><td><span class="fname">last_synced_at</span></td><td><span class="ftype">string</span></td><td><span class="fnote"><span class="ctag">*time.Time → string</span> "not yet synced" or RFC3339 — never null</span></td></tr>
+          <tr><td><span class="fname">created_at</span></td><td><span class="ftype">string</span></td><td><span class="fnote">RFC3339 UTC</span></td></tr>
+          <tr><td><span class="fname">updated_at</span></td><td><span class="ftype">string</span></td><td><span class="fnote">RFC3339 UTC</span></td></tr>
+          <tr><td><span style="color:var(--red);font-family:'SF Mono',monospace;font-size:12px">prometheus_token</span></td><td><span class="ftype">—</span></td><td><span class="fnote" style="color:var(--red)">excluded — json:"-" enforced at model level</span></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- DELETE /clusters/:id -->
-  <div class="endpoint" id="ep-delete-cluster">
-    <div class="ep-header" onclick="toggleEndpoint('ep-delete-cluster')">
-      <span class="method method-delete">DELETE</span>
-      <span class="ep-path">/api/v1/clusters/:id</span>
-      <span class="ep-desc">Remove a cluster and all recommendations</span>
-      <span class="ep-toggle">▼</span>
-    </div>
-    <div class="ep-body hidden">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">store.DeleteCluster(ctx, id)</span><span class="s-arrow">→</span><span class="s-err">404 if not found</span> &nbsp;<span class="s-err">500 on DB error</span></span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body">ON DELETE CASCADE removes all recommendations for this cluster</span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-body"><span class="s-ok">204 No Content</span></span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📈</span>Recommendations</div>
-
-  <!-- GET /clusters/:id/recommendations -->
-  <div class="endpoint" id="ep-get-recs">
-    <div class="ep-header" onclick="toggleEndpoint('ep-get-recs')">
-      <span class="method method-get">GET</span>
-      <span class="ep-path">/api/v1/clusters/:id/recommendations</span>
-      <span class="ep-desc">Get all recommendations for a cluster</span>
-      <span class="ep-toggle">▼</span>
-    </div>
-    <div class="ep-body hidden">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">store.GetCluster(ctx, id)</span> → verify cluster exists <span class="s-err">404 if not found</span></span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body"><span class="s-fn">store.ListRecommendations(ctx, clusterID)</span> → ordered by potential_savings DESC</span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-body"><span class="s-ok">200 OK</span> · array of recommendations with potential savings</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- POST /clusters/:id/recalculate -->
-  <div class="endpoint" id="ep-recalc">
-    <div class="ep-header" onclick="toggleEndpoint('ep-recalc')">
-      <span class="method method-post">POST</span>
-      <span class="ep-path">/api/v1/clusters/:id/recalculate</span>
-      <span class="ep-desc">Trigger immediate recommendation refresh</span>
-      <span class="ep-toggle">▼</span>
-    </div>
-    <div class="ep-body hidden">
-      <div class="steps">
-        <div class="step"><span class="step-num">1</span><span class="step-body"><span class="s-fn">store.GetCluster(ctx, id)</span> <span class="s-err">404 if not found</span></span></div>
-        <div class="step"><span class="step-num">2</span><span class="step-body">cluster must be <code>connected</code> <span class="s-err">400 if disconnected</span></span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-body"><span class="s-bg">spawn goroutine: collect → analyze → upsert → UpdateClusterHealth</span></span></div>
-        <div class="step"><span class="step-num">4</span><span class="step-body"><span class="s-ok">202 Accepted</span> immediately — does not wait for completion</span></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ 07. CORE WORKFLOWS ═══ -->
-<div class="doc-section" id="s07">
-  <div class="sec-eyebrow"><span class="sec-num">07</span> Core Workflows</div>
-  <h2 class="sec-title">Key Business Flows</h2>
-  <p class="sec-desc">The three critical paths in PodOptix — cluster registration, background sync, and manual recalculation.</p>
-
-  <div class="sub-h"><span class="sub-h-icon">📊</span>Prometheus Query Strategy</div>
-  <div class="info-box tip">
-    <span class="info-icon">✅</span>
-    <div class="info-body"><strong>Why P95?</strong> P99 would over-provision; P50 would under-provision. P95 × 1.2 safety buffer catches burst traffic while eliminating idle waste.</div>
-  </div>
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">promql</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
-    </div>
-    <pre><code class="language-promql">-- CPU P95 per container (lookback window = 7d)
-quantile_over_time(0.95,
-  rate(container_cpu_usage_seconds_total{
-    namespace=~".+", container!="POD", container!=""
-  }[5m])[7d:5m]
-) * 1000  -- convert to millicores
-
--- Memory P95 per container
-quantile_over_time(0.95,
-  container_memory_working_set_bytes{
-    namespace=~".+", container!="POD", container!=""
-  }[7d:5m]
-)</code></pre>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🔁</span>Retry & Failure Handling</div>
-  <div class="card-grid">
-    <div class="card">
-      <div class="card-title">⏱️ Prometheus Ping Timeout</div>
-      <div class="card-body">10-second hard timeout on cluster ping during registration. Cluster saved with <code>status: disconnected</code> — no data loss, retried on next scheduler run.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🔄 Background Goroutine Timeout</div>
-      <div class="card-body">10-minute context timeout on the async goroutine spawned post-registration. If Prometheus is slow, this prevents goroutine leak.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">📅 Scheduler Recovery</div>
-      <div class="card-body">24h ticker is non-blocking. If a cluster's goroutine panics, it's recovered and the cluster's status is set to <code>disconnected</code>. Other clusters continue unaffected.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🗂️ Migration Dirty State</div>
-      <div class="card-body">If a migration was interrupted mid-run, <code>SyncSchema()</code> detects the dirty flag and auto-retries from the last clean checkpoint.</div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ 08. INFRASTRUCTURE ═══ -->
-<div class="doc-section" id="s08">
-  <div class="sec-eyebrow"><span class="sec-num">08</span> Infrastructure</div>
-  <h2 class="sec-title">Infrastructure Architecture</h2>
-
-  <div class="sub-h"><span class="sub-h-icon">🐳</span>Docker</div>
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">dockerfile</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
-    </div>
-    <pre><code class="language-dockerfile"># Stage 1 — build
-FROM golang:1.22-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o podoptix ./cmd/server
-
-# Stage 2 — minimal runtime (&lt;20 MB)
-FROM alpine:3.19
-RUN apk add --no-cache ca-certificates
-WORKDIR /app
-COPY --from=builder /app/podoptix .
-COPY --from=builder /app/migrations ./migrations
-EXPOSE 8080
-CMD ["./podoptix"]</code></pre>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">⚙️</span>docker-compose (Local Dev)</div>
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">yaml</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
-    </div>
-    <pre><code class="language-yaml">services:
-  api:
-    build: .
-    ports: ["8080:8080"]
-    environment:
-      DATABASE_URL: postgres://podoptix:secret@db:5432/podoptix?sslmode=disable
-      JWT_SECRET: local-dev-secret
-      ENCRYPTION_KEY: 32-byte-hex-key-here
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: podoptix
-      POSTGRES_USER: podoptix
-      POSTGRES_PASSWORD: secret
-    healthcheck:
-      test: ["CMD-SHELL","pg_isready -U podoptix"]
-      interval: 5s
-      timeout: 5s
-      retries: 5</code></pre>
-  </div>
-</div>
-
-<!-- ═══ 09. DEPLOYMENT ═══ -->
-<div class="doc-section" id="s09">
-  <div class="sec-eyebrow"><span class="sec-num">09</span> Deployment</div>
-  <h2 class="sec-title">Build & Deploy</h2>
-
-  <div class="sub-h"><span class="sub-h-icon">🏗️</span>Build Process</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> CGO_ENABLED=0 GOOS=linux go build -o podoptix ./cmd/server</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> docker build -t podoptix:latest .</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> docker push registry.example.com/podoptix:latest</div>
-
-  <div class="sub-h"><span class="sub-h-icon">☸️</span>Kubernetes Deployment</div>
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">yaml · k8s/deployment.yaml</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
-    </div>
-    <pre><code class="language-yaml">apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: podoptix
-spec:
-  replicas: 2
-  template:
-    spec:
-      containers:
-        - name: podoptix
-          image: podoptix:latest
-          ports:
-            - containerPort: 8080
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-            initialDelaySeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 8080
-            initialDelaySeconds: 3
-          envFrom:
-            - secretRef:
-                name: podoptix-secrets</code></pre>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🔄</span>Rollback</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> kubectl rollout undo deployment/podoptix</div>
-  <div class="info-box warn">
-    <span class="info-icon">⚠️</span>
-    <div class="info-body"><strong>Migration rollback:</strong> Run the <code>*.down.sql</code> migration manually before rolling back the binary if the new version added DB schema changes.</div>
-  </div>
-</div>
-
-<!-- ═══ 10. CONFIG & SECRETS ═══ -->
-<div class="doc-section" id="s10">
-  <div class="sec-eyebrow"><span class="sec-num">10</span> Configuration & Secrets</div>
-  <h2 class="sec-title">Environment Variables</h2>
-
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">DATABASE_URL</td><td><span class="badge badge-hidden">required</span></td><td class="td-note">Full PostgreSQL DSN. Example: <code>postgres://user:pass@host:5432/dbname?sslmode=require</code></td></tr>
-        <tr><td class="td-mono">JWT_SECRET</td><td><span class="badge badge-hidden">required</span></td><td class="td-note">HS256 signing secret. Minimum 32 bytes. Rotate via k8s Secret.</td></tr>
-        <tr><td class="td-mono">ENCRYPTION_KEY</td><td><span class="badge badge-hidden">required</span></td><td class="td-note">32-byte hex key for AES-256-GCM Prometheus token encryption</td></tr>
-        <tr><td class="td-mono">PORT</td><td><span class="badge badge-def">optional</span></td><td class="td-note">HTTP listen port. Default: <code>8080</code></td></tr>
-        <tr><td class="td-mono">LOG_LEVEL</td><td><span class="badge badge-def">optional</span></td><td class="td-note"><code>debug | info | warn | error</code>. Default: <code>info</code></td></tr>
-        <tr><td class="td-mono">SCHEDULER_INTERVAL</td><td><span class="badge badge-def">optional</span></td><td class="td-note">Background sync interval. Default: <code>24h</code>. Dev: use <code>5m</code></td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="info-box note">
-    <span class="info-icon">🔑</span>
-    <div class="info-body"><strong>Secret rotation:</strong> Rotating <code>ENCRYPTION_KEY</code> requires a data migration — all stored Prometheus tokens must be decrypted with the old key and re-encrypted with the new one before deploying.</div>
-  </div>
-</div>
-
-<!-- ═══ 11. OBSERVABILITY ═══ -->
-<div class="doc-section" id="s11">
-  <div class="sec-eyebrow"><span class="sec-num">11</span> Observability</div>
-  <h2 class="sec-title">Logs, Metrics & Health</h2>
-
-  <div class="sub-h"><span class="sub-h-icon">❤️</span>Health Endpoints</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Endpoint</th><th>Purpose</th><th>Checks</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">GET /healthz</td><td class="td-note">Liveness probe</td><td class="td-note">Always <span class="status status-ok">200 OK</span> if process is alive</td></tr>
-        <tr><td class="td-mono">GET /readyz</td><td class="td-note">Readiness probe</td><td class="td-note"><code>store.Ping()</code> — <span class="status status-ok">200 OK</span> if DB reachable, else <span class="status status-err">503</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📝</span>Log Events to Monitor</div>
-  <div class="card-grid stagger">
-    <div class="card">
-      <div class="card-title">🔴 Error Events</div>
-      <div class="card-body"><code>prometheus ping failed</code> — cluster connectivity lost<br><code>encrypt token failed</code> — key misconfiguration<br><code>migration dirty state</code> — manual intervention needed</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🟡 Warn Events</div>
-      <div class="card-body"><code>scheduler cycle took &gt;23h</code> — cluster count growing<br><code>no metrics returned</code> — Prometheus empty range<br><code>goroutine timeout</code> — slow Prometheus</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🟢 Info Events</div>
-      <div class="card-body"><code>cluster synced successfully</code> — normal operation<br><code>recommendations upserted N rows</code> — metric<br><code>server listening :8080</code> — startup</div>
-    </div>
-    <div class="card">
-      <div class="card-title">📊 Key Metrics</div>
-      <div class="card-body">Clusters: total, connected/disconnected ratio<br>Recommendations: avg potential_savings per cluster<br>Sync duration: P95 of scheduler loop</div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ 12. ERROR HANDLING ═══ -->
-<div class="doc-section" id="s12">
-  <div class="sec-eyebrow"><span class="sec-num">12</span> Error Handling</div>
-  <h2 class="sec-title">Errors, Retries & Timeouts</h2>
-
-  <div class="sub-h"><span class="sub-h-icon">📋</span>Error Response Format</div>
-  <div class="code-block">
-    <div class="code-header">
-      <div class="code-dots"><div class="code-dot" style="background:#ef4444"></div><div class="code-dot" style="background:#f59e0b"></div><div class="code-dot" style="background:#10b981"></div></div>
-      <span class="code-lang">json</span>
-      <button class="copy-btn" onclick="copyCode(this)">copy</button>
-    </div>
-    <pre><code class="language-json">{
-  "error": "cluster not found",
-  "code":  "CLUSTER_NOT_FOUND",
-  "status": 404
-}</code></pre>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">⏱️</span>Timeout Matrix</div>
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>Operation</th><th>Timeout</th><th>Behavior on Expiry</th></tr></thead>
-      <tbody>
-        <tr><td class="td-mono">Prometheus Ping</td><td class="td-type">10 seconds</td><td class="td-note">Cluster saved as <code>disconnected</code>. No retry — next scheduler run will re-ping</td></tr>
-        <tr><td class="td-mono">Background goroutine (post-register)</td><td class="td-type">10 minutes</td><td class="td-note">Context cancelled. Cluster health not updated. Scheduler picks up in 24h</td></tr>
-        <tr><td class="td-mono">HTTP request handlers</td><td class="td-type">30 seconds</td><td class="td-note">Gin default. Client receives 503</td></tr>
-        <tr><td class="td-mono">DB query</td><td class="td-type">5 seconds</td><td class="td-note">pgx context timeout. Returns 500. Pool connection recycled</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ═══ 13. SECURITY ═══ -->
-<div class="doc-section" id="s13">
-  <div class="sec-eyebrow"><span class="sec-num">13</span> Security</div>
-  <h2 class="sec-title">Security Model</h2>
-
-  <div class="card-grid stagger">
-    <div class="card">
-      <div class="card-title">🔑 JWT Authentication</div>
-      <div class="card-body">HS256 signed tokens. Validated on every route via Gin middleware. <code>user_id</code> injected into context — never trusted from request body.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🔒 Token Encryption</div>
-      <div class="card-body">Prometheus tokens encrypted with AES-256-GCM before INSERT. Tagged <code>json:"-"</code> — never serialized to API responses. Decrypted only in-memory during Prometheus calls.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🚫 SQL Injection</div>
-      <div class="card-body">All queries use pgx parameterized statements. Zero string interpolation in SQL. No raw query builder.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🌐 Network</div>
-      <div class="card-body">DB connection via <code>sslmode=require</code> in production. Prometheus calls over HTTPS. Internal K8s service mesh for inter-service comms.</div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ 14. SCALABILITY ═══ -->
-<div class="doc-section" id="s14">
-  <div class="sec-eyebrow"><span class="sec-num">14</span> Scalability & Performance</div>
-  <h2 class="sec-title">Performance Design</h2>
-
-  <div class="sub-h"><span class="sub-h-icon">🏊</span>Connection Pool Tuning</div>
-  <div class="info-box tip">
-    <span class="info-icon">📏</span>
-    <div class="info-body"><strong>Sizing guide:</strong> Set <code>MaxConns</code> to <code>min(PostgreSQL max_connections / replicas, concurrent_goroutines × 2)</code>. Current default of 10 handles up to 100 clusters without pool exhaustion.</div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">⚡</span>Concurrency Model</div>
-  <div class="card-grid">
-    <div class="card">
-      <div class="card-title">📊 Scheduler Concurrency</div>
-      <div class="card-body">One goroutine per cluster during sync. Bounded by a semaphore (default: 10 concurrent Prometheus scrapes). Prevents overwhelming Prometheus under high cluster count.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🔷 HTTP Concurrency</div>
-      <div class="card-body">Gin handles concurrent requests via Go's goroutine-per-request model. Each request draws from the shared pgx pool. No global locks in any handler.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">📈 Horizontal Scaling</div>
-      <div class="card-body">Stateless API — scale replicas freely. Scheduler runs on all replicas — use a distributed lock (Redis or DB advisory lock) if you need exactly-once scheduling at scale.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">🗃️ DB Bottleneck</div>
-      <div class="card-body">Single PostgreSQL — current bottleneck at ~1000 clusters. Read replicas for ListClusters/ListRecommendations, primary for writes. Add index on <code>recommendations(cluster_id, potential_savings)</code>.</div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ 15. TROUBLESHOOTING ═══ -->
-<div class="doc-section" id="s15">
-  <div class="sec-eyebrow"><span class="sec-num">15</span> Troubleshooting</div>
-  <h2 class="sec-title">Runbook</h2>
-  <p class="sec-desc">Common failures, diagnostic commands, and recovery procedures.</p>
-
-  <div class="trouble-item">
-    <div class="trouble-title">🔴 Cluster stuck in <code>disconnected</code></div>
-    <div class="trouble-symptom">Symptom: <code>last_synced_at</code> is null or very old. Recommendations not generating.</div>
-    <div class="trouble-fix">
-      <strong>Check:</strong>
-      <div class="cmd"><span class="cmd-prompt">$</span> curl -s https://your-prometheus/api/v1/query?query=up</div>
-      <div class="cmd"><span class="cmd-prompt">$</span> kubectl exec -it podoptix-pod -- curl http://prometheus:9090/api/v1/query?query=up</div>
-      <strong>Fix:</strong> Verify Prometheus URL, token, and network reachability from the pod. Use <code>PUT /clusters/:id</code> to update the token, which triggers a re-ping.
-    </div>
-  </div>
-
-  <div class="trouble-item">
-    <div class="trouble-title">🔴 <code>migration dirty state</code> on startup</div>
-    <div class="trouble-symptom">Symptom: Server exits immediately with "dirty database version" log.</div>
-    <div class="trouble-fix">
-      <strong>Fix:</strong>
-      <div class="cmd"><span class="cmd-prompt">$</span> psql $DATABASE_URL -c "UPDATE schema_migrations SET dirty=false WHERE version=1;"</div>
-      Then restart. The migration will re-run from the last clean state.
-    </div>
-  </div>
-
-  <div class="trouble-item">
-    <div class="trouble-title">🟡 <code>/readyz</code> returns 503</div>
-    <div class="trouble-symptom">Symptom: Kubernetes marks pod as not ready. Traffic not routed to it.</div>
-    <div class="trouble-fix">
-      <strong>Diagnose:</strong>
-      <div class="cmd"><span class="cmd-prompt">$</span> kubectl exec -it podoptix-pod -- curl localhost:8080/readyz</div>
-      <div class="cmd"><span class="cmd-prompt">$</span> kubectl logs podoptix-pod | grep "ping db"</div>
-      <strong>Cause:</strong> PostgreSQL unreachable. Check pod network policy, DB credentials, and PostgreSQL pod status.
-    </div>
-  </div>
-
-  <div class="trouble-item">
-    <div class="trouble-title">🟡 No recommendations after sync</div>
-    <div class="trouble-symptom">Symptom: Cluster is connected, <code>last_synced_at</code> is recent, but recommendations array is empty.</div>
-    <div class="trouble-fix">
-      <strong>Diagnose:</strong> The Prometheus range query returned no data. Check:
-      <div class="cmd"><span class="cmd-prompt">$</span> curl "http://prometheus/api/v1/query_range?query=container_cpu_usage_seconds_total&start=...&end=...&step=5m"</div>
-      Ensure the cluster has workloads running and Prometheus has at least 1 lookback window of data.
-    </div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🩺</span>Useful Diagnostic Commands</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> kubectl get pods -l app=podoptix -o wide</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> kubectl logs -l app=podoptix --tail=100 -f</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> kubectl exec -it podoptix-pod -- curl localhost:8080/healthz</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> psql $DATABASE_URL -c "SELECT cluster_name, status, last_synced_at FROM clusters ORDER BY last_synced_at DESC;"</div>
-</div>
-
-<!-- ═══ 16. DEV GUIDE ═══ -->
-<div class="doc-section" id="s16">
-  <div class="sec-eyebrow"><span class="sec-num">16</span> Development Guide</div>
-  <h2 class="sec-title">Getting Started</h2>
-  <p class="sec-desc">Everything you need to run, test, and contribute to PodOptix.</p>
-
-  <div class="sub-h"><span class="sub-h-icon">⚙️</span>Prerequisites</div>
-  <div class="card-grid">
-    <div class="card"><div class="card-title">Go 1.22+</div><div class="card-body"><div class="cmd"><span class="cmd-prompt">$</span> go version</div></div></div>
-    <div class="card"><div class="card-title">Docker + Compose</div><div class="card-body"><div class="cmd"><span class="cmd-prompt">$</span> docker --version</div></div></div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">🚀</span>Local Setup</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> git clone https://github.com/your-org/podoptix && cd podoptix</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> cp .env.example .env   # edit DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> docker compose up -d db</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> go run ./cmd/server</div>
-
-  <div class="sub-h"><span class="sub-h-icon">🧪</span>Testing</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> go test ./... -v -race</div>
-  <div class="cmd"><span class="cmd-prompt">$</span> go test ./internal/store/... -tags integration  # requires running DB</div>
-
-  <div class="sub-h"><span class="sub-h-icon">➕</span>Adding a New Entity (Pattern)</div>
-  <div class="info-box tip">
-    <span class="info-icon">📐</span>
-    <div class="info-body">Follow this exact order to stay consistent with the codebase pattern.</div>
-  </div>
-  <div class="steps">
-    <div class="step"><span class="step-num">1</span><span class="step-body">Write <code>migrations/00000N_create_{entity}.up.sql</code> and corresponding <code>.down.sql</code></span></div>
-    <div class="step"><span class="step-num">2</span><span class="step-body">Add struct to <code>pkg/models/{entity}.go</code> with <code>json</code> tags and constants</span></div>
-    <div class="step"><span class="step-num">3</span><span class="step-body">Implement <code>internal/store/{entity}.go</code> with typed SQL functions</span></div>
-    <div class="step"><span class="step-num">4</span><span class="step-body">Write <code>internal/api/{entity}.go</code> handlers — delegate only to store, no SQL here</span></div>
-    <div class="step"><span class="step-num">5</span><span class="step-body">Register routes in <code>internal/api/router.go</code></span></div>
-    <div class="step"><span class="step-num">6</span><span class="step-body">Add integration tests in <code>internal/store/{entity}_test.go</code></span></div>
-  </div>
-
-  <div class="sub-h"><span class="sub-h-icon">📏</span>Code Conventions</div>
-  <div class="card-grid">
-    <div class="card"><div class="card-title">Error wrapping</div><div class="card-body">Always use <code>fmt.Errorf("context: %w", err)</code>. Never swallow errors.</div></div>
-    <div class="card"><div class="card-title">Context propagation</div><div class="card-body">Pass <code>ctx context.Context</code> as first arg to every store function. Never use <code>context.Background()</code> in handlers.</div></div>
-    <div class="card"><div class="card-title">No global state</div><div class="card-body">All dependencies injected via struct. No package-level vars except constants.</div></div>
-    <div class="card"><div class="card-title">json:"-" for secrets</div><div class="card-body">Any field that must not appear in API responses gets <code>json:"-"</code>. Test with a <code>json.Marshal</code> snapshot test.</div></div>
-  </div>
-
-  <div style="margin-top:48px;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
-    <div style="font-size:12px;color:var(--text3);margin-bottom:6px">Generated</div>
-    <div style="font-size:13px;color:var(--text2)" id="gen-time"></div>
-    <div style="font-size:12px;color:var(--text3);margin-top:8px">PodOptix · Go 1.22 · PostgreSQL 15</div>
-  </div>
-</div>
-
+  </div><!-- /pipeline -->
 </main>
+</div><!-- /layout -->
+
+<!-- tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-num" id="tt-num"></div>
+  <div class="tt-title" id="tt-title"></div>
+  <div class="tt-body" id="tt-body"></div>
+  <div style="display:flex;gap:8px;margin-top:14px;">
+    <button onclick="prevStep()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.08);border:1px solid var(--border);border-radius:5px;color:var(--dim);font-size:12px;cursor:pointer;font-family:inherit;">← Prev</button>
+    <button onclick="nextStep()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.12);border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">Next →</button>
+  </div>
 </div>
 
 <script>
-// ── Mermaid init ──
-mermaid.initialize({
-  startOnLoad: true,
-  theme: 'dark',
-  themeVariables: {
-    primaryColor: '#0d2137',
-    primaryTextColor: '#e2e8f0',
-    primaryBorderColor: '#00d4ff',
-    lineColor: '#475569',
-    secondaryColor: '#130d2b',
-    tertiaryColor: '#1a1207',
-    edgeLabelBackground: '#0a0f1e',
-    fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif',
-  },
-  flowchart: { htmlLabels: true, curve: 'basis' },
-  sequence: { actorMargin: 50, useMaxWidth: true },
-});
+// ── toggle node ──
+function toggle(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  updateSidebar();
+}
 
-// ── Highlight.js ──
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
-  document.getElementById('gen-time').textContent = new Date().toLocaleString();
-});
+// ── toggle cluster dropdown ──
+function toggleCluster() {
+  const items = document.getElementById('sb-items');
+  const arrow = document.getElementById('sb-arrow');
+  const hidden = items.classList.toggle('hidden');
+  arrow.classList.toggle('open', !hidden);
+}
 
-// ── Scroll reveal ──
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      e.target.classList.add('visible');
-      observer.unobserve(e.target);
-    }
+// ── scroll to node ──
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) { el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('flow-active'); setTimeout(()=>el.classList.remove('flow-active'),1500); }
+  return false;
+}
+
+// ── sidebar active on scroll ──
+const nodes = ['n1','n2','n3','n4','n5','n6'];
+const sbLinks = document.querySelectorAll('.sb-item');
+
+function updateSidebar() {
+  let active = null;
+  nodes.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 120) active = id;
   });
-}, { threshold: 0.05, rootMargin: '0px 0px -40px 0px' });
-
-document.querySelectorAll('.doc-section').forEach(s => observer.observe(s));
-
-// ── Active sidebar tracking ──
-const sections = document.querySelectorAll('.doc-section');
-const sidebarItems = document.querySelectorAll('.sb-item');
-
-const sectionObserver = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      const id = e.target.id;
-      sidebarItems.forEach(item => {
-        item.classList.toggle('active', item.getAttribute('href') === '#' + id);
-      });
-    }
+  sbLinks.forEach(a => {
+    const href = a.getAttribute('href').replace('#','');
+    a.classList.toggle('active', href === active);
   });
-}, { threshold: 0.3 });
+}
+window.addEventListener('scroll', updateSidebar);
 
-sections.forEach(s => sectionObserver.observe(s));
+// ── flow animation ──
+const flowSteps = [
+  { node:'n5', num:'Step 1 / 5', title:'ShouldBindJSON + Validation', body:'Gin parses the request body. Required fields (name, url, token) are validated. Lookback window defaults to "7d" if absent.' },
+  { node:'n5', num:'Step 2 / 5', title:'collector.Ping(10s)', body:'Prometheus endpoint is pinged immediately. Status set to "connected" or "disconnected" — never pending.' },
+  { node:'n4', num:'Step 3 / 5', title:'store.SaveCluster', body:'auth.Encrypt(token) → AES-256-GCM ciphertext stored. UUID assigned. Row inserted with last_synced_at = NULL.' },
+  { node:'n4', num:'Step 4 / 5', title:'store.UpdateClusterHealth', body:'Called by background goroutine after Prometheus collection completes. Stamps last_synced_at with the exact time sync finished.' },
+  { node:'n6', num:'Step 5 / 5', title:'ClusterResponse returned', body:'201 Created returned immediately. last_synced_at = "not yet synced" until background sync completes.' },
+];
+let flowStep = -1;
 
-// ── Group toggle ──
-function toggleGroup(id) {
-  const grp = document.getElementById(id);
-  grp.classList.toggle('open');
-  const items = grp.querySelector('.sb-group-items');
-  if (grp.classList.contains('open')) {
-    items.style.maxHeight = items.scrollHeight + 'px';
-  } else {
-    items.style.maxHeight = '0';
+function showStep(i) {
+  if (i < 0 || i >= flowSteps.length) return;
+  flowStep = i;
+  const s = flowSteps[flowStep];
+
+  nodes.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('flow-active','open');
+  });
+
+  const active = document.getElementById(s.node);
+  active.classList.add('flow-active','open');
+  active.scrollIntoView({ behavior:'smooth', block:'center' });
+
+  for (let j = 0; j < flowSteps.length; j++) {
+    const d = document.getElementById('sd'+j);
+    if (j < flowStep) d.className = 'sdot done';
+    else if (j === flowStep) d.className = 'sdot active';
+    else d.className = 'sdot';
   }
+
+  document.getElementById('tt-num').textContent   = s.num;
+  document.getElementById('tt-title').textContent = s.title;
+  document.getElementById('tt-body').textContent  = s.body;
+  document.getElementById('tooltip').classList.add('show');
 }
 
-// Init groups
-document.querySelectorAll('.sb-group.open .sb-group-items').forEach(el => {
-  el.style.maxHeight = el.scrollHeight + 'px';
-});
-document.querySelectorAll('.sb-group:not(.open) .sb-group-items').forEach(el => {
-  el.style.maxHeight = '0';
-});
+function startFlow() { showStep(0); }
+function nextStep()  { showStep(flowStep + 1); }
+function prevStep()  { showStep(flowStep - 1); }
 
-// ── Endpoint toggle ──
-function toggleEndpoint(id) {
-  const ep = document.getElementById(id);
-  const body = ep.querySelector('.ep-body');
-  ep.classList.toggle('open');
-  body.classList.toggle('hidden');
-}
-
-// ── Copy code ──
-function copyCode(btn) {
-  const code = btn.closest('.code-block').querySelector('code');
-  navigator.clipboard.writeText(code.textContent).then(() => {
-    btn.textContent = 'copied!';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+function resetFlow() {
+  flowStep = -1;
+  nodes.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('flow-active','open');
   });
+  for (let i = 0; i < 5; i++) document.getElementById('sd'+i).className = 'sdot';
+  document.getElementById('tooltip').classList.remove('show');
 }
-
-// ── Theme toggle ──
-function toggleTheme() {
-  const html = document.documentElement;
-  const isDark = html.getAttribute('data-theme') === 'dark';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.getElementById('theme-btn').textContent = isDark ? '🌙 Dark' : '☀ Light';
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: isDark ? 'default' : 'dark',
-  });
-}
-
-// ── Search ──
-function filterNav(query) {
-  const q = query.toLowerCase();
-  document.querySelectorAll('.sb-item').forEach(item => {
-    const match = item.textContent.toLowerCase().includes(q);
-    item.style.display = match || !q ? '' : 'none';
-  });
-}
-
-// ── Counter animation ──
-function animateCounter(el, target) {
-  const isNum = !isNaN(target);
-  if (!isNum) return;
-  let start = 0;
-  const duration = 1000;
-  const step = Math.ceil(target / (duration / 16));
-  const timer = setInterval(() => {
-    start = Math.min(start + step, target);
-    el.textContent = start;
-    if (start >= target) clearInterval(timer);
-  }, 16);
-}
-
-const counterObserver = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      const val = e.target.dataset.count;
-      if (val !== undefined) animateCounter(e.target, parseInt(val));
-      counterObserver.unobserve(e.target);
-    }
-  });
-});
-document.querySelectorAll('[data-count]').forEach(el => counterObserver.observe(el));
-
-// ── First section visible immediately ──
-document.querySelector('.doc-section').classList.add('visible');
 </script>
 </body>
 </html>
