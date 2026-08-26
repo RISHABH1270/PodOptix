@@ -50,6 +50,11 @@ func (c *Cache) Ping(ctx context.Context) error {
 	return c.client.Ping(ctx).Err()
 }
 
+// FlushDB removes all keys in the current Redis database — used in tests to ensure clean state.
+func (c *Cache) FlushDB(ctx context.Context) error {
+	return c.client.FlushDB(ctx).Err()
+}
+
 // ── Recommendations cache ────────────────────────────────────────────────────
 
 // SetRecommendations caches recommendations for a cluster as JSON.

@@ -5,19 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 )
 
-// ContainerMetrics holds raw CPU and memory data points for a single container.
+// ContainerMetrics holds raw CPU/memory usage time series and current resource limits for a single container.
 type ContainerMetrics struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
-	CPUValues     []float64 // millicores — collected over lookback window
-	MemValues     []float64 // MiB — collected over lookback window
+	CPUValues     []float64 // millicores — usage over lookback window
+	MemValues     []float64 // MiB       — usage over lookback window
+	CPULimit      int       // millicores — current limit from kube_pod_container_resource_limits (0 if unset)
+	MemLimit      int       // MiB       — current limit from kube_pod_container_resource_limits (0 if unset)
 }
 
 // Collector queries a Prometheus endpoint and returns raw metrics per container.
@@ -38,9 +41,36 @@ func New(prometheusURL string, token string) *Collector {
 	}
 }
 
-// Collect queries Prometheus for CPU and memory usage of all containers
+// Ping checks reachability and auth by running a lightweight instant query against Prometheus.
+// Used during cluster registration and update to set initial connectivity status.
+func (c *Collector) Ping(ctx context.Context) error {
+	endpoint := c.prometheusURL + "/api/v1/query"
+	params := url.Values{}
+	params.Set("query", "up")
+	params.Set("time", fmt.Sprintf("%d", time.Now().Unix()))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		return fmt.Errorf("build ping request: %w", err)
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("prometheus unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("prometheus returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// Collect queries Prometheus for CPU/memory usage and current resource limits for all containers.
 func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*ContainerMetrics, error) {
-	// calculate time range
 	end := time.Now()
 	duration, err := parseDuration(lookbackWindow)
 	if err != nil {
@@ -48,13 +78,12 @@ func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*Cont
 	}
 	start := end.Add(-duration)
 
-	// query CPU and memory
 	cpuData, err := c.queryRange(ctx,
 		`rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]) * 1000`,
 		start, end,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("query cpu: %w", err)
+		return nil, fmt.Errorf("query cpu usage: %w", err)
 	}
 
 	memData, err := c.queryRange(ctx,
@@ -62,14 +91,21 @@ func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*Cont
 		start, end,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("query memory: %w", err)
+		return nil, fmt.Errorf("query memory usage: %w", err)
 	}
 
-	// merge CPU and memory data by container identity
-	return mergeMetrics(cpuData, memData), nil
+	// query current resource limits from kube-state-metrics — gracefully returns empty if not installed
+	cpuLimits, _ := c.queryInstant(ctx,
+		`kube_pod_container_resource_limits{resource="cpu",container!="",container!="POD"} * 1000`,
+	)
+	memLimits, _ := c.queryInstant(ctx,
+		`kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"} / 1048576`,
+	)
+
+	return mergeMetrics(cpuData, memData, cpuLimits, memLimits), nil
 }
 
-// prometheusResult represents a single time series returned by Prometheus.
+// prometheusResult represents a single time series returned by /api/v1/query_range.
 type prometheusResult struct {
 	Metric map[string]string `json:"metric"`
 	Values [][]interface{}   `json:"values"` // [[timestamp, "value"], ...]
@@ -80,6 +116,20 @@ type prometheusResponse struct {
 	Status string `json:"status"`
 	Data   struct {
 		Result []prometheusResult `json:"result"`
+	} `json:"data"`
+}
+
+// prometheusInstantResult represents a single vector sample from /api/v1/query.
+type prometheusInstantResult struct {
+	Metric map[string]string `json:"metric"`
+	Value  []interface{}     `json:"value"` // [timestamp, "value"]
+}
+
+// prometheusInstantResponse is the full JSON response from /api/v1/query.
+type prometheusInstantResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		Result []prometheusInstantResult `json:"result"`
 	} `json:"data"`
 }
 
@@ -135,37 +185,97 @@ func (c *Collector) queryRange(ctx context.Context, query string, start, end tim
 	return promResp.Data.Result, nil
 }
 
-// mergeMetrics combines CPU and memory results into ContainerMetrics per container.
-func mergeMetrics(cpuResults, memResults []prometheusResult) []*ContainerMetrics {
-	// index CPU results by container identity key
-	type containerKey struct {
-		namespace, pod, container string
+// queryInstant calls Prometheus /api/v1/query (instant query) and returns raw results.
+// Used for current resource limits — a single value per container, not a time series.
+func (c *Collector) queryInstant(ctx context.Context, query string) ([]prometheusInstantResult, error) {
+	endpoint := c.prometheusURL + "/api/v1/query"
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("time", fmt.Sprintf("%d", time.Now().Unix()))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("prometheus returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var promResp prometheusInstantResponse
+	if err = json.Unmarshal(body, &promResp); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+	if promResp.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed: status=%s", promResp.Status)
+	}
+	return promResp.Data.Result, nil
+}
+
+type containerKey struct {
+	namespace, pod, container string
+}
+
+// mergeMetrics combines CPU/memory usage time series and current resource limits into ContainerMetrics per container.
+func mergeMetrics(
+	cpuResults, memResults []prometheusResult,
+	cpuLimitResults, memLimitResults []prometheusInstantResult,
+) []*ContainerMetrics {
 	cpuMap := make(map[containerKey][]float64)
 	for _, r := range cpuResults {
-		key := containerKey{
-			namespace: r.Metric["namespace"],
-			pod:       r.Metric["pod"],
-			container: r.Metric["container"],
-		}
+		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
 		cpuMap[key] = extractValues(r.Values)
 	}
 
-	// build ContainerMetrics by matching CPU and memory
+	cpuLimitMap := make(map[containerKey]int)
+	for _, r := range cpuLimitResults {
+		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
+		if len(r.Value) == 2 {
+			if s, ok := r.Value[1].(string); ok {
+				if f, err := strconv.ParseFloat(s, 64); err == nil {
+					cpuLimitMap[key] = int(math.Ceil(f))
+				}
+			}
+		}
+	}
+
+	memLimitMap := make(map[containerKey]int)
+	for _, r := range memLimitResults {
+		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
+		if len(r.Value) == 2 {
+			if s, ok := r.Value[1].(string); ok {
+				if f, err := strconv.ParseFloat(s, 64); err == nil {
+					memLimitMap[key] = int(math.Ceil(f))
+				}
+			}
+		}
+	}
+
 	var metrics []*ContainerMetrics
 	for _, r := range memResults {
-		key := containerKey{
-			namespace: r.Metric["namespace"],
-			pod:       r.Metric["pod"],
-			container: r.Metric["container"],
-		}
+		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
 		metrics = append(metrics, &ContainerMetrics{
 			Namespace:     key.namespace,
 			PodName:       key.pod,
 			ContainerName: key.container,
 			CPUValues:     cpuMap[key],
 			MemValues:     extractValues(r.Values),
+			CPULimit:      cpuLimitMap[key],
+			MemLimit:      memLimitMap[key],
 		})
 	}
 	return metrics
@@ -190,6 +300,12 @@ func extractValues(values [][]interface{}) []float64 {
 		result = append(result, f)
 	}
 	return result
+}
+
+// ParseLookbackWindow validates and parses a lookback window string (e.g. "7d", "24h", "30m").
+// Exported so the API layer can validate user input before saving to DB.
+func ParseLookbackWindow(s string) (time.Duration, error) {
+	return parseDuration(s)
 }
 
 // parseDuration converts "7d", "24h" etc. to time.Duration.

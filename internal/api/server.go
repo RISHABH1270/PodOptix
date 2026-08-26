@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net"
+	"net/http"
 
 	"github.com/RISHABH1270/PodOptix/internal/cache"
 	"github.com/RISHABH1270/PodOptix/internal/store"
@@ -15,19 +16,18 @@ type Server struct {
 	store         *store.Store // database connection injected from main
 	cache         *cache.Cache // Redis cache injected from main
 	jwtSecret     string       // used to sign and verify JWT tokens
-	encryptionKey string       // used to encrypt/decrypt cluster tokens at rest
+	encryptionKey string       // used to encrypt/decrypt Prometheus tokens at rest
 }
 
 // NewServer creates a new HTTP server and registers all routes.
 func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey string) *Server {
-	var router *gin.Engine
-	router = gin.Default()
-
-	// Attaches our custom middleware - assigns a X-Request-ID header.
+	gin.SetMode(gin.ReleaseMode) // suppress debug route logs — not useful in production or tests
+	router := gin.New()
+	router.Use(gin.Recovery())   // keep panic recovery
 	router.Use(RequestIDMiddleware())
+	router.SetTrustedProxies(nil) // direct connection only — no reverse proxy trust
 
-	var server *Server
-	server = &Server{
+	server := &Server{
 		router:        router,
 		store:         st,
 		cache:         ca,
@@ -41,7 +41,6 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey
 }
 
 // Listen binds the TCP port. Returns the listener if successful.
-// Caller can print "server is up" after this returns without error.
 func (s *Server) Listen(port string) (net.Listener, error) {
 	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -50,8 +49,12 @@ func (s *Server) Listen(port string) (net.Listener, error) {
 	return listener, nil
 }
 
-// Serve starts accepting HTTP requests on the given listener.
-// Blocking call — returns only on error.
+// Serve starts accepting HTTP requests on the given listener. Blocking call.
 func (s *Server) Serve(listener net.Listener) error {
 	return s.router.RunListener(listener)
+}
+
+// ServeHTTP implements http.Handler — used by httptest.NewServer in tests to start a real TCP listener.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r)
 }

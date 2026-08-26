@@ -4,9 +4,10 @@ import "time"
 
 // Recommendation status values
 const (
-	RecommendationStatusNewService = "new_service"  // not enough data yet — check back after 7 days
-	RecommendationStatusReady      = "ready"        // p99 computed — recommendation is available
+	RecommendationStatusNewService = "new_service" // not enough data yet — check back after 7 days
+	RecommendationStatusReady      = "ready"       // p99 computed — recommendation is available
 )
+
 
 // Recommendation represents a resource limit recommendation for a single container.
 // One row per container — updated in place every day by the scheduler.
@@ -17,16 +18,16 @@ type Recommendation struct {
 	Namespace        string  `json:"namespace"         db:"namespace"`
 	PodName          string  `json:"pod_name"          db:"pod_name"`
 	ContainerName    string  `json:"container_name"    db:"container_name"`
-	Status           string  `json:"status"            db:"status"`  // new_service | ready
+	Status string `json:"status" db:"status"` // new_service | ready
 
-	CurrentCPULimit  int     `json:"current_cpu_limit" db:"current_cpu_limit"` // millicores
-	CurrentMemLimit  int     `json:"current_mem_limit" db:"current_mem_limit"` // MiB
+	CurrentCPULimit int `json:"current_cpu_limit" db:"current_cpu_limit"` // millicores — live value from kube_pod_container_resource_limits
+	CurrentMemLimit int `json:"current_mem_limit" db:"current_mem_limit"` // MiB       — live value from kube_pod_container_resource_limits
 
-	P99CPU           float64 `json:"p99_cpu" db:"p99_cpu"` // millicores
-	P99Mem           float64 `json:"p99_mem" db:"p99_mem"` // MiB
+	P99CPU float64 `json:"p99_cpu" db:"p99_cpu"` // millicores
+	P99Mem float64 `json:"p99_mem" db:"p99_mem"` // MiB
 
-	RecommendedCPULimit int  `json:"recommended_cpu_limit" db:"recommended_cpu_limit"` // p99
-	RecommendedMemLimit int  `json:"recommended_mem_limit" db:"recommended_mem_limit"` // p99
+	RecommendedCPULimit int `json:"recommended_cpu_limit" db:"recommended_cpu_limit"` // ceil(p99_cpu × 2)
+	RecommendedMemLimit int `json:"recommended_mem_limit" db:"recommended_mem_limit"` // ceil(p99_mem × 2)
 
 	LookbackWindow   string  `json:"lookback_window" db:"lookback_window"`
 
