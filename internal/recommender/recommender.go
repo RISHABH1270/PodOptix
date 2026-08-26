@@ -13,26 +13,19 @@ import (
 
 // generate computes p99 CPU/memory from usage history and pairs it with the container's
 // current resource limits (from kube-state-metrics via ContainerMetrics).
-func generate(
-	clusterID string,
-	lookbackWindow string,
-	metrics *collector.ContainerMetrics,
-) (*models.Recommendation, error) {
-
+func generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Recommendation, error) {
 	if metrics == nil {
 		return nil, fmt.Errorf("metrics cannot be nil")
 	}
 
 	p99CPU, err := compute.ComputeP99(metrics.CPUValues)
 	if err != nil {
-		return nil, fmt.Errorf("compute p99 cpu for %s/%s: %w",
-			metrics.PodName, metrics.ContainerName, err)
+		return nil, fmt.Errorf("compute p99 cpu for %s/%s: %w", metrics.PodName, metrics.ContainerName, err)
 	}
 
 	p99Mem, err := compute.ComputeP99(metrics.MemValues)
 	if err != nil {
-		return nil, fmt.Errorf("compute p99 mem for %s/%s: %w",
-			metrics.PodName, metrics.ContainerName, err)
+		return nil, fmt.Errorf("compute p99 mem for %s/%s: %w", metrics.PodName, metrics.ContainerName, err)
 	}
 
 	now := time.Now()
@@ -50,24 +43,17 @@ func generate(
 		P99Mem:              p99Mem,
 		RecommendedCPULimit: int(math.Ceil(p99CPU * 2)),
 		RecommendedMemLimit: int(math.Ceil(p99Mem * 2)),
-		LookbackWindow:      lookbackWindow,
 		CreatedAt:           now,
 		UpdatedAt:           now,
 	}, nil
 }
 
 // GenerateAll generates recommendations for all containers in a cluster.
-// Containers with insufficient data (empty CPU or memory values) are marked as new_service and skipped for p99 computation.
-func GenerateAll(
-	clusterID string,
-	lookbackWindow string,
-	allMetrics []*collector.ContainerMetrics,
-) ([]*models.Recommendation, error) {
-
+// Containers with insufficient data are marked as new_service — check back after the cluster's lookback window.
+func GenerateAll(clusterID string, allMetrics []*collector.ContainerMetrics) ([]*models.Recommendation, error) {
 	var recommendations []*models.Recommendation
 
 	for _, m := range allMetrics {
-		// not enough data — mark as new_service
 		if len(m.CPUValues) == 0 || len(m.MemValues) == 0 {
 			now := time.Now()
 			recommendations = append(recommendations, &models.Recommendation{
@@ -77,14 +63,13 @@ func GenerateAll(
 				PodName:          m.PodName,
 				ContainerName:    m.ContainerName,
 				Status:           models.RecommendationStatusNewService,
-				LookbackWindow:   lookbackWindow,
 				CreatedAt:        now,
 				UpdatedAt:        now,
 			})
 			continue
 		}
 
-		rec, err := generate(clusterID, lookbackWindow, m)
+		rec, err := generate(clusterID, m)
 		if err != nil {
 			return nil, fmt.Errorf("generate recommendation: %w", err)
 		}

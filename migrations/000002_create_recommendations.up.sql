@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS recommendations (
     current_mem_limit     INTEGER       NOT NULL DEFAULT 0,                  -- MiB
     p99_cpu               FLOAT         NOT NULL DEFAULT 0,                  -- millicores
     p99_mem               FLOAT         NOT NULL DEFAULT 0,                  -- MiB
-    recommended_cpu_limit INTEGER       NOT NULL DEFAULT 0,                  -- p99 x 2
-    recommended_mem_limit INTEGER       NOT NULL DEFAULT 0,                  -- p99 x 2
-    lookback_window       VARCHAR(10)   NOT NULL,
+    recommended_cpu_limit INTEGER       NOT NULL DEFAULT 0,                  -- ceil(p99_cpu × 2)
+    recommended_mem_limit INTEGER       NOT NULL DEFAULT 0,                  -- ceil(p99_mem × 2)
+    applied               BOOLEAN       NOT NULL DEFAULT FALSE,              -- true when recommendation applied to cluster — enables cost savings calculation
     created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 

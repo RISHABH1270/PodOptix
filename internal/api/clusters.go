@@ -151,7 +151,7 @@ func (s *Server) createCluster(c *gin.Context) {
 				return
 			}
 
-			recs, err := recommender.GenerateAll(clusterID, lookbackWindow, metrics)
+			recs, err := recommender.GenerateAll(clusterID, metrics)
 			if err != nil {
 				log.Printf("ERROR initial sync recommend cluster=%s: %v", clusterID, err)
 				return

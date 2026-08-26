@@ -129,7 +129,7 @@ func (s *Server) recalculate(c *gin.Context) {
 		}
 
 		// generate recommendations
-		recs, err := recommender.GenerateAll(clusterID, cluster.LookbackWindow, metrics)
+		recs, err := recommender.GenerateAll(clusterID, metrics)
 		if err != nil {
 			log.Printf("ERROR recalculate recommend cluster=%s: %v", clusterID, err)
 			return
