@@ -70,7 +70,6 @@ func (s *Server) createCluster(c *gin.Context) {
 
 	var req CreateClusterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("ERROR [%s] createCluster invalid request: %v", requestID, err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "Invalid request — name, prometheus_url and token are required",
 			"request_id": requestID,
@@ -97,7 +96,6 @@ func (s *Server) createCluster(c *gin.Context) {
 
 	status := models.ClusterStatusConnected
 	if err := collector.New(req.PrometheusURL, req.PrometheusToken).Ping(pingCtx); err != nil {
-		log.Printf("INFO [%s] createCluster connectivity check failed for %s: %v", requestID, req.PrometheusURL, err)
 		status = models.ClusterStatusDisconnected
 	}
 
@@ -203,7 +201,6 @@ func (s *Server) getCluster(c *gin.Context) {
 
 	cluster, err := s.store.GetCluster(c.Request.Context(), clusterID)
 	if err != nil {
-		log.Printf("ERROR [%s] getCluster id=%s: %v", requestID, clusterID, err)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":      "Cluster not found",
 			"request_id": requestID,
@@ -221,7 +218,6 @@ func (s *Server) updateCluster(c *gin.Context) {
 	// fetch existing cluster
 	cluster, err := s.store.GetCluster(c.Request.Context(), clusterID)
 	if err != nil {
-		log.Printf("ERROR [%s] updateCluster not found id=%s: %v", requestID, clusterID, err)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":      "Cluster not found",
 			"request_id": requestID,
@@ -315,7 +311,6 @@ func (s *Server) deleteCluster(c *gin.Context) {
 	clusterID := c.Param("id")
 
 	if err := s.store.DeleteCluster(c.Request.Context(), clusterID); err != nil {
-		log.Printf("ERROR [%s] deleteCluster id=%s: %v", requestID, clusterID, err)
 		if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":      "Cluster not found",

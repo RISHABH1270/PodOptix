@@ -13,6 +13,7 @@ func TestAuth(t *testing.T) {
 
 	t.Run("POST /auth/register", func(t *testing.T) {
 		t.Run("success", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/auth/register", `{"email":"register@podoptix.io","password":"secret123"}`, "")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -21,8 +22,9 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("duplicate email returns 409", func(t *testing.T) {
+			track(t)
 			b := `{"email":"duplicate@podoptix.io","password":"secret123"}`
-			do(t, http.MethodPost, "/auth/register", b, "")
+			do(t, http.MethodPost, "/auth/register", b, "").Body.Close()
 			resp := do(t, http.MethodPost, "/auth/register", b, "")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusConflict, resp.StatusCode)
@@ -30,6 +32,7 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("missing password returns 400", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/auth/register", `{"email":"missing@podoptix.io"}`, "")
 			resp.Body.Close()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -40,6 +43,7 @@ func TestAuth(t *testing.T) {
 		do(t, http.MethodPost, "/auth/register", `{"email":"login@podoptix.io","password":"secret123"}`, "").Body.Close()
 
 		t.Run("success returns token", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/auth/login", `{"email":"login@podoptix.io","password":"secret123"}`, "")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -47,6 +51,7 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("wrong password returns 401", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/auth/login", `{"email":"login@podoptix.io","password":"wrongpassword"}`, "")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -54,6 +59,7 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("unknown email returns 401", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/auth/login", `{"email":"ghost@podoptix.io","password":"secret123"}`, "")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -63,6 +69,7 @@ func TestAuth(t *testing.T) {
 
 	t.Run("JWT middleware", func(t *testing.T) {
 		t.Run("no token returns 401", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodGet, "/api/v1/clusters", "", "")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -70,6 +77,7 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("bad format returns 401", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodGet, "/api/v1/clusters", "", "wrongformat")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -77,13 +85,15 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("tampered token returns 401", func(t *testing.T) {
-			resp := do(t, http.MethodGet, "/api/v1/clusters", "", "thisisaninvalidtoken")
+			track(t)
+			resp := do(t, http.MethodGet, "/api/v1/clusters", "", "Bearer thisisaninvalidtoken")
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 			assert.Contains(t, body, "Invalid or expired token")
 		})
 
 		t.Run("valid token grants access", func(t *testing.T) {
+			track(t)
 			rw := do(t, http.MethodPost, "/auth/register", `{"email":"jwttest@podoptix.io","password":"secret123"}`, "")
 			b, _ := io.ReadAll(rw.Body)
 			rw.Body.Close()
@@ -93,7 +103,7 @@ func TestAuth(t *testing.T) {
 			if !ok {
 				t.Fatalf("register failed: %s", string(b))
 			}
-			resp := do(t, http.MethodGet, "/api/v1/clusters", "", tok)
+			resp := do(t, http.MethodGet, "/api/v1/clusters", "", bearer(tok))
 			resp.Body.Close()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 		})

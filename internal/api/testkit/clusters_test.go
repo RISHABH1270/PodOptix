@@ -13,7 +13,7 @@ import (
 func createCluster(t *testing.T, name, url string) string {
 	t.Helper()
 	body := `{"cluster_name":"` + name + `","prometheus_url":"` + url + `","prometheus_token":"test-token-123"}`
-	resp := do(t, http.MethodPost, "/api/v1/clusters", body, testToken())
+	resp := do(t, http.MethodPost, "/api/v1/clusters", body, bearer(testToken()))
 	b, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	var res map[string]any
@@ -26,10 +26,11 @@ func createCluster(t *testing.T, name, url string) string {
 }
 
 func TestClusters(t *testing.T) {
-	tok := testToken()
+	tok := bearer(testToken())
 
 	t.Run("POST /clusters", func(t *testing.T) {
 		t.Run("success returns 201 with cluster_id and not yet synced", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/api/v1/clusters",
 				`{"cluster_name":"post-ok","prometheus_url":"http://prom.test.com","prometheus_token":"tok"}`, tok)
 			body := readBody(t, resp)
@@ -39,12 +40,14 @@ func TestClusters(t *testing.T) {
 		})
 
 		t.Run("missing required fields returns 400", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/api/v1/clusters", `{"cluster_name":"no-url"}`, tok)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		})
 
 		t.Run("invalid lookback_window returns 400", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/api/v1/clusters",
 				`{"cluster_name":"bad-lb","prometheus_url":"http://p.test","prometheus_token":"tok","lookback_window":"99d"}`, tok)
 			body := readBody(t, resp)
@@ -53,6 +56,7 @@ func TestClusters(t *testing.T) {
 		})
 
 		t.Run("no auth returns 401", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPost, "/api/v1/clusters",
 				`{"cluster_name":"no-auth","prometheus_url":"http://p.test","prometheus_token":"tok"}`, "")
 			resp.Body.Close()
@@ -62,6 +66,7 @@ func TestClusters(t *testing.T) {
 
 	t.Run("GET /clusters", func(t *testing.T) {
 		t.Run("returns 200 with array", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodGet, "/api/v1/clusters", "", tok)
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -73,6 +78,7 @@ func TestClusters(t *testing.T) {
 		id := createCluster(t, "get-test", "http://prom.get.test")
 
 		t.Run("success returns cluster", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodGet, "/api/v1/clusters/"+id, "", tok)
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -80,6 +86,7 @@ func TestClusters(t *testing.T) {
 		})
 
 		t.Run("unknown id returns 404", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodGet, "/api/v1/clusters/non-existent-id", "", tok)
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -91,6 +98,7 @@ func TestClusters(t *testing.T) {
 		id := createCluster(t, "update-test", "http://prom.update.test")
 
 		t.Run("success updates name", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPut, "/api/v1/clusters/"+id, `{"cluster_name":"updated-name"}`, tok)
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -98,6 +106,7 @@ func TestClusters(t *testing.T) {
 		})
 
 		t.Run("invalid lookback_window returns 400", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPut, "/api/v1/clusters/"+id, `{"lookback_window":"99d"}`, tok)
 			body := readBody(t, resp)
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -105,6 +114,7 @@ func TestClusters(t *testing.T) {
 		})
 
 		t.Run("unknown id returns 404", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodPut, "/api/v1/clusters/non-existent-id", `{"cluster_name":"ghost"}`, tok)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -115,18 +125,21 @@ func TestClusters(t *testing.T) {
 		id := createCluster(t, "delete-test", "http://prom.delete.test")
 
 		t.Run("success returns 204", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodDelete, "/api/v1/clusters/"+id, "", tok)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 		})
 
 		t.Run("deleted cluster returns 404 on GET", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodGet, "/api/v1/clusters/"+id, "", tok)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 		})
 
 		t.Run("unknown id returns 404", func(t *testing.T) {
+			track(t)
 			resp := do(t, http.MethodDelete, "/api/v1/clusters/non-existent-id", "", tok)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)

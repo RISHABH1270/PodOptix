@@ -25,12 +25,10 @@ type LoginRequest struct {
 
 // register creates a new user account.
 func (s *Server) register(c *gin.Context) {
-	var requestID string
-	requestID = c.GetString("request_id")
+	requestID := c.GetString("request_id")
 
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("ERROR [%s] register invalid request: %v", requestID, err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "Email and password are required",
 			"request_id": requestID,
@@ -38,7 +36,6 @@ func (s *Server) register(c *gin.Context) {
 		return
 	}
 
-	// hash the password before storing
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
 		log.Printf("ERROR [%s] register hash password: %v", requestID, err)
@@ -49,8 +46,7 @@ func (s *Server) register(c *gin.Context) {
 		return
 	}
 
-	var user *models.User
-	user = &models.User{
+	user := &models.User{
 		UserID:       uuid.New().String(),
 		Email:        req.Email,
 		PasswordHash: hash,
@@ -59,7 +55,6 @@ func (s *Server) register(c *gin.Context) {
 	}
 
 	if err = s.store.CreateUser(c.Request.Context(), user); err != nil {
-		log.Printf("ERROR [%s] register create user: %v", requestID, err)
 		c.JSON(http.StatusConflict, gin.H{
 			"error":      "An account with this email already exists",
 			"request_id": requestID,
@@ -67,7 +62,6 @@ func (s *Server) register(c *gin.Context) {
 		return
 	}
 
-	// generate JWT token immediately after registration
 	token, err := auth.GenerateToken(user.UserID, user.Email, s.jwtSecret)
 	if err != nil {
 		log.Printf("ERROR [%s] register generate token: %v", requestID, err)
@@ -87,12 +81,10 @@ func (s *Server) register(c *gin.Context) {
 
 // login authenticates a user and returns a JWT token.
 func (s *Server) login(c *gin.Context) {
-	var requestID string
-	requestID = c.GetString("request_id")
+	requestID := c.GetString("request_id")
 
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("ERROR [%s] login invalid request: %v", requestID, err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "Email and password are required",
 			"request_id": requestID,
@@ -100,10 +92,8 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	// fetch user by email
 	user, err := s.store.GetUserByEmail(c.Request.Context(), req.Email)
 	if err != nil {
-		log.Printf("ERROR [%s] login user not found: %v", requestID, err)
 		// same error for wrong email OR wrong password — prevents user enumeration
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error":      "Invalid email or password",
@@ -112,9 +102,7 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	// verify password against stored hash
 	if err = auth.CheckPassword(req.Password, user.PasswordHash); err != nil {
-		log.Printf("ERROR [%s] login wrong password for %s", requestID, req.Email)
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error":      "Invalid email or password",
 			"request_id": requestID,
@@ -122,7 +110,6 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
-	// generate JWT token
 	token, err := auth.GenerateToken(user.UserID, user.Email, s.jwtSecret)
 	if err != nil {
 		log.Printf("ERROR [%s] login generate token: %v", requestID, err)

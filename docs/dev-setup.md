@@ -271,18 +271,18 @@ Tests use an isolated environment:
 
 ```bash
 # Run all API tests
-go test ./internal/api/testkit/... -v
+go test ./internal/api/testkit/... -count=1
 
 # Run a specific test group
-go test ./internal/api/testkit/... -run TestClusters -v
-go test ./internal/api/testkit/... -run TestAuth -v
-go test ./internal/api/testkit/... -run TestHealth -v
+go test ./internal/api/testkit/... -run TestClusters -count=1
+go test ./internal/api/testkit/... -run TestAuth -count=1
+go test ./internal/api/testkit/... -run TestHealth -count=1
 
 # Run a specific subtest
-go test ./internal/api/testkit/... -run TestClusters/POST -v
+go test ./internal/api/testkit/... -run TestClusters/POST -count=1
 
 # Run all tests in the project
-go test ./...
+go test ./... -count=1
 ```
 
 ---

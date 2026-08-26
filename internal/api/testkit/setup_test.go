@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/RISHABH1270/PodOptix/internal/api"
@@ -18,8 +19,12 @@ import (
 )
 
 var (
-	ts     *httptest.Server // real TCP listener on fixed port 9090
-	client = &http.Client{}
+	ts      *httptest.Server
+	client  = &http.Client{}
+	passed  int
+	failed  int
+	counter int
+	mu      sync.Mutex
 )
 
 const (
@@ -31,8 +36,51 @@ const (
 	testPort  = "9090"
 )
 
+// tty writes directly to the terminal — bypasses go test's stdout/stderr capture.
+var tty *os.File
+
+func log(format string, args ...any) {
+	fmt.Fprintf(tty, format, args...)
+}
+
 func init() {
 	os.Chdir("../../..")
+	var err error
+	tty, err = os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		tty = os.Stderr // fallback for CI environments without a TTY
+	}
+}
+
+// shortName extracts the leaf test name from a full subtest path.
+func shortName(fullName string) string {
+	for i := len(fullName) - 1; i >= 0; i-- {
+		if fullName[i] == '/' {
+			return fullName[i+1:]
+		}
+	}
+	return fullName
+}
+
+// track increments the running counter and prints a single clean result line on completion.
+func track(t *testing.T) {
+	t.Helper()
+	mu.Lock()
+	counter++
+	n := counter
+	mu.Unlock()
+	t.Cleanup(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		name := shortName(t.Name())
+		if t.Failed() {
+			failed++
+			log("  [%2d]  ✗  %s\n", n, name)
+		} else {
+			passed++
+			log("  [%2d]  ✓  %s\n", n, name)
+		}
+	})
 }
 
 // testToken returns a valid JWT for use in tests.
@@ -41,8 +89,14 @@ func testToken() string {
 	return t
 }
 
-// do fires a real HTTP request against the test server and returns the response.
-func do(t *testing.T, method, path, body, token string) *http.Response {
+// bearer returns a raw Bearer Authorization header value.
+func bearer(token string) string {
+	return "Bearer " + token
+}
+
+// do fires a real HTTP request against the test server.
+// auth is the raw Authorization header value.
+func do(t *testing.T, method, path, body, auth string) *http.Response {
 	t.Helper()
 
 	var reqBody io.Reader
@@ -57,8 +111,8 @@ func do(t *testing.T, method, path, body, token string) *http.Response {
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	if auth != "" {
+		req.Header.Set("Authorization", auth)
 	}
 
 	resp, err := client.Do(req)
@@ -68,7 +122,7 @@ func do(t *testing.T, method, path, body, token string) *http.Response {
 	return resp
 }
 
-// readBody reads and returns the response body as string.
+// readBody reads and returns the response body as a string.
 func readBody(t *testing.T, resp *http.Response) string {
 	t.Helper()
 	defer resp.Body.Close()
@@ -101,14 +155,12 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic("failed to connect to redis: " + err.Error())
 	}
-	// flush test keyspace before every run — clean slate, no leftover keys from previous runs
 	if err := redisCache.FlushDB(context.Background()); err != nil {
 		panic("failed to flush redis test db: " + err.Error())
 	}
 
 	srv := api.NewServer(db, redisCache, jwtSecret, encKey)
 
-	// fixed port from docker-compose — consistent with local dev environment
 	listener, err := srv.Listen(testPort)
 	if err != nil {
 		panic("failed to bind port " + testPort + ": " + err.Error())
@@ -116,9 +168,9 @@ func TestMain(m *testing.M) {
 	ts = &httptest.Server{URL: "http://localhost:" + testPort}
 	go srv.Serve(listener)
 
-	fmt.Println("\n  Running PodOptix API Tests...")
-	fmt.Printf("  Server: %s\n", ts.URL)
-	fmt.Println("  ──────────────────────────────────────")
+	log("\n  Running PodOptix API Tests...\n")
+	log("  Server: %s\n", ts.URL)
+	log("  ──────────────────────────────────────\n")
 
 	code := m.Run()
 
@@ -128,7 +180,13 @@ func TestMain(m *testing.M) {
 	conn.Exec(context.Background(), "DROP DATABASE IF EXISTS podoptix_test WITH (FORCE)")
 	conn.Close(context.Background())
 
-	fmt.Println("  ──────────────────────────────────────")
-	fmt.Println()
+	total := passed + failed
+	log("  Total: %d  |  Passed: %d  |  Failed: %d\n", total, passed, failed)
+	if code == 0 {
+		log("  ✓ All tests passed\n")
+	} else {
+		log("  ✗ Some tests failed\n")
+	}
+	log("  ──────────────────────────────────────\n\n")
 	os.Exit(code)
 }
