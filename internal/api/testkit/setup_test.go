@@ -12,20 +12,23 @@ import (
 
 	"github.com/RISHABH1270/PodOptix/internal/api"
 	"github.com/RISHABH1270/PodOptix/internal/auth"
+	"github.com/RISHABH1270/PodOptix/internal/cache"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/jackc/pgx/v5"
 )
 
 var (
-	ts     *httptest.Server // real TCP listener — tests make actual HTTP requests
+	ts     *httptest.Server // real TCP listener on fixed port 9090
 	client = &http.Client{}
 )
 
 const (
 	adminURL  = "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
 	testDBURL = "postgres://postgres:password@localhost:5432/podoptix_test?sslmode=disable"
+	redisURL  = "redis://localhost:6379/1" // Redis index 1 — production uses 0, tests use 1 to avoid key collisions
 	jwtSecret = "test-jwt-secret-key-for-testing"
 	encKey    = "test-32-byte-encryption-key!!!!1"
+	testPort  = "9090"
 )
 
 func init() {
@@ -94,10 +97,24 @@ func TestMain(m *testing.M) {
 		panic("failed to connect to test database: " + err.Error())
 	}
 
-	srv := api.NewServer(db, nil, jwtSecret, encKey)
+	redisCache, err := cache.New(redisURL)
+	if err != nil {
+		panic("failed to connect to redis: " + err.Error())
+	}
+	// flush test keyspace before every run — clean slate, no leftover keys from previous runs
+	if err := redisCache.FlushDB(context.Background()); err != nil {
+		panic("failed to flush redis test db: " + err.Error())
+	}
 
-	// real TCP listener on a random port — tests make actual HTTP requests
-	ts = httptest.NewServer(srv)
+	srv := api.NewServer(db, redisCache, jwtSecret, encKey)
+
+	// fixed port from docker-compose — consistent with local dev environment
+	listener, err := srv.Listen(testPort)
+	if err != nil {
+		panic("failed to bind port " + testPort + ": " + err.Error())
+	}
+	ts = &httptest.Server{URL: "http://localhost:" + testPort}
+	go srv.Serve(listener)
 
 	fmt.Println("\n  Running PodOptix API Tests...")
 	fmt.Printf("  Server: %s\n", ts.URL)
@@ -105,7 +122,7 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 
-	ts.Close()
+	redisCache.Close()
 	db.Close()
 	conn, _ = pgx.Connect(context.Background(), adminURL)
 	conn.Exec(context.Background(), "DROP DATABASE IF EXISTS podoptix_test WITH (FORCE)")
