@@ -12,11 +12,11 @@ import (
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	router        *gin.Engine
-	store         *store.Store
-	cache         *cache.Cache
-	jwtSecret     string
-	encryptionKey string
+	router        *gin.Engine  // Gin router — knows all routes and middleware
+	store         *store.Store // database connection injected from main
+	cache         *cache.Cache // Redis cache injected from main
+	jwtSecret     string       // used to sign and verify JWT tokens
+	encryptionKey string       // used to encrypt/decrypt Prometheus tokens at rest
 }
 
 // NewServer creates a new HTTP server and registers all routes.
