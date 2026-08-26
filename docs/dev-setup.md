@@ -47,13 +47,13 @@ cp .env.example .env
 
 Default values already match the local Docker setup — no changes needed for local development.
 
-`.env` contents:
+`.env` contents (from `.env.example`):
 ```
 PORT=8080
 DATABASE_URL=postgres://postgres:password@localhost:5432/podoptix?sslmode=disable
 REDIS_URL=redis://localhost:6379
-JWT_SECRET=my-local-dev-secret-key-001
-ENCRYPTION_KEY=my-local-32-byte-encryption-key!
+JWT_SECRET=change-me-to-a-long-random-secret
+ENCRYPTION_KEY=change-me-to-32-byte-random-key!
 ```
 
 **Required environment variables:**
@@ -363,5 +363,5 @@ export $(cat .env | xargs) && go run ./cmd/hub
 
 `ENCRYPTION_KEY` must be exactly 32 bytes. For local dev:
 ```
-ENCRYPTION_KEY=my-local-32-byte-encryption-key!
+ENCRYPTION_KEY=change-me-to-32-byte-random-key!
 ```
