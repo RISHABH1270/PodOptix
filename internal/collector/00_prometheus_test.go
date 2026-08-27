@@ -3,90 +3,86 @@ package collector
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// ─── parseDuration tests ────────────────────────────────────────────────────
+// ── test counter ─────────────────────────────────────────────────────────────
 
-func TestParseDuration_Days(t *testing.T) {
-	d, err := parseDuration("7d")
-	assert.NoError(t, err)
-	assert.Equal(t, 7*24*60*60, int(d.Seconds()))
-}
+var (
+	passed, failed, counter int
+	mu                      sync.Mutex
+	tty                     *os.File
+)
 
-func TestParseDuration_Hours(t *testing.T) {
-	d, err := parseDuration("24h")
-	assert.NoError(t, err)
-	assert.Equal(t, 24*60*60, int(d.Seconds()))
-}
-
-func TestParseDuration_Minutes(t *testing.T) {
-	d, err := parseDuration("30m")
-	assert.NoError(t, err)
-	assert.Equal(t, 30*60, int(d.Seconds()))
-}
-
-func TestParseDuration_Invalid(t *testing.T) {
-	_, err := parseDuration("xyz")
-	assert.Error(t, err)
-}
-
-func TestParseDuration_UnknownUnit(t *testing.T) {
-	_, err := parseDuration("7w")
-	assert.Error(t, err)
-}
-
-// ─── extractValues tests ────────────────────────────────────────────────────
-
-func TestExtractValues_Valid(t *testing.T) {
-	values := [][]interface{}{
-		{1719100800, "120.5"},
-		{1719104400, "115.2"},
-		{1719108000, "132.8"},
+func init() {
+	var err error
+	tty, err = os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		tty = os.Stderr
 	}
-	result := extractValues(values)
-	assert.Equal(t, 3, len(result))
-	assert.Equal(t, 120.5, result[0])
-	assert.Equal(t, 115.2, result[1])
-	assert.Equal(t, 132.8, result[2])
 }
 
-func TestExtractValues_Empty(t *testing.T) {
-	result := extractValues([][]interface{}{})
-	assert.Empty(t, result)
-}
+func log(format string, args ...any) { fmt.Fprintf(tty, format, args...) }
 
-func TestExtractValues_InvalidValue(t *testing.T) {
-	values := [][]interface{}{
-		{1719100800, "notanumber"},
-		{1719104400, "120.5"},
+func shortName(full string) string {
+	for i := len(full) - 1; i >= 0; i-- {
+		if full[i] == '/' {
+			return full[i+1:]
+		}
 	}
-	result := extractValues(values)
-	// invalid value skipped, valid one kept
-	assert.Equal(t, 1, len(result))
-	assert.Equal(t, 120.5, result[0])
+	return full
 }
 
-// ─── Collect tests using fake Prometheus HTTP server ────────────────────────
+func track(t *testing.T) {
+	t.Helper()
+	mu.Lock()
+	counter++
+	n := counter
+	mu.Unlock()
+	t.Cleanup(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if t.Failed() {
+			failed++
+			log("  [%2d]  ✗  %s\n", n, shortName(t.Name()))
+		} else {
+			passed++
+			log("  [%2d]  ✓  %s\n", n, shortName(t.Name()))
+		}
+	})
+}
 
-// fakePrometheusResponse builds a Prometheus /api/v1/query_range response
-// with one container result and given values.
-func fakePrometheusResponse(namespace, pod, container string, values [][]interface{}) string {
+func TestMain(m *testing.M) {
+	log("\n  Running Collector Tests...\n")
+	log("  ──────────────────────────────────────\n")
+	code := m.Run()
+	log("  Total: %d  |  Passed: %d  |  Failed: %d\n", passed+failed, passed, failed)
+	if code == 0 {
+		log("  ✓ All tests passed\n")
+	} else {
+		log("  ✗ Some tests failed\n")
+	}
+	log("  ──────────────────────────────────────\n\n")
+	os.Exit(code)
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func fakeRangeResponse(namespace, pod, container string, values [][]interface{}) string {
 	resp := map[string]interface{}{
 		"status": "success",
 		"data": map[string]interface{}{
 			"resultType": "matrix",
 			"result": []map[string]interface{}{
 				{
-					"metric": map[string]string{
-						"namespace": namespace,
-						"pod":       pod,
-						"container": container,
-					},
+					"metric": map[string]string{"namespace": namespace, "pod": pod, "container": container},
 					"values": values,
 				},
 			},
@@ -96,89 +92,137 @@ func fakePrometheusResponse(namespace, pod, container string, values [][]interfa
 	return string(b)
 }
 
-func TestCollect_Success(t *testing.T) {
-	cpuValues := [][]interface{}{{1719100800, "120.5"}, {1719104400, "115.2"}}
-	memValues := [][]interface{}{{1719100800, "180.2"}, {1719104400, "178.9"}}
+var emptyResp = `{"status":"success","data":{"resultType":"matrix","result":[]}}`
 
-	callCount := 0
-	// fake Prometheus server — returns CPU response first, Memory response second
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		callCount++
-		if callCount == 1 {
-			// first call = CPU query
-			w.Write([]byte(fakePrometheusResponse("payments", "payment-api", "api", cpuValues)))
-		} else {
-			// second call = Memory query
-			w.Write([]byte(fakePrometheusResponse("payments", "payment-api", "api", memValues)))
-		}
-	}))
-	defer server.Close()
+// ── parseDuration ─────────────────────────────────────────────────────────────
 
-	c := New(server.URL, "")
-	metrics, err := c.Collect(context.Background(), "7d")
-
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(metrics))
-	assert.Equal(t, "payments", metrics[0].Namespace)
-	assert.Equal(t, "payment-api", metrics[0].PodName)
-	assert.Equal(t, "api", metrics[0].ContainerName)
-	assert.Equal(t, 2, len(metrics[0].CPUValues))
-	assert.Equal(t, 2, len(metrics[0].MemValues))
-	assert.Equal(t, 120.5, metrics[0].CPUValues[0])
-	assert.Equal(t, 180.2, metrics[0].MemValues[0])
+func TestParseDuration(t *testing.T) {
+	t.Run("days", func(t *testing.T) {
+		track(t)
+		d, err := parseDuration("7d")
+		assert.NoError(t, err)
+		assert.Equal(t, 7*24*60*60, int(d.Seconds()))
+	})
+	t.Run("hours", func(t *testing.T) {
+		track(t)
+		d, err := parseDuration("24h")
+		assert.NoError(t, err)
+		assert.Equal(t, 24*60*60, int(d.Seconds()))
+	})
+	t.Run("minutes", func(t *testing.T) {
+		track(t)
+		d, err := parseDuration("30m")
+		assert.NoError(t, err)
+		assert.Equal(t, 30*60, int(d.Seconds()))
+	})
+	t.Run("invalid value returns error", func(t *testing.T) {
+		track(t)
+		_, err := parseDuration("xyz")
+		assert.Error(t, err)
+	})
+	t.Run("unknown unit returns error", func(t *testing.T) {
+		track(t)
+		_, err := parseDuration("7w")
+		assert.Error(t, err)
+	})
 }
 
-func TestCollect_PrometheusError(t *testing.T) {
-	// fake server that always returns 500
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
+// ── extractValues ─────────────────────────────────────────────────────────────
 
-	c := New(server.URL, "")
-	_, err := c.Collect(context.Background(), "7d")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "prometheus returned status 500")
+func TestExtractValues(t *testing.T) {
+	t.Run("valid values parsed correctly", func(t *testing.T) {
+		track(t)
+		result := extractValues([][]interface{}{
+			{1719100800, "120.5"},
+			{1719104400, "115.2"},
+			{1719108000, "132.8"},
+		})
+		assert.Equal(t, []float64{120.5, 115.2, 132.8}, result)
+	})
+	t.Run("empty input returns nil", func(t *testing.T) {
+		track(t)
+		assert.Empty(t, extractValues([][]interface{}{}))
+	})
+	t.Run("invalid value skipped, valid one kept", func(t *testing.T) {
+		track(t)
+		result := extractValues([][]interface{}{
+			{1719100800, "notanumber"},
+			{1719104400, "120.5"},
+		})
+		assert.Equal(t, []float64{120.5}, result)
+	})
 }
 
-func TestCollect_EmptyResponse(t *testing.T) {
-	// fake server that returns success but no containers
-	emptyResp := `{"status":"success","data":{"resultType":"matrix","result":[]}}`
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(emptyResp))
-	}))
-	defer server.Close()
+// ── Collect ───────────────────────────────────────────────────────────────────
 
-	c := New(server.URL, "")
-	metrics, err := c.Collect(context.Background(), "7d")
+func TestCollect(t *testing.T) {
+	t.Run("success returns merged cpu and memory per container", func(t *testing.T) {
+		track(t)
+		cpuValues := [][]interface{}{{1719100800, "120.5"}, {1719104400, "115.2"}}
+		memValues := [][]interface{}{{1719100800, "180.2"}, {1719104400, "178.9"}}
+		callCount := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			callCount++
+			if callCount == 1 {
+				w.Write([]byte(fakeRangeResponse("payments", "payment-api", "api", cpuValues)))
+			} else {
+				w.Write([]byte(fakeRangeResponse("payments", "payment-api", "api", memValues)))
+			}
+		}))
+		defer srv.Close()
 
-	assert.NoError(t, err)
-	assert.Empty(t, metrics)
-}
+		metrics, err := New(srv.URL, "").Collect(context.Background(), "7d")
+		assert.NoError(t, err)
+		assert.Len(t, metrics, 1)
+		assert.Equal(t, "payments", metrics[0].Namespace)
+		assert.Equal(t, "payment-api", metrics[0].PodName)
+		assert.Equal(t, "api", metrics[0].ContainerName)
+		assert.Equal(t, []float64{120.5, 115.2}, metrics[0].CPUValues)
+		assert.Equal(t, []float64{180.2, 178.9}, metrics[0].MemValues)
+	})
 
-func TestCollect_WithToken(t *testing.T) {
-	receivedToken := ""
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedToken = r.Header.Get("Authorization")
-		emptyResp := `{"status":"success","data":{"resultType":"matrix","result":[]}}`
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(emptyResp))
-	}))
-	defer server.Close()
+	t.Run("prometheus 500 returns error", func(t *testing.T) {
+		track(t)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer srv.Close()
 
-	c := New(server.URL, "my-secret-token")
-	c.Collect(context.Background(), "7d")
+		_, err := New(srv.URL, "").Collect(context.Background(), "7d")
+		assert.ErrorContains(t, err, "prometheus returned status 500")
+	})
 
-	assert.Equal(t, "Bearer my-secret-token", receivedToken)
-}
+	t.Run("empty result returns empty slice", func(t *testing.T) {
+		track(t)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(emptyResp))
+		}))
+		defer srv.Close()
 
-func TestCollect_InvalidDuration(t *testing.T) {
-	c := New("http://localhost:9090", "")
-	_, err := c.Collect(context.Background(), "invalid")
+		metrics, err := New(srv.URL, "").Collect(context.Background(), "7d")
+		assert.NoError(t, err)
+		assert.Empty(t, metrics)
+	})
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "parse lookback window")
+	t.Run("token sent as Bearer header", func(t *testing.T) {
+		track(t)
+		var received string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			received = r.Header.Get("Authorization")
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(emptyResp))
+		}))
+		defer srv.Close()
+
+		New(srv.URL, "my-secret-token").Collect(context.Background(), "7d")
+		assert.Equal(t, "Bearer my-secret-token", received)
+	})
+
+	t.Run("invalid duration returns error", func(t *testing.T) {
+		track(t)
+		_, err := New("http://localhost:9090", "").Collect(context.Background(), "invalid")
+		assert.ErrorContains(t, err, "parse lookback window")
+	})
 }

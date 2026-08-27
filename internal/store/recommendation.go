@@ -11,7 +11,7 @@ import (
 
 // UpsertRecommendation inserts a new recommendation or updates the existing one.
 // One row per container — updated in place every time the scheduler runs.
-// lookback_window is also updated so changing a cluster's window is reflected immediately.
+// applied field is preserved on conflict — scheduler never resets a user's applied flag.
 func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendation) error {
 	query := `
 		INSERT INTO recommendations (
