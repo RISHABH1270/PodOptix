@@ -510,6 +510,22 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <p class="page-desc">How Prometheus metrics flow through collection, p99 computation, recommendation generation, and storage — triggered by the scheduler every 24h or manually via recalculate.</p>
   </div>
 
+  <!-- Recommendation flow bar -->
+  <div class="flow-bar" style="margin-top:24px">
+    <span class="flow-label">POST /recalculate flow</span>
+    <button class="flow-btn" onclick="recStartFlow()">▶ Start</button>
+    <button class="reset-btn" onclick="recPrevStep()">← Prev</button>
+    <button class="reset-btn" onclick="recNextStep()">Next →</button>
+    <button class="reset-btn" onclick="recResetFlow()">↺ Reset</button>
+    <div class="step-dots">
+      <div class="sdot" id="rsd0"></div>
+      <div class="sdot" id="rsd1"></div>
+      <div class="sdot" id="rsd2"></div>
+      <div class="sdot" id="rsd3"></div>
+      <div class="sdot" id="rsd4"></div>
+    </div>
+  </div>
+
   <div id="rec-pipeline" style="display:flex;flex-direction:column;gap:0;margin-top:24px">
 
     <!-- shared store.go already documented above -->
@@ -782,6 +798,58 @@ function resetFlow() {
     el.classList.remove('flow-active','open');
   });
   for (let i = 0; i < 5; i++) document.getElementById('sd'+i).className = 'sdot';
+  document.getElementById('tooltip').classList.remove('show');
+}
+
+// ── Recommendation flow animation ──
+const recFlowSteps = [
+  { node:'r6', num:'Step 1 / 5', title:'JWT + Lock', body:'Request authenticated via JWT. AcquireRecalculateLock (Redis SETNX, 10 min TTL) — if already locked, return 429. Otherwise lock acquired.' },
+  { node:'r5', num:'Step 2 / 5', title:'collector.Collect()', body:'4 Prometheus queries: CPU & Memory usage (query_range, step 3600s) + current CPU & Memory limits (instant). Results merged by (namespace, pod, container) key.' },
+  { node:'r5', num:'Step 3 / 5', title:'compute.ComputeP99() + recommender.GenerateAll()', body:'For each container: sort values, index = ceil(0.99 × n) − 1. RecommendedLimit = ceil(p99 × 2). Containers with no data → status = new_service.' },
+  { node:'r4', num:'Step 4 / 5', title:'store.UpsertRecommendation()', body:'INSERT ... ON CONFLICT DO UPDATE for each container. One row per container updated in place. applied flag is NEVER reset — user-owned.' },
+  { node:'r6', num:'Step 5 / 5', title:'UpdateClusterHealth + InvalidateCache', body:'Stamps last_synced_at = NOW(), status = connected. Deletes Redis key cluster:{id}:recommendations so next GET fetches fresh data.' },
+];
+let recFlowStep = -1;
+
+function recShowStep(i) {
+  if (i < 0 || i >= recFlowSteps.length) return;
+  recFlowStep = i;
+  const s = recFlowSteps[recFlowStep];
+
+  ['r2','r3','r4','r5','r6'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('flow-active','open');
+  });
+
+  const active = document.getElementById(s.node);
+  if (active) { active.classList.add('flow-active','open'); active.scrollIntoView({ behavior:'smooth', block:'center' }); }
+
+  for (let j = 0; j < recFlowSteps.length; j++) {
+    const d = document.getElementById('rsd'+j);
+    if (d) {
+      if (j < recFlowStep) d.className = 'sdot done';
+      else if (j === recFlowStep) d.className = 'sdot active';
+      else d.className = 'sdot';
+    }
+  }
+
+  document.getElementById('tt-num').textContent   = s.num;
+  document.getElementById('tt-title').textContent = s.title;
+  document.getElementById('tt-body').textContent  = s.body;
+  document.getElementById('tooltip').classList.add('show');
+}
+
+function recStartFlow() { recShowStep(0); }
+function recNextStep()  { recShowStep(recFlowStep + 1); }
+function recPrevStep()  { recShowStep(recFlowStep - 1); }
+
+function recResetFlow() {
+  recFlowStep = -1;
+  ['r2','r3','r4','r5','r6'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('flow-active','open');
+  });
+  for (let i = 0; i < 5; i++) { const d = document.getElementById('rsd'+i); if (d) d.className = 'sdot'; }
   document.getElementById('tooltip').classList.remove('show');
 }
 </script>
