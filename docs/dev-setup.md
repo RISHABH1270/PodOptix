@@ -251,12 +251,56 @@ curl -X PUT http://localhost:8080/api/v1/clusters/<cluster-id> \
 
 > All fields are optional — only provided fields are updated.
 
-### 5. Get recommendations
+### 5. Delete a cluster
+
+```bash
+curl -X DELETE http://localhost:8080/api/v1/clusters/<cluster-id> \
+  -H "Authorization: Bearer <token>"
+```
+
+### 6. Get recommendations
 
 ```bash
 curl http://localhost:8080/api/v1/clusters/<cluster-id>/recommendations \
   -H "Authorization: Bearer <token>"
 ```
+
+Response:
+```json
+[
+  {
+    "recommendation_id":     "...",
+    "cluster_id":            "...",
+    "namespace":             "production",
+    "pod_name":              "api-server-7d9f",
+    "container_name":        "api",
+    "status":                "ready",
+    "current_cpu_limit":     2000,
+    "current_mem_limit":     512,
+    "p99_cpu":               312.4,
+    "p99_mem":               198.1,
+    "recommended_cpu_limit": 625,
+    "recommended_mem_limit": 397,
+    "applied":               false,
+    "created_at":            "2026-08-26T00:00:00Z",
+    "updated_at":            "2026-08-26T06:00:00Z"
+  }
+]
+```
+
+> `status` is `ready` when data is available, `new_service` when the container has no historical data yet.
+> `applied` — toggle to `true` once you apply the recommendation to your cluster (used for cost savings tracking).
+
+### 7. Trigger manual recalculation
+
+```bash
+curl -X POST http://localhost:8080/api/v1/clusters/<cluster-id>/recalculate \
+  -H "Authorization: Bearer <token>"
+```
+
+Response: `202 Accepted` — recalculation runs in background, check recommendations in a few minutes.
+
+> Returns `429 Too Many Requests` if a recalculation is already in progress for this cluster.
 
 ---
 
