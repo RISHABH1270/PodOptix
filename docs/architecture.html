@@ -3,23 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PodOptix — Cluster Architecture</title>
+<title>PodOptix — System Architecture</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 
 :root{
-  --bg:      #05080f;
-  --bg2:     #080d1a;
-  --bg3:     #0c1226;
-  --cyan:    #00d4ff;
-  --purple:  #7c3aed;
-  --green:   #00e676;
-  --amber:   #fbbf24;
-  --red:     #ff4d6d;
-  --text:    #c8d8e8;
-  --dim:     #4a6070;
-  --border:  rgba(0,212,255,0.1);
+  --bg:      #f5f7ff;
+  --bg2:     #ffffff;
+  --bg3:     #f1f5f9;
+  --cyan:    #0ea5e9;
+  --purple:  #8b5cf6;
+  --green:   #10b981;
+  --amber:   #f59e0b;
+  --red:     #ef4444;
+  --text:    #4a5568;
+  --text-strong: #0d1b3e;
+  --dim:     #8896a7;
+  --border:  rgba(0,0,0,0.08);
+  --accent:  #4f46e5;
   --sw:      260px;
 }
 
@@ -32,15 +34,14 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 /* ── sidebar ── */
 .sidebar{
   width:var(--sw);flex-shrink:0;
-  background:rgba(8,13,26,0.96);
+  background:#ffffff;
   border-right:1px solid var(--border);
-  backdrop-filter:blur(20px);
   position:sticky;top:0;height:100vh;
   overflow-y:auto;
   display:flex;flex-direction:column;
 }
 .sidebar::-webkit-scrollbar{width:3px}
-.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);border-radius:2px}
 
 .sb-logo{
   padding:22px 20px 18px;
@@ -48,7 +49,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   display:flex;align-items:center;gap:10px;
 }
 .sb-logo svg{flex-shrink:0;border-radius:8px}
-.sb-logo-text{font-size:16px;font-weight:700;background:linear-gradient(90deg,var(--cyan),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sb-logo-text{font-size:16px;font-weight:700;color:var(--accent)}
 .sb-logo-sub{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
 
 .sb-section-label{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);padding:20px 20px 6px}
@@ -56,10 +57,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .sb-group-toggle{
   display:flex;align-items:center;gap:8px;
   padding:8px 20px;
-  font-size:13.5px;font-weight:600;color:var(--text);
+  font-size:13.5px;font-weight:600;color:var(--text-strong);
   cursor:pointer;user-select:none;transition:color .18s;
 }
-.sb-group-toggle:hover{color:var(--cyan)}
+.sb-group-toggle:hover{color:var(--accent)}
 .sb-arrow{font-size:12px;color:var(--dim);transition:transform .2s}
 .sb-arrow.open{transform:rotate(90deg)}
 
@@ -74,92 +75,94 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   border-left:2px solid transparent;
   transition:all .18s;
 }
-.sb-item:hover{color:var(--text);background:rgba(0,212,255,0.04)}
-.sb-item.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(0,212,255,0.06)}
+.sb-item:hover{color:var(--text-strong);background:rgba(79,70,229,0.04)}
+.sb-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(79,70,229,0.06)}
 
 .sb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .d1{background:var(--purple)} .d2{background:var(--amber)} .d3{background:var(--cyan)}
 .d4{background:var(--purple)} .d5{background:var(--green)} .d6{background:var(--red)}
 
 .sb-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
-.sb-status{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.sb-status{width:6px;height:6px;border-radius:50%;background:var(--green)}
 
 /* ── main ── */
 .main{flex:1;padding:48px 56px 80px;max-width:860px;margin:0 auto}
 
-.page-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.page-eyebrow::before{content:'';display:block;width:20px;height:1px;background:var(--cyan)}
-.page-title{font-size:32px;font-weight:700;color:#fff;letter-spacing:-0.5px;margin-bottom:8px}
-.page-title span{color:var(--cyan)}
+.page-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.page-eyebrow::before{content:'';display:block;width:20px;height:1px;background:var(--accent)}
+.page-title{font-size:32px;font-weight:700;color:var(--text-strong);letter-spacing:-0.5px;margin-bottom:8px}
+.page-title span{color:var(--accent)}
 .page-desc{font-size:14px;color:var(--dim);margin-bottom:32px;max-width:100%}
 
 .flow-bar{
   display:flex;align-items:center;gap:12px;
   padding:12px 18px;margin-bottom:36px;
-  background:rgba(0,212,255,0.04);
+  background:#ffffff;
   border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06);
 }
 .flow-label{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
 .flow-btn{
-  padding:6px 16px;border:1px solid var(--cyan);border-radius:5px;
-  background:rgba(0,212,255,0.08);color:var(--cyan);
+  padding:6px 16px;border:1px solid var(--accent);border-radius:5px;
+  background:var(--accent);color:#ffffff;
   font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;
   font-family:inherit;
 }
-.flow-btn:hover{background:rgba(0,212,255,0.16)}
+.flow-btn:hover{background:#4338ca;border-color:#4338ca}
 .reset-btn{
   padding:6px 12px;border:1px solid var(--border);border-radius:5px;
   background:transparent;color:var(--dim);font-size:12px;cursor:pointer;
   font-family:inherit;transition:all .18s;
 }
-.reset-btn:hover{color:var(--text);border-color:var(--dim)}
+.reset-btn:hover{color:var(--text-strong);border-color:rgba(0,0,0,0.2);background:#f8fafc}
 .step-dots{display:flex;gap:6px;margin-left:auto}
-.sdot{width:8px;height:8px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);transition:all .3s}
-.sdot.done{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-.sdot.active{background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px var(--amber)}
+.sdot{width:8px;height:8px;border-radius:50%;background:#e2e8f0;border:1px solid rgba(0,0,0,0.1);transition:all .3s}
+.sdot.done{background:var(--cyan);border-color:var(--cyan)}
+.sdot.active{background:var(--amber);border-color:var(--amber)}
 
 /* ── pipeline ── */
 #pipeline{display:flex;flex-direction:column;gap:0;align-items:stretch}
 
 /* connector */
 .connector{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 0;width:100%;text-align:center}
-.conn-line{width:2px;height:40px;background:linear-gradient(to bottom,var(--border),rgba(0,212,255,0.25));position:relative;overflow:hidden;margin:0 auto}
-.conn-line::after{content:'';position:absolute;width:100%;height:20px;background:linear-gradient(to bottom,transparent,var(--cyan),transparent);animation:pktflow 2s ease-in-out infinite;top:-20px}
+.conn-line{width:2px;height:40px;background:linear-gradient(to bottom,#e2e8f0,#cbd5e1);position:relative;overflow:hidden;margin:0 auto}
+.conn-line::after{content:'';position:absolute;width:100%;height:20px;background:linear-gradient(to bottom,transparent,rgba(79,70,229,0.6),transparent);animation:pktflow 2s ease-in-out infinite;top:-20px}
 @keyframes pktflow{0%{top:-20px}100%{top:40px}}
-.conn-arrow{color:var(--cyan);font-size:14px;opacity:.6;margin-top:-4px;display:block;text-align:center}
+.conn-arrow{color:#94a3b8;font-size:14px;opacity:.8;margin-top:-4px;display:block;text-align:center}
 .conn-label{font-size:10px;color:var(--dim);margin:2px 0;letter-spacing:.5px}
 
 /* node card */
 .node-card{
-  background:var(--bg2);
+  background:#ffffff;
   border:1px solid var(--border);
   border-radius:10px;
   overflow:hidden;
+  box-shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
   transition:border-color .25s,box-shadow .25s;
   cursor:pointer;
   scroll-margin-top:32px;
 }
-.node-card:hover{border-color:rgba(0,212,255,0.3)}
-.node-card.flow-active{border-color:var(--cyan);box-shadow:0 0 24px rgba(0,212,255,0.15)}
-.node-card.open{border-color:rgba(0,212,255,0.25)}
+.node-card:hover{background:#fafbff;box-shadow:0 4px 12px rgba(79,70,229,0.12);border-color:rgba(79,70,229,0.2)}
+.node-card.flow-active{border:2px solid var(--accent);box-shadow:0 0 20px rgba(79,70,229,0.15)}
+.node-card.open{border-color:rgba(79,70,229,0.2)}
 
 .node-header{display:flex;align-items:center;gap:14px;padding:16px 20px}
 .node-icon{font-size:20px;flex-shrink:0}
 .node-info{flex:1;min-width:0}
 .node-tag{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
-.node-title{font-size:15px;font-weight:600;color:#fff}
+.node-title{font-size:15px;font-weight:600;color:var(--text-strong)}
 .node-path{font-size:11px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;margin-top:1px}
 .node-badges{display:flex;gap:6px;flex-shrink:0}
 .node-chev{font-size:11px;color:var(--dim);transition:transform .2s;flex-shrink:0}
 .node-card.open .node-chev{transform:rotate(180deg)}
 
 .badge{padding:3px 9px;border-radius:12px;font-size:10.5px;font-weight:600;font-family:'SF Mono',Consolas,monospace}
-.b1{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
-.b2{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.3)}
-.b3{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.25)}
-.b4{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
-.b5{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.25)}
-.b6{background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.25)}
+.b1{background:rgba(139,92,246,.1);color:#7c3aed;border:1px solid rgba(139,92,246,.25)}
+.b2{background:rgba(245,158,11,.1);color:#b45309;border:1px solid rgba(245,158,11,.25)}
+.b3{background:rgba(14,165,233,.1);color:#0369a1;border:1px solid rgba(14,165,233,.25)}
+.b4{background:rgba(139,92,246,.1);color:#7c3aed;border:1px solid rgba(139,92,246,.25)}
+.b5{background:rgba(16,185,129,.1);color:#047857;border:1px solid rgba(16,185,129,.25)}
+.b6{background:rgba(239,68,68,.1);color:#dc2626;border:1px solid rgba(239,68,68,.25)}
 
 /* drawer */
 .node-drawer{display:none;padding:0 20px 20px}
@@ -169,64 +172,64 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 /* tables */
 .ftable{width:100%;border-collapse:collapse;font-size:12.5px}
 .ftable th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);padding:6px 10px;border-bottom:1px solid var(--border);text-align:left}
-.ftable td{padding:8px 10px;border-bottom:1px solid rgba(0,212,255,0.05);vertical-align:top}
+.ftable td{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,0.04);vertical-align:top}
 .ftable tr:last-child td{border-bottom:none}
-.ftable tr:hover td{background:rgba(0,212,255,0.03)}
-.fname{font-family:'SF Mono',Consolas,monospace;color:var(--cyan);font-size:12px}
-.ftype{font-family:'SF Mono',Consolas,monospace;color:#a78bfa;font-size:11.5px}
+.ftable tr:hover td{background:rgba(79,70,229,0.03)}
+.fname{font-family:'SF Mono',Consolas,monospace;color:#0369a1;font-size:12px}
+.ftype{font-family:'SF Mono',Consolas,monospace;color:#7c3aed;font-size:11.5px}
 .fnote{color:var(--dim);font-size:12px}
-.ctag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(0,212,255,.1);color:var(--cyan);margin-right:4px;font-family:monospace}
-.locktag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(251,191,36,.1);color:var(--amber);margin-right:4px}
+.ctag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(14,165,233,.1);color:#0369a1;margin-right:4px;font-family:monospace}
+.locktag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;background:rgba(245,158,11,.1);color:#b45309;margin-right:4px}
 
 /* fn list */
 .fn-list{display:flex;flex-direction:column;gap:8px}
-.fn-item{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:rgba(0,212,255,0.03);border:1px solid rgba(0,212,255,0.07)}
-.fn-item.accent{background:rgba(124,58,237,0.06);border-color:rgba(124,58,237,0.2)}
+.fn-item{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:#f8fafc;border:1px solid rgba(0,0,0,0.06)}
+.fn-item.accent{background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.18)}
 .method{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:'SF Mono',Consolas,monospace;flex-shrink:0;margin-top:1px;letter-spacing:.5px}
-.m-sql{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
-.m-get{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.25)}
-.m-post{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.25)}
-.m-put{background:rgba(124,58,237,.12);color:#a78bfa;border:1px solid rgba(124,58,237,.25)}
-.m-delete{background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.25)}
-.fn-sig{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:#fff;margin-bottom:3px}
-.fn-desc{font-size:12px;color:var(--dim);line-height:1.6}
+.m-sql{background:rgba(245,158,11,.1);color:#92400e;border:1px solid rgba(245,158,11,.25)}
+.m-get{background:rgba(16,185,129,.1);color:#065f46;border:1px solid rgba(16,185,129,.25)}
+.m-post{background:rgba(14,165,233,.1);color:#0369a1;border:1px solid rgba(14,165,233,.25)}
+.m-put{background:rgba(139,92,246,.1);color:#6d28d9;border:1px solid rgba(139,92,246,.25)}
+.m-delete{background:rgba(239,68,68,.1);color:#991b1b;border:1px solid rgba(239,68,68,.25)}
+.fn-sig{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--text-strong);margin-bottom:3px}
+.fn-desc{font-size:12px;color:var(--text);line-height:1.6}
 
 /* code block */
-.code-block{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:14px 16px;font-family:'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto}
-.kw{color:#a78bfa} .sn{color:var(--cyan)} .tp{color:#fbbf24} .tg{color:var(--dim)} .cm{color:#3a5060} .br{color:var(--text)} .ind{display:block;padding-left:20px}
+.code-block{background:#f1f5f9;border:1px solid var(--border);border-radius:6px;padding:14px 16px;font-family:'SF Mono',Consolas,monospace;font-size:11.5px;line-height:1.9;overflow-x:auto;color:var(--text-strong)}
+.kw{color:#7c3aed} .sn{color:#0369a1} .tp{color:#b45309} .tg{color:var(--dim)} .cm{color:#94a3b8} .br{color:var(--text-strong)} .ind{display:block;padding-left:20px}
 
 /* constants */
 .const-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .chip{padding:5px 12px;border-radius:20px;font-size:11.5px;font-family:'SF Mono',Consolas,monospace}
-.chip-status{background:rgba(0,230,118,.08);color:var(--green);border:1px solid rgba(0,230,118,.2)}
-.chip-window{background:rgba(0,212,255,.08);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
-.chip-default{background:rgba(251,191,36,.08);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
+.chip-status{background:rgba(16,185,129,.08);color:#047857;border:1px solid rgba(16,185,129,.2)}
+.chip-window{background:rgba(14,165,233,.08);color:#0369a1;border:1px solid rgba(14,165,233,.2)}
+.chip-default{background:rgba(245,158,11,.08);color:#b45309;border:1px solid rgba(245,158,11,.2)}
 
 /* endpoints */
-.ep-row{display:flex;gap:14px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:rgba(0,212,255,0.02);border:1px solid rgba(0,212,255,0.07);margin-bottom:8px}
+.ep-row{display:flex;gap:14px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:#f8fafc;border:1px solid rgba(0,0,0,0.06);margin-bottom:8px}
 .ep-row:last-of-type{margin-bottom:12px}
 .ep-left{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:200px}
-.ep-path{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:#fff}
+.ep-path{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--text-strong)}
 .ep-code{font-size:11px;color:var(--dim)}
-.ep-title{font-size:12.5px;color:var(--text);margin-bottom:3px}
+.ep-title{font-size:12.5px;color:var(--text-strong);margin-bottom:3px}
 .ep-flow{font-size:11.5px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;line-height:1.6}
 
 /* goroutine box */
-.go-box{margin-top:12px;padding:14px 16px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.25);border-radius:8px}
-.go-lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a78bfa;margin-bottom:10px}
-.go-step{display:flex;align-items:flex-start;gap:10px;padding:5px 0;font-size:12px;color:var(--dim);border-bottom:1px solid rgba(124,58,237,0.1)}
+.go-box{margin-top:12px;padding:14px 16px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.18);border-radius:8px}
+.go-lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6d28d9;margin-bottom:10px}
+.go-step{display:flex;align-items:flex-start;gap:10px;padding:5px 0;font-size:12px;color:var(--text);border-bottom:1px solid rgba(139,92,246,0.08)}
 .go-step:last-child{border-bottom:none}
-.go-num{color:#a78bfa;font-weight:700;flex-shrink:0}
+.go-num{color:#7c3aed;font-weight:700;flex-shrink:0}
 
 /* dsec */
 .dsec-title{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
 
 /* tooltip */
-.tooltip{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--cyan);border-radius:10px;padding:16px 18px;max-width:320px;z-index:999;box-shadow:0 0 30px rgba(0,212,255,.15);display:none}
+.tooltip{position:fixed;bottom:24px;right:24px;background:#ffffff;border:1px solid rgba(79,70,229,0.25);border-radius:10px;padding:16px 18px;max-width:320px;z-index:999;box-shadow:0 4px 20px rgba(79,70,229,0.12),0 1px 4px rgba(0,0,0,0.06);display:none}
 .tooltip.show{display:block}
-.tt-num{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--cyan);text-transform:uppercase;margin-bottom:6px}
-.tt-title{font-size:14px;font-weight:600;color:#fff;margin-bottom:6px}
-.tt-body{font-size:12.5px;color:var(--dim);line-height:1.65}
+.tt-num{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--accent);text-transform:uppercase;margin-bottom:6px}
+.tt-title{font-size:14px;font-weight:600;color:var(--text-strong);margin-bottom:6px}
+.tt-body{font-size:12.5px;color:var(--text);line-height:1.65}
 </style>
 </head>
 <body>
@@ -235,8 +238,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <!-- ══ SIDEBAR ══ -->
 <nav class="sidebar">
   <div class="sb-logo">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="38" height="38">
-      <defs><linearGradient id="g" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#FBBF24"/></linearGradient></defs>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="36" height="36">
+      <defs><linearGradient id="g" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fbbf24"/></linearGradient></defs>
       <rect width="200" height="200" fill="#0F172A" rx="28"/>
       <path d="M 36 140 A 72 72 0 0 1 164 140" fill="none" stroke="#334155" stroke-width="10" stroke-linecap="round"/>
       <path d="M 36 140 A 72 72 0 0 1 120 55" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round"/>
@@ -262,6 +265,18 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <a class="sb-item" href="#n4" onclick="scrollTo('n4')"><span class="sb-dot d4"></span>Data Access Layer</a>
     <a class="sb-item" href="#n5" onclick="scrollTo('n5')"><span class="sb-dot d5"></span>HTTP API</a>
     <a class="sb-item" href="#n6" onclick="scrollTo('n6')"><span class="sb-dot d6"></span>Response DTO</a>
+  </div>
+
+  <div class="sb-group-toggle" onclick="toggleRec()">
+    <span class="sb-arrow open" id="sb-arrow-rec">▶</span>
+    <span>Recommendation</span>
+  </div>
+  <div class="sb-items" id="sb-items-rec">
+    <a class="sb-item" href="#r2" onclick="scrollTo('r2')"><span class="sb-dot" style="background:var(--amber)"></span>PostgreSQL Migration</a>
+    <a class="sb-item" href="#r3" onclick="scrollTo('r3')"><span class="sb-dot" style="background:var(--cyan)"></span>Go Data Model</a>
+    <a class="sb-item" href="#r4" onclick="scrollTo('r4')"><span class="sb-dot" style="background:var(--purple)"></span>Data Access Layer</a>
+    <a class="sb-item" href="#r5" onclick="scrollTo('r5')"><span class="sb-dot" style="background:var(--green)"></span>Collector + Compute</a>
+    <a class="sb-item" href="#r6" onclick="scrollTo('r6')"><span class="sb-dot" style="background:var(--red)"></span>HTTP API</a>
   </div>
 
   <div class="sb-footer">
@@ -491,6 +506,191 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   </div><!-- /pipeline -->
+
+  <!-- ══ RECOMMENDATION ENTITY ══ -->
+  <div style="margin-top:64px;padding-top:40px;border-top:1px solid var(--border)">
+    <h1 class="page-title" style="margin-bottom:8px">Recommendation Entity <span>Pipeline</span></h1>
+    <p class="page-desc">How Prometheus metrics flow through collection, p99 computation, recommendation generation, and storage — triggered by the scheduler every 24h or manually via recalculate.</p>
+  </div>
+
+  <!-- Recommendation flow bar -->
+  <div class="flow-bar" style="margin-top:24px">
+    <span class="flow-label">POST /recalculate flow</span>
+    <button class="flow-btn" onclick="recStartFlow()">▶ Start</button>
+    <button class="reset-btn" onclick="recPrevStep()">← Prev</button>
+    <button class="reset-btn" onclick="recNextStep()">Next →</button>
+    <button class="reset-btn" onclick="recResetFlow()">↺ Reset</button>
+    <div class="step-dots">
+      <div class="sdot" id="rsd0"></div>
+      <div class="sdot" id="rsd1"></div>
+      <div class="sdot" id="rsd2"></div>
+      <div class="sdot" id="rsd3"></div>
+      <div class="sdot" id="rsd4"></div>
+    </div>
+  </div>
+
+  <div id="rec-pipeline" style="display:flex;flex-direction:column;gap:0;margin-top:24px">
+
+    <!-- shared store.go already documented above -->
+    <div class="node-card" id="r2" onclick="toggle('r2')" style="margin-top:0">
+      <div class="node-header">
+        <div class="node-icon">🗄</div>
+        <div class="node-info">
+          <div class="node-tag">Schema</div>
+          <div class="node-title">PostgreSQL Migration</div>
+          <div class="node-path">migrations/000002_create_recommendations.up.sql</div>
+        </div>
+        <div class="node-badges"><span class="badge b2">12 columns</span><span class="badge b2">1 unique constraint</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <table class="ftable">
+          <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="td-name">recommendation_id</td><td class="td-type">VARCHAR(36)</td><td class="td-note"><span class="ctag">PK</span> UUID v4</td></tr>
+            <tr><td class="td-name">cluster_id</td><td class="td-type">VARCHAR(36)</td><td class="td-note"><span class="ctag">FK → clusters</span></td></tr>
+            <tr><td class="td-name">namespace</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Kubernetes namespace</td></tr>
+            <tr><td class="td-name">pod_name</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Pod name</td></tr>
+            <tr><td class="td-name">container_name</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Container name — UNIQUE with cluster_id + namespace + pod_name</td></tr>
+            <tr><td class="td-name">status</td><td class="td-type">VARCHAR(20)</td><td class="td-note"><span class="ctag">DEFAULT 'new_service'</span> → ready when data available</td></tr>
+            <tr><td class="td-name">current_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">millicores — live from kube_pod_container_resource_limits</td></tr>
+            <tr><td class="td-name">current_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">MiB — live from kube_pod_container_resource_limits</td></tr>
+            <tr><td class="td-name">p99_cpu</td><td class="td-type">FLOAT</td><td class="td-note">millicores — 99th percentile over lookback window</td></tr>
+            <tr><td class="td-name">p99_mem</td><td class="td-type">FLOAT</td><td class="td-note">MiB — 99th percentile over lookback window</td></tr>
+            <tr><td class="td-name">recommended_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_cpu × 2)</td></tr>
+            <tr><td class="td-name">recommended_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_mem × 2)</td></tr>
+            <tr><td class="td-name">applied</td><td class="td-type">BOOLEAN</td><td class="td-note"><span class="ctag">DEFAULT FALSE</span> toggled true when applied — enables cost savings tracking</td></tr>
+            <tr><td class="td-name">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">when first generated</td></tr>
+            <tr><td class="td-name">updated_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">last recalculated</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- Go Data Model -->
+    <div class="node-card" id="r3" onclick="toggle('r3')">
+      <div class="node-header">
+        <div class="node-icon">📐</div>
+        <div class="node-info">
+          <div class="node-tag">Go Data Model</div>
+          <div class="node-title">Recommendation struct</div>
+          <div class="node-path">pkg/models/recommendation.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b3">2 status constants</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="dsec-title" style="margin-bottom:10px">type Recommendation struct</div>
+        <div class="code-block">
+          <span class="kw">type</span> <span class="sn">Recommendation</span> <span class="kw">struct</span> <span class="br">{</span><br>
+          <span class="ind"><span class="sn">RecommendationID</span>    <span class="tp">string</span>    <span class="tg">`json:"recommendation_id"`</span></span>
+          <span class="ind"><span class="sn">ClusterID</span>           <span class="tp">string</span>    <span class="tg">`json:"cluster_id"`</span></span>
+          <span class="ind"><span class="sn">Namespace</span>           <span class="tp">string</span>    <span class="tg">`json:"namespace"`</span></span>
+          <span class="ind"><span class="sn">PodName</span>             <span class="tp">string</span>    <span class="tg">`json:"pod_name"`</span></span>
+          <span class="ind"><span class="sn">ContainerName</span>       <span class="tp">string</span>    <span class="tg">`json:"container_name"`</span></span>
+          <span class="ind"><span class="sn">Status</span>              <span class="tp">string</span>    <span class="tg">`json:"status"`</span>  <span class="cm">// new_service | ready</span></span>
+          <span class="ind"><span class="sn">CurrentCPULimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_cpu_limit"`</span>  <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">CurrentMemLimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_mem_limit"`</span>  <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">P99CPU</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_cpu"`</span>            <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">P99Mem</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_mem"`</span>            <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">RecommendedCPULimit</span> <span class="tp">int</span>       <span class="tg">`json:"recommended_cpu_limit"`</span>  <span class="cm">// ceil(p99 × 2)</span></span>
+          <span class="ind"><span class="sn">RecommendedMemLimit</span> <span class="tp">int</span>       <span class="tg">`json:"recommended_mem_limit"`</span>  <span class="cm">// ceil(p99 × 2)</span></span>
+          <span class="ind"><span class="sn">Applied</span>             <span class="tp">bool</span>      <span class="tg">`json:"applied"`</span>  <span class="cm">// cost savings tracking</span></span>
+          <span class="ind"><span class="sn">CreatedAt</span>           <span class="tp">time.Time</span> <span class="tg">`json:"created_at"`</span></span>
+          <span class="ind"><span class="sn">UpdatedAt</span>           <span class="tp">time.Time</span> <span class="tg">`json:"updated_at"`</span></span>
+          <span class="br">}</span>
+        </div>
+        <div style="margin-top:14px">
+          <div class="dsec-title">Constants</div>
+          <div class="const-chips">
+            <span class="chip chip-status">RecommendationStatusNewService = "new_service"</span>
+            <span class="chip chip-status">RecommendationStatusReady = "ready"</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- Store -->
+    <div class="node-card" id="r4" onclick="toggle('r4')">
+      <div class="node-header">
+        <div class="node-icon">⚙</div>
+        <div class="node-info">
+          <div class="node-tag">Data Access Layer</div>
+          <div class="node-title">Store — recommendation.go</div>
+          <div class="node-path">internal/store/recommendation.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b4">2 functions</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="fn-list">
+          <div class="fn-item accent"><span class="method m-post">UPSERT</span><div><div class="fn-sig">UpsertRecommendation(ctx, *models.Recommendation) error</div><div class="fn-desc">INSERT ... ON CONFLICT (cluster_id, namespace, pod_name, container_name) DO UPDATE. One row per container, updated in place. <strong style="color:#a78bfa">applied field is never reset by the system</strong> — user-owned flag.</div></div></div>
+          <div class="fn-item"><span class="method m-get">SELECT</span><div><div class="fn-sig">ListByCluster(ctx, clusterID string) ([]*models.Recommendation, error)</div><div class="fn-desc">All recommendations for a cluster ordered by namespace → pod → container. Returns empty slice (never nil) — safe for JSON. Uses idx_recommendations_cluster_id index for fast lookup.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- Collector + Compute + Recommender -->
+    <div class="node-card" id="r5" onclick="toggle('r5')">
+      <div class="node-header">
+        <div class="node-icon">🔬</div>
+        <div class="node-info">
+          <div class="node-tag">Collection + Computation</div>
+          <div class="node-title">Collector → Compute → Recommender</div>
+          <div class="node-path">collector / compute / recommender</div>
+        </div>
+        <div class="node-badges"><span class="badge b5">4 Prometheus queries</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="fn-list">
+          <div class="fn-item"><span class="method m-get">HTTP</span><div><div class="fn-sig">collector.Collect(ctx, lookbackWindow)</div><div class="fn-desc">4 Prometheus queries: CPU usage (query_range) · Memory usage (query_range) · CPU limits (instant) · Memory limits (instant). Results merged by (namespace, pod, container) key into []*ContainerMetrics.</div></div></div>
+          <div class="fn-item"><span class="method m-sql">MATH</span><div><div class="fn-sig">compute.ComputeP99(values []float64)</div><div class="fn-desc">Sort values → index = ceil(0.99 × n) − 1. Never modifies the original slice. Returns error on empty dataset.</div></div></div>
+          <div class="fn-item accent"><span class="method m-sql">GEN</span><div><div class="fn-sig">recommender.GenerateAll(clusterID, metrics)</div><div class="fn-desc">For each container: if CPU or Mem values empty → status = new_service. Otherwise: p99CPU × 2 → ceil → RecommendedCPULimit. Same for memory. Returns []*Recommendation ready for UpsertRecommendation.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- API -->
+    <div class="node-card" id="r6" onclick="toggle('r6')">
+      <div class="node-header">
+        <div class="node-icon">🌐</div>
+        <div class="node-info">
+          <div class="node-tag">HTTP API</div>
+          <div class="node-title">Recommendations API — Gin</div>
+          <div class="node-path">internal/api/recommendation.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b5">2 endpoints</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="ep-row"><div class="ep-left"><span class="method m-get">GET</span><span class="ep-path">/clusters/:id/recommendations</span><span class="ep-code">200</span></div><div><div class="ep-title">listRecommendations — cache-aside</div><div class="ep-flow">Redis GET cluster:{id}:recommendations (TTL 3h) → HIT: return immediately · MISS: ListByCluster → SetRecommendations → return</div></div></div>
+        <div class="ep-row"><div class="ep-left"><span class="method m-post">POST</span><span class="ep-path">/clusters/:id/recalculate</span><span class="ep-code">202/404/429</span></div><div><div class="ep-title">recalculate — distributed lock + background goroutine</div><div class="ep-flow">GetCluster → AcquireRecalculateLock (SETNX 10min) → 429 if locked · Decrypt token → return 202 → go: Collect → GenerateAll → Upsert × N → UpdateClusterHealth → InvalidateCache → ReleaseRecalculateLock</div></div></div>
+        <div class="go-box" style="margin-top:12px">
+          <div class="go-lbl">Scheduler — automatic trigger</div>
+          <div class="go-step"><span class="go-num">1</span><span>Runs immediately on server start — all registered clusters</span></div>
+          <div class="go-step"><span class="go-num">2</span><span>Repeats every 24 hours via time.NewTicker</span></div>
+          <div class="go-step"><span class="go-num">3</span><span>Also triggered on new cluster registration if Prometheus is reachable</span></div>
+          <div class="go-step"><span class="go-num">4</span><span>Per-cluster timeout of 10 min — hanging Prometheus never blocks other clusters</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /rec-pipeline -->
+
 </main>
 </div><!-- /layout -->
 
@@ -500,8 +700,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   <div class="tt-title" id="tt-title"></div>
   <div class="tt-body" id="tt-body"></div>
   <div style="display:flex;gap:8px;margin-top:14px;">
-    <button onclick="prevStep()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.08);border:1px solid var(--border);border-radius:5px;color:var(--dim);font-size:12px;cursor:pointer;font-family:inherit;">← Prev</button>
-    <button onclick="nextStep()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.12);border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">Next →</button>
+    <button onclick="activeFlowPrev()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.08);border:1px solid var(--border);border-radius:5px;color:var(--dim);font-size:12px;cursor:pointer;font-family:inherit;">← Prev</button>
+    <button onclick="activeFlowNext()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.12);border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">Next →</button>
   </div>
 </div>
 
@@ -521,6 +721,14 @@ function toggleCluster() {
   arrow.classList.toggle('open', !hidden);
 }
 
+// ── toggle recommendation dropdown ──
+function toggleRec() {
+  const items = document.getElementById('sb-items-rec');
+  const arrow = document.getElementById('sb-arrow-rec');
+  const hidden = items.classList.toggle('hidden');
+  arrow.classList.toggle('open', !hidden);
+}
+
 // ── scroll to node ──
 function scrollTo(id) {
   const el = document.getElementById(id);
@@ -529,7 +737,7 @@ function scrollTo(id) {
 }
 
 // ── sidebar active on scroll ──
-const nodes = ['n1','n2','n3','n4','n5','n6'];
+const nodes = ['n1','n2','n3','n4','n5','n6','r2','r3','r4','r5','r6'];
 const sbLinks = document.querySelectorAll('.sb-item');
 
 function updateSidebar() {
@@ -582,9 +790,13 @@ function showStep(i) {
   document.getElementById('tooltip').classList.add('show');
 }
 
-function startFlow() { showStep(0); }
+function startFlow() { recResetFlow(); showStep(0); }
 function nextStep()  { showStep(flowStep + 1); }
 function prevStep()  { showStep(flowStep - 1); }
+
+// routes tooltip Prev/Next to whichever flow is currently active
+function activeFlowNext() { if (recFlowStep >= 0) recNextStep(); else nextStep(); }
+function activeFlowPrev() { if (recFlowStep >= 0) recPrevStep(); else prevStep(); }
 
 function resetFlow() {
   flowStep = -1;
@@ -593,6 +805,58 @@ function resetFlow() {
     el.classList.remove('flow-active','open');
   });
   for (let i = 0; i < 5; i++) document.getElementById('sd'+i).className = 'sdot';
+  document.getElementById('tooltip').classList.remove('show');
+}
+
+// ── Recommendation flow animation ──
+const recFlowSteps = [
+  { node:'r6', num:'Step 1 / 5', title:'JWT + Lock', body:'Request authenticated via JWT. AcquireRecalculateLock (Redis SETNX, 10 min TTL) — if already locked, return 429. Otherwise lock acquired.' },
+  { node:'r5', num:'Step 2 / 5', title:'collector.Collect()', body:'4 Prometheus queries: CPU & Memory usage (query_range, step 3600s) + current CPU & Memory limits (instant). Results merged by (namespace, pod, container) key.' },
+  { node:'r5', num:'Step 3 / 5', title:'compute.ComputeP99() + recommender.GenerateAll()', body:'For each container: sort values, index = ceil(0.99 × n) − 1. RecommendedLimit = ceil(p99 × 2). Containers with no data → status = new_service.' },
+  { node:'r4', num:'Step 4 / 5', title:'store.UpsertRecommendation()', body:'INSERT ... ON CONFLICT DO UPDATE for each container. One row per container updated in place. applied flag is NEVER reset — user-owned.' },
+  { node:'r6', num:'Step 5 / 5', title:'UpdateClusterHealth + InvalidateCache', body:'Stamps last_synced_at = NOW(), status = connected. Deletes Redis key cluster:{id}:recommendations so next GET fetches fresh data.' },
+];
+let recFlowStep = -1;
+
+function recShowStep(i) {
+  if (i < 0 || i >= recFlowSteps.length) return;
+  recFlowStep = i;
+  const s = recFlowSteps[recFlowStep];
+
+  ['r2','r3','r4','r5','r6'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('flow-active','open');
+  });
+
+  const active = document.getElementById(s.node);
+  if (active) { active.classList.add('flow-active','open'); active.scrollIntoView({ behavior:'smooth', block:'center' }); }
+
+  for (let j = 0; j < recFlowSteps.length; j++) {
+    const d = document.getElementById('rsd'+j);
+    if (d) {
+      if (j < recFlowStep) d.className = 'sdot done';
+      else if (j === recFlowStep) d.className = 'sdot active';
+      else d.className = 'sdot';
+    }
+  }
+
+  document.getElementById('tt-num').textContent   = s.num;
+  document.getElementById('tt-title').textContent = s.title;
+  document.getElementById('tt-body').textContent  = s.body;
+  document.getElementById('tooltip').classList.add('show');
+}
+
+function recStartFlow() { resetFlow(); recShowStep(0); }
+function recNextStep()  { recShowStep(recFlowStep + 1); }
+function recPrevStep()  { recShowStep(recFlowStep - 1); }
+
+function recResetFlow() {
+  recFlowStep = -1;
+  ['r2','r3','r4','r5','r6'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('flow-active','open');
+  });
+  for (let i = 0; i < 5; i++) { const d = document.getElementById('rsd'+i); if (d) d.className = 'sdot'; }
   document.getElementById('tooltip').classList.remove('show');
 }
 </script>
