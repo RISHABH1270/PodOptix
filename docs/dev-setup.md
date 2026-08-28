@@ -270,7 +270,10 @@ Tests use an isolated environment:
 - Server port: `9090` (production uses `8080`)
 
 ```bash
-# Run all API integration tests (requires docker compose up -d)
+# Run everything (requires docker compose up -d)
+go test ./... -count=1
+
+# Run only API integration tests
 go test ./internal/api/testkit/... -count=1
 
 # Run a specific test group
@@ -282,13 +285,10 @@ go test ./internal/api/testkit/... -run TestHealth -count=1
 # Run a specific subtest
 go test ./internal/api/testkit/... -run TestClusters/POST -count=1
 
-# Run unit tests (no docker needed)
+# Run unit tests only (no docker needed)
 go test ./internal/compute/... -count=1
 go test ./internal/collector/... -count=1
 go test ./internal/recommender/... -count=1
-
-# Run all tests
-go test ./... -count=1
 ```
 
 ---
