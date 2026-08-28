@@ -1,79 +1,138 @@
 package compute
 
 import (
+	"fmt"
+	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestComputeP99_Empty(t *testing.T) {
-	_, err := ComputeP99([]float64{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "empty dataset")
-}
+// ── test counter ──────────────────────────────────────────────────────────────
 
-func TestComputeP99_SingleValue(t *testing.T) {
-	result, err := ComputeP99([]float64{120.5})
-	assert.NoError(t, err)
-	assert.Equal(t, 120.5, result)
-}
+var (
+	passed, failed, counter int
+	mu                      sync.Mutex
+	tty                     *os.File
+)
 
-func TestComputeP99_TwoValues(t *testing.T) {
-	result, err := ComputeP99([]float64{100.0, 200.0})
-	assert.NoError(t, err)
-	// ceil(0.99 * 2) = ceil(1.98) = 2, index = 1 → 200.0
-	assert.Equal(t, 200.0, result)
-}
-
-func TestComputeP99_IgnoresTopSpike(t *testing.T) {
-	// 100 values: 99 normal values (100.0) and 1 huge spike (9999.0)
-	values := make([]float64, 99)
-	for i := range values {
-		values[i] = 100.0
+func init() {
+	var err error
+	tty, err = os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		tty = os.Stderr
 	}
-	values = append(values, 9999.0) // spike at the top
-
-	result, err := ComputeP99(values)
-	assert.NoError(t, err)
-	// p99 of 100 values — index = ceil(0.99*100)-1 = 99-1 = 98 → 100.0
-	// the spike at position 99 is ignored
-	assert.Equal(t, 100.0, result)
 }
 
-func TestComputeP99_ReturnsCorrectPosition(t *testing.T) {
-	// 10 values: 1,2,3,4,5,6,7,8,9,10
-	values := []float64{5, 3, 8, 1, 9, 2, 7, 4, 10, 6}
+func log(format string, args ...any) { fmt.Fprintf(tty, format, args...) }
 
-	result, err := ComputeP99(values)
-	assert.NoError(t, err)
-	// sorted: [1,2,3,4,5,6,7,8,9,10]
-	// ceil(0.99 * 10) = ceil(9.9) = 10, index = 10-1 = 9 → value = 10
-	assert.Equal(t, 10.0, result)
-}
-
-func TestComputeP99_DoesNotModifyOriginal(t *testing.T) {
-	original := []float64{5.0, 3.0, 8.0, 1.0, 9.0}
-	originalCopy := make([]float64, len(original))
-	copy(originalCopy, original)
-
-	ComputeP99(original)
-
-	// original slice must be unchanged after computation
-	assert.Equal(t, originalCopy, original)
-}
-
-func TestComputeP99_Typical7DayWorkload(t *testing.T) {
-	// simulate 168 data points (7 days × 24 hours)
-	// 167 normal values at 120.0 + 1 spike at 9999.0 (top 0.6%)
-	values := make([]float64, 167)
-	for i := range values {
-		values[i] = 120.0
+func shortName(full string) string {
+	for i := len(full) - 1; i >= 0; i-- {
+		if full[i] == '/' {
+			return full[i+1:]
+		}
 	}
-	values = append(values, 9999.0) // 1 spike = top 0.6%
+	return full
+}
 
-	result, err := ComputeP99(values)
-	assert.NoError(t, err)
-	// p99 index = ceil(0.99 * 168) - 1 = 166 → sorted[166] = 120.0
-	// the spike at position 167 is beyond p99 — correctly ignored
-	assert.Equal(t, 120.0, result)
+func track(t *testing.T) {
+	t.Helper()
+	mu.Lock()
+	counter++
+	n := counter
+	mu.Unlock()
+	t.Cleanup(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		if t.Failed() {
+			failed++
+			log("  [%2d]  ✗  %s\n", n, shortName(t.Name()))
+		} else {
+			passed++
+			log("  [%2d]  ✓  %s\n", n, shortName(t.Name()))
+		}
+	})
+}
+
+func TestMain(m *testing.M) {
+	log("\n  Running Compute Tests...\n")
+	log("  ──────────────────────────────────────\n")
+	code := m.Run()
+	log("  Total: %d  |  Passed: %d  |  Failed: %d\n", passed+failed, passed, failed)
+	if code == 0 {
+		log("  ✓ All tests passed\n")
+	} else {
+		log("  ✗ Some tests failed\n")
+	}
+	log("  ──────────────────────────────────────\n\n")
+	os.Exit(code)
+}
+
+// ── ComputeP99 ────────────────────────────────────────────────────────────────
+
+func TestComputeP99(t *testing.T) {
+	t.Run("empty dataset returns error", func(t *testing.T) {
+		track(t)
+		_, err := ComputeP99([]float64{})
+		assert.ErrorContains(t, err, "empty dataset")
+	})
+
+	t.Run("single value returns that value", func(t *testing.T) {
+		track(t)
+		result, err := ComputeP99([]float64{120.5})
+		assert.NoError(t, err)
+		assert.Equal(t, 120.5, result)
+	})
+
+	t.Run("two values returns highest", func(t *testing.T) {
+		track(t)
+		// ceil(0.99 × 2) = 2, index = 1 → 200.0
+		result, err := ComputeP99([]float64{100.0, 200.0})
+		assert.NoError(t, err)
+		assert.Equal(t, 200.0, result)
+	})
+
+	t.Run("correct index position", func(t *testing.T) {
+		track(t)
+		// sorted: [1,2,3,4,5,6,7,8,9,10] — ceil(0.99×10)=10, index=9 → 10.0
+		result, err := ComputeP99([]float64{5, 3, 8, 1, 9, 2, 7, 4, 10, 6})
+		assert.NoError(t, err)
+		assert.Equal(t, 10.0, result)
+	})
+
+	t.Run("top 1% spike ignored", func(t *testing.T) {
+		track(t)
+		// 99 normal values + 1 spike — p99 index = 98 → 100.0, spike at 99 ignored
+		values := make([]float64, 99)
+		for i := range values {
+			values[i] = 100.0
+		}
+		values = append(values, 9999.0)
+		result, err := ComputeP99(values)
+		assert.NoError(t, err)
+		assert.Equal(t, 100.0, result)
+	})
+
+	t.Run("original slice not modified", func(t *testing.T) {
+		track(t)
+		original := []float64{5.0, 3.0, 8.0, 1.0, 9.0}
+		snapshot := make([]float64, len(original))
+		copy(snapshot, original)
+		ComputeP99(original)
+		assert.Equal(t, snapshot, original)
+	})
+
+	t.Run("typical 7d workload — spike beyond p99 ignored", func(t *testing.T) {
+		track(t)
+		// 167 normal + 1 spike — p99 index = ceil(0.99×168)-1 = 166 → 120.0
+		values := make([]float64, 167)
+		for i := range values {
+			values[i] = 120.0
+		}
+		values = append(values, 9999.0)
+		result, err := ComputeP99(values)
+		assert.NoError(t, err)
+		assert.Equal(t, 120.0, result)
+	})
 }
