@@ -697,8 +697,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   <div class="tt-title" id="tt-title"></div>
   <div class="tt-body" id="tt-body"></div>
   <div style="display:flex;gap:8px;margin-top:14px;">
-    <button onclick="prevStep()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.08);border:1px solid var(--border);border-radius:5px;color:var(--dim);font-size:12px;cursor:pointer;font-family:inherit;">← Prev</button>
-    <button onclick="nextStep()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.12);border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">Next →</button>
+    <button onclick="activeFlowPrev()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.08);border:1px solid var(--border);border-radius:5px;color:var(--dim);font-size:12px;cursor:pointer;font-family:inherit;">← Prev</button>
+    <button onclick="activeFlowNext()" style="flex:1;padding:6px 0;background:rgba(0,212,255,0.12);border:1px solid var(--cyan);border-radius:5px;color:var(--cyan);font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">Next →</button>
   </div>
 </div>
 
@@ -787,9 +787,13 @@ function showStep(i) {
   document.getElementById('tooltip').classList.add('show');
 }
 
-function startFlow() { showStep(0); }
+function startFlow() { recResetFlow(); showStep(0); }
 function nextStep()  { showStep(flowStep + 1); }
 function prevStep()  { showStep(flowStep - 1); }
+
+// routes tooltip Prev/Next to whichever flow is currently active
+function activeFlowNext() { if (recFlowStep >= 0) recNextStep(); else nextStep(); }
+function activeFlowPrev() { if (recFlowStep >= 0) recPrevStep(); else prevStep(); }
 
 function resetFlow() {
   flowStep = -1;
@@ -839,7 +843,7 @@ function recShowStep(i) {
   document.getElementById('tooltip').classList.add('show');
 }
 
-function recStartFlow() { recShowStep(0); }
+function recStartFlow() { resetFlow(); recShowStep(0); }
 function recNextStep()  { recShowStep(recFlowStep + 1); }
 function recPrevStep()  { recShowStep(recFlowStep - 1); }
 
