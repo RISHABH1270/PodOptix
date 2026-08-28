@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PodOptix — Cluster Architecture</title>
+<title>PodOptix — System Architecture</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -264,6 +264,18 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <a class="sb-item" href="#n6" onclick="scrollTo('n6')"><span class="sb-dot d6"></span>Response DTO</a>
   </div>
 
+  <div class="sb-group-toggle" onclick="toggleRec()">
+    <span class="sb-arrow open" id="sb-arrow-rec">▶</span>
+    <span>Recommendation</span>
+  </div>
+  <div class="sb-items" id="sb-items-rec">
+    <a class="sb-item" href="#r2" onclick="scrollTo('r2')"><span class="sb-dot" style="background:var(--amber)"></span>PostgreSQL Migration</a>
+    <a class="sb-item" href="#r3" onclick="scrollTo('r3')"><span class="sb-dot" style="background:var(--cyan)"></span>Go Data Model</a>
+    <a class="sb-item" href="#r4" onclick="scrollTo('r4')"><span class="sb-dot" style="background:var(--purple)"></span>Data Access Layer</a>
+    <a class="sb-item" href="#r5" onclick="scrollTo('r5')"><span class="sb-dot" style="background:var(--green)"></span>Collector + Compute</a>
+    <a class="sb-item" href="#r6" onclick="scrollTo('r6')"><span class="sb-dot" style="background:var(--red)"></span>HTTP API</a>
+  </div>
+
   <div class="sb-footer">
     <span class="sb-status"></span>
     <span>Go 1.26 · PostgreSQL 16</span>
@@ -491,6 +503,175 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   </div><!-- /pipeline -->
+
+  <!-- ══ RECOMMENDATION ENTITY ══ -->
+  <div style="margin-top:64px;padding-top:40px;border-top:1px solid var(--border)">
+    <h1 class="page-title" style="margin-bottom:8px">Recommendation Entity <span>Pipeline</span></h1>
+    <p class="page-desc">How Prometheus metrics flow through collection, p99 computation, recommendation generation, and storage — triggered by the scheduler every 24h or manually via recalculate.</p>
+  </div>
+
+  <div id="rec-pipeline" style="display:flex;flex-direction:column;gap:0;margin-top:24px">
+
+    <!-- shared store.go already documented above -->
+    <div class="node-card" id="r2" onclick="toggle('r2')" style="margin-top:0">
+      <div class="node-header">
+        <div class="node-icon">🗄</div>
+        <div class="node-info">
+          <div class="node-tag">Schema</div>
+          <div class="node-title">PostgreSQL Migration</div>
+          <div class="node-path">migrations/000002_create_recommendations.up.sql</div>
+        </div>
+        <div class="node-badges"><span class="badge b2">12 columns</span><span class="badge b2">1 unique constraint</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <table class="ftable">
+          <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="td-name">recommendation_id</td><td class="td-type">VARCHAR(36)</td><td class="td-note"><span class="ctag">PK</span> UUID v4</td></tr>
+            <tr><td class="td-name">cluster_id</td><td class="td-type">VARCHAR(36)</td><td class="td-note"><span class="ctag">FK → clusters</span></td></tr>
+            <tr><td class="td-name">namespace</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Kubernetes namespace</td></tr>
+            <tr><td class="td-name">pod_name</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Pod name</td></tr>
+            <tr><td class="td-name">container_name</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Container name — UNIQUE with cluster_id + namespace + pod_name</td></tr>
+            <tr><td class="td-name">status</td><td class="td-type">VARCHAR(20)</td><td class="td-note"><span class="ctag">DEFAULT 'new_service'</span> → ready when data available</td></tr>
+            <tr><td class="td-name">current_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">millicores — live from kube_pod_container_resource_limits</td></tr>
+            <tr><td class="td-name">current_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">MiB — live from kube_pod_container_resource_limits</td></tr>
+            <tr><td class="td-name">p99_cpu</td><td class="td-type">FLOAT</td><td class="td-note">millicores — 99th percentile over lookback window</td></tr>
+            <tr><td class="td-name">p99_mem</td><td class="td-type">FLOAT</td><td class="td-note">MiB — 99th percentile over lookback window</td></tr>
+            <tr><td class="td-name">recommended_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_cpu × 2)</td></tr>
+            <tr><td class="td-name">recommended_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_mem × 2)</td></tr>
+            <tr><td class="td-name">applied</td><td class="td-type">BOOLEAN</td><td class="td-note"><span class="ctag">DEFAULT FALSE</span> toggled true when applied — enables cost savings tracking</td></tr>
+            <tr><td class="td-name">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">when first generated</td></tr>
+            <tr><td class="td-name">updated_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">last recalculated</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- Go Data Model -->
+    <div class="node-card" id="r3" onclick="toggle('r3')">
+      <div class="node-header">
+        <div class="node-icon">📐</div>
+        <div class="node-info">
+          <div class="node-tag">Go Data Model</div>
+          <div class="node-title">Recommendation struct</div>
+          <div class="node-path">pkg/models/recommendation.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b3">2 status constants</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="dsec-title" style="margin-bottom:10px">type Recommendation struct</div>
+        <div class="code-block">
+          <span class="kw">type</span> <span class="sn">Recommendation</span> <span class="kw">struct</span> <span class="br">{</span><br>
+          <span class="ind"><span class="sn">RecommendationID</span>    <span class="tp">string</span>    <span class="tg">`json:"recommendation_id"`</span></span>
+          <span class="ind"><span class="sn">ClusterID</span>           <span class="tp">string</span>    <span class="tg">`json:"cluster_id"`</span></span>
+          <span class="ind"><span class="sn">Namespace</span>           <span class="tp">string</span>    <span class="tg">`json:"namespace"`</span></span>
+          <span class="ind"><span class="sn">PodName</span>             <span class="tp">string</span>    <span class="tg">`json:"pod_name"`</span></span>
+          <span class="ind"><span class="sn">ContainerName</span>       <span class="tp">string</span>    <span class="tg">`json:"container_name"`</span></span>
+          <span class="ind"><span class="sn">Status</span>              <span class="tp">string</span>    <span class="tg">`json:"status"`</span>  <span class="cm">// new_service | ready</span></span>
+          <span class="ind"><span class="sn">CurrentCPULimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_cpu_limit"`</span>  <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">CurrentMemLimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_mem_limit"`</span>  <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">P99CPU</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_cpu"`</span>            <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">P99Mem</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_mem"`</span>            <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">RecommendedCPULimit</span> <span class="tp">int</span>       <span class="tg">`json:"recommended_cpu_limit"`</span>  <span class="cm">// ceil(p99 × 2)</span></span>
+          <span class="ind"><span class="sn">RecommendedMemLimit</span> <span class="tp">int</span>       <span class="tg">`json:"recommended_mem_limit"`</span>  <span class="cm">// ceil(p99 × 2)</span></span>
+          <span class="ind"><span class="sn">Applied</span>             <span class="tp">bool</span>      <span class="tg">`json:"applied"`</span>  <span class="cm">// cost savings tracking</span></span>
+          <span class="ind"><span class="sn">CreatedAt</span>           <span class="tp">time.Time</span> <span class="tg">`json:"created_at"`</span></span>
+          <span class="ind"><span class="sn">UpdatedAt</span>           <span class="tp">time.Time</span> <span class="tg">`json:"updated_at"`</span></span>
+          <span class="br">}</span>
+        </div>
+        <div style="margin-top:14px">
+          <div class="dsec-title">Constants</div>
+          <div class="const-chips">
+            <span class="chip chip-status">RecommendationStatusNewService = "new_service"</span>
+            <span class="chip chip-status">RecommendationStatusReady = "ready"</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- Store -->
+    <div class="node-card" id="r4" onclick="toggle('r4')">
+      <div class="node-header">
+        <div class="node-icon">⚙</div>
+        <div class="node-info">
+          <div class="node-tag">Data Access Layer</div>
+          <div class="node-title">Store — recommendation.go</div>
+          <div class="node-path">internal/store/recommendation.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b4">2 functions</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="fn-list">
+          <div class="fn-item accent"><span class="method m-post">UPSERT</span><div><div class="fn-sig">UpsertRecommendation(ctx, *models.Recommendation) error</div><div class="fn-desc">INSERT ... ON CONFLICT (cluster_id, namespace, pod_name, container_name) DO UPDATE. One row per container, updated in place. <strong style="color:#a78bfa">applied field is never reset by the system</strong> — user-owned flag.</div></div></div>
+          <div class="fn-item"><span class="method m-get">SELECT</span><div><div class="fn-sig">ListByCluster(ctx, clusterID string) ([]*models.Recommendation, error)</div><div class="fn-desc">All recommendations for a cluster ordered by namespace → pod → container. Returns empty slice (never nil) — safe for JSON. Uses idx_recommendations_cluster_id index for fast lookup.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- Collector + Compute + Recommender -->
+    <div class="node-card" id="r5" onclick="toggle('r5')">
+      <div class="node-header">
+        <div class="node-icon">🔬</div>
+        <div class="node-info">
+          <div class="node-tag">Collection + Computation</div>
+          <div class="node-title">Collector → Compute → Recommender</div>
+          <div class="node-path">collector / compute / recommender</div>
+        </div>
+        <div class="node-badges"><span class="badge b5">4 Prometheus queries</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="fn-list">
+          <div class="fn-item"><span class="method m-get">HTTP</span><div><div class="fn-sig">collector.Collect(ctx, lookbackWindow)</div><div class="fn-desc">4 Prometheus queries: CPU usage (query_range) · Memory usage (query_range) · CPU limits (instant) · Memory limits (instant). Results merged by (namespace, pod, container) key into []*ContainerMetrics.</div></div></div>
+          <div class="fn-item"><span class="method m-sql">MATH</span><div><div class="fn-sig">compute.ComputeP99(values []float64)</div><div class="fn-desc">Sort values → index = ceil(0.99 × n) − 1. Never modifies the original slice. Returns error on empty dataset.</div></div></div>
+          <div class="fn-item accent"><span class="method m-sql">GEN</span><div><div class="fn-sig">recommender.GenerateAll(clusterID, metrics)</div><div class="fn-desc">For each container: if CPU or Mem values empty → status = new_service. Otherwise: p99CPU × 2 → ceil → RecommendedCPULimit. Same for memory. Returns []*Recommendation ready for UpsertRecommendation.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- API -->
+    <div class="node-card" id="r6" onclick="toggle('r6')">
+      <div class="node-header">
+        <div class="node-icon">🌐</div>
+        <div class="node-info">
+          <div class="node-tag">HTTP API</div>
+          <div class="node-title">Recommendations API — Gin</div>
+          <div class="node-path">internal/api/recommendation.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b5">2 endpoints</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="ep-row"><div class="ep-left"><span class="method m-get">GET</span><span class="ep-path">/clusters/:id/recommendations</span><span class="ep-code">200</span></div><div><div class="ep-title">listRecommendations — cache-aside</div><div class="ep-flow">Redis GET cluster:{id}:recommendations (TTL 3h) → HIT: return immediately · MISS: ListByCluster → SetRecommendations → return</div></div></div>
+        <div class="ep-row"><div class="ep-left"><span class="method m-post">POST</span><span class="ep-path">/clusters/:id/recalculate</span><span class="ep-code">202/404/429</span></div><div><div class="ep-title">recalculate — distributed lock + background goroutine</div><div class="ep-flow">GetCluster → AcquireRecalculateLock (SETNX 10min) → 429 if locked · Decrypt token → return 202 → go: Collect → GenerateAll → Upsert × N → UpdateClusterHealth → InvalidateCache → ReleaseRecalculateLock</div></div></div>
+        <div class="go-box" style="margin-top:12px">
+          <div class="go-lbl">Scheduler — automatic trigger</div>
+          <div class="go-step"><span class="go-num">1</span><span>Runs immediately on server start — all registered clusters</span></div>
+          <div class="go-step"><span class="go-num">2</span><span>Repeats every 24 hours via time.NewTicker</span></div>
+          <div class="go-step"><span class="go-num">3</span><span>Also triggered on new cluster registration if Prometheus is reachable</span></div>
+          <div class="go-step"><span class="go-num">4</span><span>Per-cluster timeout of 10 min — hanging Prometheus never blocks other clusters</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /rec-pipeline -->
+
 </main>
 </div><!-- /layout -->
 
@@ -521,6 +702,14 @@ function toggleCluster() {
   arrow.classList.toggle('open', !hidden);
 }
 
+// ── toggle recommendation dropdown ──
+function toggleRec() {
+  const items = document.getElementById('sb-items-rec');
+  const arrow = document.getElementById('sb-arrow-rec');
+  const hidden = items.classList.toggle('hidden');
+  arrow.classList.toggle('open', !hidden);
+}
+
 // ── scroll to node ──
 function scrollTo(id) {
   const el = document.getElementById(id);
@@ -529,7 +718,7 @@ function scrollTo(id) {
 }
 
 // ── sidebar active on scroll ──
-const nodes = ['n1','n2','n3','n4','n5','n6'];
+const nodes = ['n1','n2','n3','n4','n5','n6','r2','r3','r4','r5','r6'];
 const sbLinks = document.querySelectorAll('.sb-item');
 
 function updateSidebar() {
