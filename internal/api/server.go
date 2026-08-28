@@ -6,24 +6,26 @@ import (
 	"net/http"
 
 	"github.com/RISHABH1270/PodOptix/internal/cache"
+	"github.com/RISHABH1270/PodOptix/internal/scheduler"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/gin-gonic/gin"
 )
 
 // Server holds the HTTP router and all its dependencies.
 type Server struct {
-	router        *gin.Engine  // Gin router — knows all routes and middleware
-	store         *store.Store // database connection injected from main
-	cache         *cache.Cache // Redis cache injected from main
-	jwtSecret     string       // used to sign and verify JWT tokens
-	encryptionKey string       // used to encrypt/decrypt Prometheus tokens at rest
+	router        *gin.Engine         // Gin router — knows all routes and middleware
+	store         *store.Store        // database connection injected from main
+	cache         *cache.Cache        // Redis cache injected from main
+	scheduler     *scheduler.Scheduler // used to trigger immediate sync on cluster registration
+	jwtSecret     string              // used to sign and verify JWT tokens
+	encryptionKey string              // used to encrypt/decrypt Prometheus tokens at rest
 }
 
 // NewServer creates a new HTTP server and registers all routes.
-func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey string) *Server {
+func NewServer(st *store.Store, ca *cache.Cache, sched *scheduler.Scheduler, jwtSecret string, encryptionKey string) *Server {
 	gin.SetMode(gin.ReleaseMode) // suppress debug route logs — not useful in production or tests
 	router := gin.New()
-	router.Use(gin.Recovery())   // keep panic recovery
+	router.Use(gin.Recovery())    // keep panic recovery
 	router.Use(RequestIDMiddleware())
 	router.SetTrustedProxies(nil) // direct connection only — no reverse proxy trust
 
@@ -31,6 +33,7 @@ func NewServer(st *store.Store, ca *cache.Cache, jwtSecret string, encryptionKey
 		router:        router,
 		store:         st,
 		cache:         ca,
+		scheduler:     sched,
 		jwtSecret:     jwtSecret,
 		encryptionKey: encryptionKey,
 	}

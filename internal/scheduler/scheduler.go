@@ -8,8 +8,8 @@ import (
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
-	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/RISHABH1270/PodOptix/internal/store"
+	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
 // Scheduler runs the collection pipeline once per day for every registered cluster.
@@ -50,7 +50,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}
 }
 
-// runAll fetches all clusters and runs the full pipeline for each one.
+// runAll fetches all clusters and runs the full pipeline for each one sequentially.
 func (s *Scheduler) runAll(ctx context.Context) {
 	log.Printf("INFO  scheduler running collection for all clusters")
 
@@ -66,40 +66,39 @@ func (s *Scheduler) runAll(ctx context.Context) {
 	}
 
 	for _, cluster := range clusters {
-		// decrypt token before using for Prometheus
 		plainToken, err := auth.Decrypt(cluster.PrometheusToken, s.encryptionKey)
 		if err != nil {
 			log.Printf("ERROR scheduler decrypt token cluster=%s: %v", cluster.ClusterID, err)
 			continue
 		}
-		s.runForCluster(ctx, cluster.ClusterID, cluster.PrometheusURL, plainToken, cluster.LookbackWindow)
+		s.RunForCluster(ctx, cluster.ClusterID, cluster.PrometheusURL, plainToken, cluster.LookbackWindow)
 	}
 }
 
-// runForCluster runs the full collect → recommend → upsert pipeline for one cluster.
-func (s *Scheduler) runForCluster(ctx context.Context, clusterID, prometheusURL, token, lookbackWindow string) {
+// RunForCluster runs the full collect → recommend → upsert pipeline for one cluster.
+// Called by the scheduler loop and directly after cluster registration for immediate first sync.
+// Uses a 10 minute timeout so a hanging Prometheus never blocks the full run.
+func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL, token, lookbackWindow string) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
 	log.Printf("INFO  scheduler collecting cluster=%s", clusterID)
 
-	// step 1 — collect raw metrics from Prometheus
-	c := collector.New(prometheusURL, token)
-	metrics, err := c.Collect(ctx, lookbackWindow)
+	metrics, err := collector.New(prometheusURL, token).Collect(ctx, lookbackWindow)
 	if err != nil {
 		log.Printf("ERROR scheduler collect cluster=%s: %v", clusterID, err)
-		// mark cluster as unhealthy — Prometheus unreachable
 		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now())
 		return
 	}
 
 	log.Printf("INFO  scheduler collected %d containers from cluster=%s", len(metrics), clusterID)
 
-	// step 2 — generate recommendations
-	recommendations, err := recommender.GenerateAll(clusterID, lookbackWindow, metrics)
+	recommendations, err := recommender.GenerateAll(clusterID, metrics)
 	if err != nil {
 		log.Printf("ERROR scheduler recommend cluster=%s: %v", clusterID, err)
 		return
 	}
 
-	// step 3 — upsert recommendations to database
 	var saved int
 	for _, rec := range recommendations {
 		if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
@@ -110,9 +109,7 @@ func (s *Scheduler) runForCluster(ctx context.Context, clusterID, prometheusURL,
 		saved++
 	}
 
-	log.Printf("INFO  scheduler saved %d/%d recommendations for cluster=%s",
-		saved, len(recommendations), clusterID)
+	log.Printf("INFO  scheduler saved %d/%d recommendations for cluster=%s", saved, len(recommendations), clusterID)
 
-	// mark cluster as healthy — collection succeeded
 	s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
 }

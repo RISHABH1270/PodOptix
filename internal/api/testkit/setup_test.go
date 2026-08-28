@@ -159,7 +159,7 @@ func TestMain(m *testing.M) {
 		panic("failed to flush redis test db: " + err.Error())
 	}
 
-	srv := api.NewServer(db, redisCache, jwtSecret, encKey)
+	srv := api.NewServer(db, redisCache, nil, jwtSecret, encKey) // nil scheduler — tests don't need background sync
 
 	listener, err := srv.Listen(testPort)
 	if err != nil {
