@@ -18,16 +18,13 @@ func ComputeP99(values []float64) (float64, error) {
 		return values[0], nil
 	}
 
-	// step 1 — sort a copy so we don't modify the original slice
-	var sorted []float64
-	sorted = make([]float64, len(values))
+	// sort a copy so the original slice is never modified
+	sorted := make([]float64, len(values))
 	copy(sorted, values)
 	sort.Float64s(sorted)
 
-	// step 2 — calculate the index at the 99th percentile
-	// ceil(0.99 × n) - 1 always stays within bounds since 0.99 × n < n
-	var index int
-	index = int(math.Ceil(0.99*float64(len(sorted)))) - 1
+	// ceil(0.99 × n) - 1 — always within bounds since 0.99 × n < n
+	index := int(math.Ceil(0.99*float64(len(sorted)))) - 1
 
 	return sorted[index], nil
 }

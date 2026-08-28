@@ -16,11 +16,8 @@ import (
 // listRecommendations returns all recommendations for a cluster.
 // Checks Redis cache first — falls back to PostgreSQL on miss.
 func (s *Server) listRecommendations(c *gin.Context) {
-	var requestID string
-	requestID = c.GetString("request_id")
-
-	var clusterID string
-	clusterID = c.Param("id")
+	requestID := c.GetString("request_id")
+	clusterID := c.Param("id")
 
 	// try Redis cache first
 	if s.cache != nil {
@@ -30,7 +27,6 @@ func (s *Server) listRecommendations(c *gin.Context) {
 			log.Printf("WARN  [%s] listRecommendations cache get: %v", requestID, err)
 		}
 		if hit {
-			log.Printf("INFO  [%s] listRecommendations cache hit cluster=%s", requestID, clusterID)
 			c.JSON(http.StatusOK, cached)
 			return
 		}
@@ -47,11 +43,7 @@ func (s *Server) listRecommendations(c *gin.Context) {
 		return
 	}
 
-	if recommendations == nil {
-		recommendations = []*models.Recommendation{}
-	}
-
-	// store in Redis cache for next request
+	// cache for next request
 	if s.cache != nil {
 		if err = s.cache.SetRecommendations(c.Request.Context(), clusterID, recommendations); err != nil {
 			log.Printf("WARN  [%s] listRecommendations cache set: %v", requestID, err)
@@ -63,18 +55,14 @@ func (s *Server) listRecommendations(c *gin.Context) {
 
 // recalculate triggers a manual recommendation recalculation for a cluster.
 // Uses a distributed lock to prevent duplicate jobs.
-// Returns 202 Accepted immediately — runs in background.
+// Returns 202 Accepted immediately — runs in background with 10 min timeout.
 func (s *Server) recalculate(c *gin.Context) {
-	var requestID string
-	requestID = c.GetString("request_id")
-
-	var clusterID string
-	clusterID = c.Param("id")
+	requestID := c.GetString("request_id")
+	clusterID := c.Param("id")
 
 	// verify cluster exists
 	cluster, err := s.store.GetCluster(c.Request.Context(), clusterID)
 	if err != nil {
-		log.Printf("ERROR [%s] recalculate cluster not found %s: %v", requestID, clusterID, err)
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":      "Cluster not found",
 			"request_id": requestID,
@@ -110,9 +98,9 @@ func (s *Server) recalculate(c *gin.Context) {
 
 	// run in background — return 202 immediately
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
 		defer func() {
-			// always release lock when done
 			if s.cache != nil {
 				s.cache.ReleaseRecalculateLock(ctx, clusterID)
 			}
@@ -120,32 +108,27 @@ func (s *Server) recalculate(c *gin.Context) {
 
 		log.Printf("INFO  recalculate started cluster=%s", clusterID)
 
-		// collect metrics
-		col := collector.New(cluster.PrometheusURL, plainToken)
-		metrics, err := col.Collect(ctx, cluster.LookbackWindow)
+		metrics, err := collector.New(cluster.PrometheusURL, plainToken).Collect(ctx, cluster.LookbackWindow)
 		if err != nil {
 			log.Printf("ERROR recalculate collect cluster=%s: %v", clusterID, err)
+			s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now())
 			return
 		}
 
-		// generate recommendations
-		recs, err := recommender.GenerateAll(clusterID, cluster.LookbackWindow, metrics)
+		recs, err := recommender.GenerateAll(clusterID, metrics)
 		if err != nil {
 			log.Printf("ERROR recalculate recommend cluster=%s: %v", clusterID, err)
 			return
 		}
 
-		// upsert to database
 		for _, rec := range recs {
 			if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
 				log.Printf("ERROR recalculate upsert cluster=%s: %v", clusterID, err)
 			}
 		}
 
-		// update last_synced_at so the client sees a fresh timestamp
 		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
 
-		// invalidate cache — next request fetches fresh data
 		if s.cache != nil {
 			s.cache.InvalidateRecommendations(ctx, clusterID)
 		}
@@ -153,7 +136,6 @@ func (s *Server) recalculate(c *gin.Context) {
 		log.Printf("INFO  recalculate completed cluster=%s saved=%d", clusterID, len(recs))
 	}()
 
-	// return 202 immediately — recalculation running in background
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":    "Recalculation started. Check recommendations in a few minutes.",
 		"cluster_id": clusterID,

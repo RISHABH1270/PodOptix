@@ -11,6 +11,7 @@ import (
 
 // UpsertRecommendation inserts a new recommendation or updates the existing one.
 // One row per container — updated in place every time the scheduler runs.
+// applied field is preserved on conflict — scheduler never resets a user's applied flag.
 func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendation) error {
 	query := `
 		INSERT INTO recommendations (
@@ -18,7 +19,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 			status, current_cpu_limit, current_mem_limit,
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
-			lookback_window, created_at, updated_at
+			applied, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
 		ON CONFLICT (cluster_id, namespace, pod_name, container_name)
 		DO UPDATE SET
@@ -44,7 +45,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 		r.P99Mem,
 		r.RecommendedCPULimit,
 		r.RecommendedMemLimit,
-		r.LookbackWindow,
+		r.Applied,
 		r.CreatedAt,
 	)
 	if err != nil {
@@ -55,7 +56,8 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
-// ListByCluster fetches all recommendations for a given cluster ordered by namespace → pod → container.
+// ListByCluster fetches all recommendations for a cluster ordered by namespace → pod → container.
+// Returns empty slice (never nil) so callers can safely serialise to JSON without a nil check.
 func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.Recommendation, error) {
 	query := `
 		SELECT
@@ -63,7 +65,7 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 			status, current_cpu_limit, current_mem_limit,
 			p99_cpu, p99_mem,
 			recommended_cpu_limit, recommended_mem_limit,
-			lookback_window, created_at, updated_at
+			applied, created_at, updated_at
 		FROM recommendations
 		WHERE cluster_id = $1
 		ORDER BY namespace, pod_name, container_name
@@ -74,10 +76,10 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 	}
 	defer rows.Close()
 
-	var recommendations []*models.Recommendation
+	recommendations := []*models.Recommendation{}
 	for rows.Next() {
 		r := &models.Recommendation{}
-		err := rows.Scan(
+		if err := rows.Scan(
 			&r.RecommendationID,
 			&r.ClusterID,
 			&r.Namespace,
@@ -90,11 +92,10 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 			&r.P99Mem,
 			&r.RecommendedCPULimit,
 			&r.RecommendedMemLimit,
-			&r.LookbackWindow,
+			&r.Applied,
 			&r.CreatedAt,
 			&r.UpdatedAt,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("scan recommendation: %w", err)
 		}
 		recommendations = append(recommendations, r)

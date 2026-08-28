@@ -36,7 +36,7 @@ func New(prometheusURL string, token string) *Collector {
 		prometheusURL: prometheusURL,
 		token:         token,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second, // fail fast if Prometheus is unresponsiv - 30 seconds
+			Timeout: 30 * time.Second, // fail fast if Prometheus is unresponsive
 		},
 	}
 }
@@ -135,28 +135,21 @@ type prometheusInstantResponse struct {
 
 // queryRange calls Prometheus /api/v1/query_range and returns raw results.
 func (c *Collector) queryRange(ctx context.Context, query string, start, end time.Time) ([]prometheusResult, error) {
-	// build the request URL with query parameters
-	endpoint := c.prometheusURL + "/api/v1/query_range"
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("start", start.UTC().Format(time.RFC3339))
 	params.Set("end", end.UTC().Format(time.RFC3339))
 	params.Set("step", "3600") // one data point per hour
 
-	var req *http.Request
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+params.Encode(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.prometheusURL+"/api/v1/query_range?"+params.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-
-	// attach auth token if provided
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 
-	// execute the request
-	var resp *http.Response
-	resp, err = c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
@@ -166,9 +159,7 @@ func (c *Collector) queryRange(ctx context.Context, query string, start, end tim
 		return nil, fmt.Errorf("prometheus returned status %d", resp.StatusCode)
 	}
 
-	// parse the JSON response
-	var body []byte
-	body, err = io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
 	}
@@ -177,11 +168,9 @@ func (c *Collector) queryRange(ctx context.Context, query string, start, end tim
 	if err = json.Unmarshal(body, &promResp); err != nil {
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
-
 	if promResp.Status != "success" {
 		return nil, fmt.Errorf("prometheus query failed: status=%s", promResp.Status)
 	}
-
 	return promResp.Data.Result, nil
 }
 
@@ -300,12 +289,6 @@ func extractValues(values [][]interface{}) []float64 {
 		result = append(result, f)
 	}
 	return result
-}
-
-// ParseLookbackWindow validates and parses a lookback window string (e.g. "7d", "24h", "30m").
-// Exported so the API layer can validate user input before saving to DB.
-func ParseLookbackWindow(s string) (time.Duration, error) {
-	return parseDuration(s)
 }
 
 // parseDuration converts "7d", "24h" etc. to time.Duration.

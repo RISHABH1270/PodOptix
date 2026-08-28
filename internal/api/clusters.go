@@ -9,7 +9,6 @@ import (
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
-	"github.com/RISHABH1270/PodOptix/internal/recommender"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -131,41 +130,14 @@ func (s *Server) createCluster(c *gin.Context) {
 		return
 	}
 
-	// kick off initial sync in background — only if Prometheus is reachable
-	// plain token available here without decryption, timeout prevents goroutine running forever
-	if status == models.ClusterStatusConnected {
-		clusterID := cluster.ClusterID
+	// kick off initial sync via scheduler — only if Prometheus is reachable
+	// plain token available here without decryption
+	if status == models.ClusterStatusConnected && s.scheduler != nil {
 		plainToken := req.PrometheusToken
+		clusterID := cluster.ClusterID
 		prometheusURL := cluster.PrometheusURL
 		lookbackWindow := cluster.LookbackWindow
-
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-			log.Printf("INFO  initial sync started cluster=%s", clusterID)
-
-			metrics, err := collector.New(prometheusURL, plainToken).Collect(ctx, lookbackWindow)
-			if err != nil {
-				log.Printf("ERROR initial sync collect cluster=%s: %v", clusterID, err)
-				s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now())
-				return
-			}
-
-			recs, err := recommender.GenerateAll(clusterID, lookbackWindow, metrics)
-			if err != nil {
-				log.Printf("ERROR initial sync recommend cluster=%s: %v", clusterID, err)
-				return
-			}
-
-			for _, rec := range recs {
-				if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
-					log.Printf("ERROR initial sync upsert cluster=%s: %v", clusterID, err)
-				}
-			}
-
-			s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
-			log.Printf("INFO  initial sync completed cluster=%s saved=%d", clusterID, len(recs))
-		}()
+		go s.scheduler.RunForCluster(context.Background(), clusterID, prometheusURL, plainToken, lookbackWindow)
 	}
 
 	c.JSON(http.StatusCreated, toClusterResponse(cluster))
