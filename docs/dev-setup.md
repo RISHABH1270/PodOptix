@@ -271,7 +271,8 @@ Tests use an isolated environment:
 
 ```bash
 # Run everything (requires docker compose up -d)
-go test ./... -count=1
+# -p 1 runs packages sequentially — prevents interleaved output from parallel packages
+go test ./... -count=1 -p 1
 
 # Run only API integration tests
 go test ./internal/api/testkit/... -count=1
