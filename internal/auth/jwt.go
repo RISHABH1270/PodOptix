@@ -14,11 +14,9 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// GenerateToken creates a signed JWT token for a user.
-// Token expires in 24 hours.
+// GenerateToken creates a signed JWT token for a user. Token expires in 24 hours.
 func GenerateToken(userID string, email string, secret string) (string, error) {
-	var claims Claims
-	claims = Claims{
+	claims := Claims{
 		UserID: userID,
 		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -27,36 +25,26 @@ func GenerateToken(userID string, email string, secret string) (string, error) {
 		},
 	}
 
-	var token *jwt.Token
-	token = jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	var signed string
-	var err error
-	signed, err = token.SignedString([]byte(secret))
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
 	if err != nil {
 		return "", fmt.Errorf("sign token: %w", err)
 	}
-
 	return signed, nil
 }
 
 // ValidateToken parses and verifies a JWT token string.
 // Returns the claims if valid, error if expired or tampered.
+// Explicit HMAC check prevents algorithm confusion attacks (alg:none bypass).
 func ValidateToken(tokenString string, secret string) (*Claims, error) {
 	var claims Claims
-	var err error
-
-	_, err = jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (interface{}, error) {
-		// verify signing algorithm — prevents algorithm confusion attacks
+	_, err := jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return []byte(secret), nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
-
 	return &claims, nil
 }

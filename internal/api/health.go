@@ -7,48 +7,38 @@ import (
 )
 
 // handleHealthz responds to Kubernetes liveness probes.
-// Returns 200 OK if the process is alive — does not check dependencies.
+// Always 200 — just confirms the process is alive, does not check dependencies.
 func (s *Server) handleHealthz(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
-	})
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // handleReadyz responds to Kubernetes readiness probes.
-// Returns 200 only if all dependencies (PostgreSQL, Redis) are reachable.
-// Kubernetes stops sending traffic to this pod if readyz fails.
+// Returns 200 only if PostgreSQL and Redis are reachable.
+// Kubernetes stops routing traffic to this pod if readyz fails.
 func (s *Server) handleReadyz(c *gin.Context) {
-	var checks = gin.H{}
-	var allReady = true
+	checks := gin.H{}
+	ready := true
 
-	// check PostgreSQL
 	if err := s.store.Ping(c.Request.Context()); err != nil {
-		checks["postgres"] = "unhealthy"
-		allReady = false
+		checks["postgres"] = "error"
+		ready = false
 	} else {
-		checks["postgres"] = "healthy"
+		checks["postgres"] = "ok"
 	}
 
-	// check Redis
 	if s.cache != nil {
 		if err := s.cache.Ping(c.Request.Context()); err != nil {
-			checks["redis"] = "unhealthy"
-			allReady = false
+			checks["redis"] = "error"
+			ready = false
 		} else {
-			checks["redis"] = "healthy"
+			checks["redis"] = "ok"
 		}
 	}
 
-	if !allReady {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "unhealthy",
-			"checks": checks,
-		})
+	if !ready {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "degraded", "checks": checks})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
-		"checks": checks,
-	})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "checks": checks})
 }

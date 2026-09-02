@@ -86,14 +86,14 @@ PodOptix queries historical usage data from Prometheus, computes the 99th percen
 |-----------|-------|-------------|
 | **Web Dashboard** | Presentation | UI to view recommendations per cluster, namespace, and pod |
 | **REST API Server** | Presentation | HTTP server — CRUD for clusters, serve recommendations as JSON or YAML |
-| **Auth Service** | Service | User registration + login · bcrypt password hashing · JWT token issuance · middleware verifies all `/api/v1/*` requests |
+| **Auth Service** | Service | User registration + login · bcrypt password hashing · JWT token issuance · middleware verifies all protected routes |
 | **Cluster Registry** | Service | Stores Prometheus endpoint URLs and encrypted auth tokens |
 | **Scheduler** | Service | Cron-based job runner — triggers data collection per cluster once per day |
 | **PromQL Engine** | Processing | Queries Prometheus `/api/v1/query_range` with PromQL expressions |
 | **p99 Computation Engine** | Processing | Computes 99th percentile from raw time series over a rolling 7-day window |
 | **Recommendation Engine** | Processing | Applies 2× multiplier · Formats output as YAML resource patches |
 | **Database (PostgreSQL)** | Storage | Persists cluster config and recommendations — one row per container, updated daily |
-| **Cache (Redis)** | Storage | Caches PromQL query results per cluster — TTL: 1 hour |
+| **Cache (Redis)** | Storage | Caches recommendations per cluster — TTL: 3 hours |
 
 ---
 
@@ -117,9 +117,8 @@ The Hub stores the token encrypted at rest (AES-256-GCM) and begins scheduling d
 
 | Status | Meaning |
 |--------|---------|
-| `pending` | Registered but not yet queried |
-| `healthy` | Last collection job succeeded |
-| `unhealthy` | Last collection job failed (Prometheus unreachable, auth error, etc.) |
+| `connected` | Prometheus reachable — set immediately on registration via 10s ping |
+| `disconnected` | Prometheus unreachable — set immediately on registration via 10s ping |
 
 ---
 
@@ -127,8 +126,9 @@ The Hub stores the token encrypted at rest (AES-256-GCM) and begins scheduling d
 
 ```
   Step 1   User registers a cluster
-           Dashboard → POST /clusters { name, prometheus_url, token }
+           Dashboard → POST /clusters { cluster_name, prometheus_url, prometheus_token }
            Cluster Registry stores encrypted credentials in Database
+           Prometheus is pinged immediately (10s timeout) → status = connected/disconnected
 
   Step 2   Scheduler triggers a collection job
            Runs once per day per registered cluster
@@ -166,9 +166,7 @@ Scheduler (cron: once/day)
         │         │
         │         ├── Decrypt Prometheus token (AES-256-GCM)
         │         │
-        │         ├── PromQL Engine → query_range (CPU + Memory, 7-day window)
-        │         │         │
-        │         │         └── Cache result in Redis (TTL: 1 hr)
+        │         ├── PromQL Engine → query_range (CPU + Memory, lookback window)
         │         │
         │         ├── p99 Computation Engine → quantile(0.99, time_series)
         │         │
@@ -180,10 +178,8 @@ Scheduler (cron: once/day)
 ```
 
 **Two triggers for recalculation:**
-1. **Automatic** — scheduler runs once per day for all clusters
-2. **Manual** — "Recalculate" button in the dashboard triggers on-demand refresh via a Redis job queue
-
-**Job queue rationale:** 100 clusters × 1000 pods = 100,000 containers to process simultaneously would cause 200 concurrent Prometheus HTTP calls and 100,000 DB upserts — likely crashing the server. The job queue ensures one cluster is processed at a time. The user gets an immediate "queued" response.
+1. **Automatic** — scheduler runs once per day for all clusters (also runs on startup for all registered clusters)
+2. **Manual** — `POST /clusters/:id/recalculate` triggers on-demand refresh; returns 202 immediately; uses a distributed Redis lock (10 min) to prevent duplicate runs — returns 429 if already in progress
 
 ---
 
