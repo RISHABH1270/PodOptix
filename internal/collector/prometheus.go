@@ -227,7 +227,7 @@ func mergeMetrics(
 	cpuMap := make(map[containerKey][]float64)
 	for _, r := range cpuResults {
 		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
-		cpuMap[key] = extractValues(r.Values)
+		cpuMap[key] = ExtractValues(r.Values)
 	}
 
 	cpuLimitMap := make(map[containerKey]int)
@@ -262,7 +262,7 @@ func mergeMetrics(
 			PodName:       key.pod,
 			ContainerName: key.container,
 			CPUValues:     cpuMap[key],
-			MemValues:     extractValues(r.Values),
+			MemValues:     ExtractValues(r.Values),
 			CPULimit:      cpuLimitMap[key],
 			MemLimit:      memLimitMap[key],
 		})
@@ -271,7 +271,7 @@ func mergeMetrics(
 }
 
 // extractValues converts Prometheus [[timestamp, "value"]] pairs to []float64.
-func extractValues(values [][]interface{}) []float64 {
+func ExtractValues(values [][]interface{}) []float64 {
 	var result []float64
 	for _, v := range values {
 		if len(v) != 2 {
