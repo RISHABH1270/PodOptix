@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/api"
@@ -23,34 +26,26 @@ const (
 )
 
 func main() {
-	var cfg *config.Config
-	var err error
-
-	// 1. load config — everything else depends on it
-	cfg, err = config.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
 	printBanner(cfg.Port)
 
-	// 2. ensure database exists — creates it if first time
 	if err = store.EnsureDatabase(cfg.DatabaseURL); err != nil {
 		fmt.Println(red + "  Database : failed — " + err.Error() + reset)
 		log.Fatalf("failed to ensure database: %v", err)
 	}
 	fmt.Println(green + "  Database : " + reset + "Database ready")
 
-	// 3. sync schema — run migrations
 	if err = store.SyncSchema(cfg.DatabaseURL); err != nil {
 		fmt.Println(red + "  Schema   : failed — " + err.Error() + reset)
 		log.Fatalf("schema sync failed: %v", err)
 	}
 	fmt.Println(green + "  Schema   : " + reset + "Schema synced")
 
-	// 4. open connection pool
-	var db *store.Store
-	db, err = store.New(cfg.DatabaseURL)
+	db, err := store.New(cfg.DatabaseURL)
 	if err != nil {
 		fmt.Println(red + "  Pool     : failed — " + err.Error() + reset)
 		log.Fatalf("failed to initialize connection pool: %v", err)
@@ -58,9 +53,7 @@ func main() {
 	defer db.Close()
 	fmt.Println(green + "  Pool     : " + reset + "Connection pool ready")
 
-	// 5. connect to Redis
-	var redisCache *cache.Cache
-	redisCache, err = cache.New(cfg.RedisURL)
+	redisCache, err := cache.New(cfg.RedisURL)
 	if err != nil {
 		fmt.Println(red + "  Redis    : failed — " + err.Error() + reset)
 		log.Fatalf("failed to connect to redis: %v", err)
@@ -68,14 +61,15 @@ func main() {
 	defer redisCache.Close()
 	fmt.Println(green + "  Redis    : " + reset + "Connected")
 
-	// 6. start scheduler in background — runs once per day
+	// context cancelled on SIGTERM/SIGINT — propagates to scheduler and in-flight jobs
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	sched := scheduler.New(db, 24*time.Hour, cfg.EncryptionKey)
-	go sched.Start(context.Background())
+	go sched.Start(ctx)
 	fmt.Println(green + "  Scheduler: " + reset + "Started — runs every 24 hours")
 
-	// 7. start HTTP server
-	var server *api.Server
-	server = api.NewServer(db, redisCache, sched, cfg.JWTSecret, cfg.EncryptionKey)
+	server := api.NewServer(db, redisCache, sched, cfg.JWTSecret, cfg.EncryptionKey)
 
 	listener, err := server.Listen(cfg.Port)
 	if err != nil {
