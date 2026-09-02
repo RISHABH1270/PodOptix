@@ -72,7 +72,7 @@ func (c *Collector) Ping(ctx context.Context) error {
 // Collect queries Prometheus for CPU/memory usage and current resource limits for all containers.
 func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*ContainerMetrics, error) {
 	end := time.Now()
-	duration, err := parseDuration(lookbackWindow)
+	duration, err := ParseDuration(lookbackWindow)
 	if err != nil {
 		return nil, fmt.Errorf("parse lookback window: %w", err)
 	}
@@ -292,7 +292,7 @@ func extractValues(values [][]interface{}) []float64 {
 }
 
 // parseDuration converts "7d", "24h" etc. to time.Duration.
-func parseDuration(s string) (time.Duration, error) {
+func ParseDuration(s string) (time.Duration, error) {
 	if len(s) < 2 {
 		return 0, fmt.Errorf("invalid duration: %s", s)
 	}
