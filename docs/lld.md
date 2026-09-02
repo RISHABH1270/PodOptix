@@ -66,7 +66,7 @@
 │  │   ┌────────────────────────┐     ┌────────────────────────┐   │  │
 │  │   │        Database        │     │         Cache          │   │  │
 │  │   │  · clusters            │     │  · PromQL results      │   │  │
-│  │   │  · recommendations     │     │  · TTL: 1 hr           │   │  │
+│  │   │  · recommendations     │     │  · TTL: 3 hr           │   │  │
 │  │   │  · users               │     │                        │   │  │
 │  │   └────────────────────────┘     └────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────┘  │
@@ -122,14 +122,16 @@ Authorization: Bearer eyJhbGci...
 ### Cluster Registration Flow
 
 ```
-User → POST /api/v1/clusters { name, prometheus_url, token, lookback_window }
+User → POST /clusters { cluster_name, prometheus_url, prometheus_token, lookback_window }
           │
           ├── 1. JWTMiddleware validates token
           ├── 2. ShouldBindJSON → validate required fields
           ├── 3. Generate UUID for cluster_id
-          ├── 4. EncryptToken(token, ENCRYPTION_KEY) → AES-256-GCM ciphertext
-          ├── 5. INSERT into clusters table (encrypted_token stored)
-          └── 6. Return Cluster object (token field omitted from JSON: json:"-")
+          ├── 4. EncryptToken(prometheus_token, ENCRYPTION_KEY) → AES-256-GCM ciphertext
+          ├── 5. INSERT into clusters table (encrypted token stored, status = 'disconnected')
+          ├── 6. Ping Prometheus immediately (10s timeout) → UPDATE status = 'connected'/'disconnected'
+          ├── 7. Return 201 with Cluster object (last_synced_at = "not yet synced")
+          └── 8. If connected: background goroutine runs collect → recommend → upsert
 ```
 
 ### Recommendation Collection Flow (Scheduler-triggered)
@@ -140,40 +142,36 @@ Scheduler (cron: daily)
       └── For each cluster:
                │
                ├── 1. GetCluster → decrypt token (AES-256-GCM)
-               ├── 2. Check Redis cache: cluster:{id}:metrics
-               │         ├── HIT  → use cached data
-               │         └── MISS → query Prometheus, cache result TTL 1hr
-               │
-               ├── 3. PromQL Engine: queryRange(CPU query, start, end, step=3600)
-               │         · start = now - 7d
+               ├── 2. PromQL Engine: queryRange(CPU query, start, end, step=3600)
+               │         · start = now - lookback_window
                │         · end   = now
-               │         · step  = 3600 (one data point per hour = 168 points)
+               │         · step  = 3600 (one data point per hour)
                │
-               ├── 4. PromQL Engine: queryRange(Memory query, start, end, step=3600)
+               ├── 3. PromQL Engine: queryRange(Memory query, start, end, step=3600)
                │
-               ├── 5. mergeMetrics(cpuData, memData) → []*ContainerMetrics
+               ├── 4. mergeMetrics(cpuData, memData) → []*ContainerMetrics
                │         · indexed by (namespace, pod, container)
                │
-               ├── 6. p99 Engine: quantile(0.99, values) per container
+               ├── 5. p99 Engine: quantile(0.99, values) per container
                │
-               ├── 7. Recommendation Engine: ceil(p99 × 2) per container
+               ├── 6. Recommendation Engine: ceil(p99 × 2) per container
                │
-               ├── 8. UpsertRecommendation per container
+               ├── 7. UpsertRecommendation per container
                │         ON CONFLICT (cluster_id, namespace, pod_name, container_name)
                │         DO UPDATE SET p99_cpu=..., updated_at=NOW()
                │
-               └── 9. Invalidate Redis key: cluster:{id}:recommendations
+               └── 8. Invalidate Redis key: cluster:{id}:recommendations
 ```
 
 ### Dashboard Read Flow (recommendations)
 
 ```
-GET /api/v1/clusters/:id/recommendations
+GET /clusters/:id/recommendations
       │
       ├── 1. JWTMiddleware validates token
       ├── 2. Check Redis: cluster:{id}:recommendations
       │         ├── HIT  → return cached JSON (< 1ms)
-      │         └── MISS → query PostgreSQL → cache TTL 1hr → return
+      │         └── MISS → query PostgreSQL → cache TTL 3hr → return
       └── 3. Return []Recommendation ordered by created_at DESC
 ```
 
@@ -185,25 +183,32 @@ GET /api/v1/clusters/:id/recommendations
 
 ```sql
 CREATE TABLE IF NOT EXISTS clusters (
-    cluster_id     VARCHAR(36)   PRIMARY KEY,
-    name           VARCHAR(255)  NOT NULL UNIQUE,
-    prometheus_url TEXT          NOT NULL,
-    token          TEXT          NOT NULL,
-    lookback_window VARCHAR(10)  NOT NULL DEFAULT '7d',
-    status         VARCHAR(20)   NOT NULL DEFAULT 'pending',
-    created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+    cluster_id      VARCHAR(36)   PRIMARY KEY,
+    cluster_name    VARCHAR(100)  NOT NULL UNIQUE,
+    prometheus_url  TEXT          NOT NULL,
+    prometheus_token TEXT         NOT NULL,
+    lookback_window VARCHAR(10)   NOT NULL DEFAULT '7d',
+    status          VARCHAR(20)   NOT NULL DEFAULT 'disconnected',
+    created_by      VARCHAR(255)  NOT NULL,
+    last_synced_at  TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+
+    CHECK (status IN ('connected', 'disconnected')),
+    CHECK (lookback_window IN ('7d', '10d', '30d'))
 );
 ```
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | `cluster_id` | VARCHAR(36) | PRIMARY KEY | UUID v4 — always 36 chars |
-| `name` | VARCHAR(255) | NOT NULL, UNIQUE | Human-readable cluster name |
+| `cluster_name` | VARCHAR(100) | NOT NULL, UNIQUE | Human-readable cluster name |
 | `prometheus_url` | TEXT | NOT NULL | Full HTTP endpoint URL |
-| `token` | TEXT | NOT NULL | AES-256-GCM encrypted at rest |
-| `lookback_window` | VARCHAR(10) | NOT NULL, DEFAULT '7d' | e.g. "7d", "24h", "30d" |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | pending / healthy / unhealthy |
+| `prometheus_token` | TEXT | NOT NULL | AES-256-GCM encrypted at rest |
+| `lookback_window` | VARCHAR(10) | NOT NULL, DEFAULT '7d' | `7d`, `10d`, or `30d` only |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'disconnected' | `connected` / `disconnected` |
+| `created_by` | VARCHAR(255) | NOT NULL | Email of registering user — audit trail |
+| `last_synced_at` | TIMESTAMPTZ | nullable | NULL until first sync completes |
 | `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | UTC timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | UTC timestamp |
 
@@ -223,7 +228,7 @@ CREATE TABLE IF NOT EXISTS recommendations (
     p99_mem             FLOAT        NOT NULL DEFAULT 0,
     recommended_cpu_limit INTEGER    NOT NULL DEFAULT 0,
     recommended_mem_limit INTEGER    NOT NULL DEFAULT 0,
-    lookback_window     VARCHAR(10)  NOT NULL DEFAULT '7d',
+    applied             BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
@@ -247,7 +252,7 @@ CREATE INDEX idx_recommendations_cluster_id ON recommendations(cluster_id);
 | `p99_mem` | FLOAT | Raw p99 value in MiB |
 | `recommended_cpu_limit` | INTEGER | `ceil(p99_cpu × 2)` millicores |
 | `recommended_mem_limit` | INTEGER | `ceil(p99_mem × 2)` MiB |
-| `lookback_window` | VARCHAR(10) | Window used for this computation |
+| `applied` | BOOLEAN | TRUE if recommendation was applied to cluster — tracks cost savings |
 | `created_at` | TIMESTAMPTZ | First generated |
 | `updated_at` | TIMESTAMPTZ | Last recalculated |
 
@@ -283,12 +288,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 ### Authentication
 
-All `/api/v1/*` endpoints require:
+All cluster endpoints require:
 ```
 Authorization: Bearer <jwt_token>
 ```
 
-Public endpoints (no auth required): `GET /healthz`, `POST /auth/register`, `POST /auth/login`
+Public endpoints (no auth required): `GET /healthz`, `GET /readyz`, `POST /auth/register`, `POST /auth/login`
 
 ### Error Response Format
 
@@ -313,6 +318,24 @@ Kubernetes liveness probe.
 **Response 200:**
 ```json
 { "status": "ok" }
+```
+
+---
+
+#### `GET /readyz`
+
+Kubernetes readiness probe. Checks PostgreSQL and Redis connectivity.
+
+**Auth:** None
+
+**Response 200 (all healthy):**
+```json
+{ "status": "ok", "checks": { "postgres": "ok", "redis": "ok" } }
+```
+
+**Response 503 (degraded):**
+```json
+{ "status": "degraded", "checks": { "postgres": "ok", "redis": "error" } }
 ```
 
 ---
@@ -375,7 +398,7 @@ Authenticate and receive a JWT token.
 
 ---
 
-#### `GET /api/v1/clusters`
+#### `GET /clusters`
 
 List all registered clusters.
 
@@ -386,23 +409,25 @@ List all registered clusters.
 [
   {
     "cluster_id":      "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-    "name":            "production-cluster",
+    "cluster_name":    "production-cluster",
     "prometheus_url":  "https://prometheus.example.com",
     "lookback_window": "7d",
-    "status":          "healthy",
+    "status":          "connected",
+    "created_by":      "user@example.com",
+    "last_synced_at":  "not yet synced",
     "created_at":      "2026-06-24T00:00:00Z",
     "updated_at":      "2026-06-24T00:00:00Z"
   }
 ]
 ```
 
-Note: `token` field is always omitted from responses (`json:"-"`).
+Note: `prometheus_token` field is always omitted from responses (`json:"-"`).
 
 Returns `[]` (empty array) when no clusters exist — never `null`.
 
 ---
 
-#### `POST /api/v1/clusters`
+#### `POST /clusters`
 
 Register a new workload cluster.
 
@@ -411,34 +436,38 @@ Register a new workload cluster.
 **Request body:**
 ```json
 {
-  "name":            "production-cluster",
-  "prometheus_url":  "https://prometheus.example.com",
-  "token":           "your-prometheus-bearer-token",
-  "lookback_window": "7d"
+  "cluster_name":      "production-cluster",
+  "prometheus_url":    "https://prometheus.example.com",
+  "prometheus_token":  "your-prometheus-bearer-token",
+  "lookback_window":   "7d"
 }
 ```
 
-All fields required. `lookback_window` format: `"7d"`, `"24h"`, `"30d"`.
+All fields required. `lookback_window` must be one of: `"7d"`, `"10d"`, `"30d"`.
 
 **Response 201:**
 ```json
 {
   "cluster_id":      "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-  "name":            "production-cluster",
+  "cluster_name":    "production-cluster",
   "prometheus_url":  "https://prometheus.example.com",
   "lookback_window": "7d",
-  "status":          "pending",
+  "status":          "connected",
+  "created_by":      "user@example.com",
+  "last_synced_at":  "not yet synced",
   "created_at":      "2026-06-24T00:00:00Z",
   "updated_at":      "2026-06-24T00:00:00Z"
 }
 ```
 
+Status is `connected` or `disconnected` — never `pending`. Prometheus is pinged during registration (10s timeout) to set the status immediately.
+
 **Errors:**
-- `400` — missing required fields
+- `400` — missing or invalid fields
 
 ---
 
-#### `GET /api/v1/clusters/:id`
+#### `GET /clusters/:id`
 
 Get a single cluster by ID.
 
@@ -451,7 +480,7 @@ Get a single cluster by ID.
 
 ---
 
-#### `PUT /api/v1/clusters/:id`
+#### `PUT /clusters/:id`
 
 Update a cluster's configuration.
 
@@ -460,10 +489,10 @@ Update a cluster's configuration.
 **Request body:** (any subset of fields)
 ```json
 {
-  "name":            "production-cluster-updated",
-  "prometheus_url":  "https://new-prometheus.example.com",
-  "token":           "new-prometheus-token",
-  "lookback_window": "14d"
+  "cluster_name":     "production-cluster-updated",
+  "prometheus_url":   "https://new-prometheus.example.com",
+  "prometheus_token": "new-prometheus-token",
+  "lookback_window":  "30d"
 }
 ```
 
@@ -475,7 +504,7 @@ Update a cluster's configuration.
 
 ---
 
-#### `DELETE /api/v1/clusters/:id`
+#### `DELETE /clusters/:id`
 
 Remove a cluster and all its recommendations.
 
@@ -488,7 +517,7 @@ Remove a cluster and all its recommendations.
 
 ---
 
-#### `GET /api/v1/clusters/:id/recommendations`
+#### `GET /clusters/:id/recommendations`
 
 Get all recommendations for a cluster.
 
@@ -510,7 +539,7 @@ Get all recommendations for a cluster.
     "p99_mem":              180.2,
     "recommended_cpu_limit": 241,
     "recommended_mem_limit": 361,
-    "lookback_window":      "7d",
+    "applied":              false,
     "created_at":           "2026-06-24T00:00:00Z",
     "updated_at":           "2026-06-24T00:00:00Z"
   }
@@ -524,26 +553,38 @@ CPU values in millicores. Memory values in MiB. Ordered by `created_at DESC`.
 
 ---
 
+#### `POST /clusters/:id/recalculate`
+
+Trigger a manual recommendation recalculation for a cluster.
+
+**Auth:** JWT required
+
+**Response 202:** No body — recalculation started in background.
+
+**Errors:**
+- `404` — "Cluster not found"
+- `429` — recalculation already in progress (distributed Redis lock held)
+
+---
+
 ## Redis Key Design
 
 | Role | Key Pattern | TTL | Operation | Why |
 |------|-------------|-----|-----------|-----|
-| Recommendations cache | `cluster:{id}:recommendations` | 1 hour | GET/SET/DEL | Dashboard reads on every page load — serve from Redis, not PostgreSQL |
-| Raw metrics cache | `cluster:{id}:metrics` | 1 hour | GET/SET | Avoid re-querying Prometheus for same window |
+| Recommendations cache | `cluster:{id}:recommendations` | 3 hours | GET/SET/DEL | Dashboard reads on every page load — serve from Redis, not PostgreSQL |
 | Distributed lock | `lock:cluster:{id}:recalculate` | 10 minutes | SetNX | Prevent duplicate recalculate jobs for same cluster |
-| Job queue | `recalculate-jobs` | No TTL | LPUSH/RPOP | Sequential processing — one cluster at a time |
 
 **Cache-aside pattern for recommendations:**
 
 ```
-GET /api/v1/clusters/:id/recommendations
+GET /clusters/:id/recommendations
         ↓
 Redis GET cluster:{id}:recommendations
         ↓
 HIT  → unmarshal JSON → return (< 1ms)
 MISS → PostgreSQL SELECT WHERE cluster_id = :id
         ↓
-     marshal to JSON → Redis SET TTL 1hr → return
+     marshal to JSON → Redis SET TTL 3hr → return
 ```
 
 After scheduler completes or manual recalculate finishes:
@@ -632,7 +673,7 @@ Without this check, an attacker could craft a token with `"alg":"none"` (no sign
 | Password storage | bcrypt — one-way, salted, slow |
 | Input validation | `binding:"required"` — Gin rejects missing fields |
 | Secrets in logs | Never — no tokens, credentials, or JWT secrets logged |
-| API access | JWT middleware on all `/api/v1/*` routes |
+| API access | JWT middleware on all cluster routes |
 | No plaintext credentials | All secrets via environment variables or Kubernetes Secrets |
 | Request tracing | Every request gets a unique `X-Request-ID` header |
 
@@ -713,10 +754,13 @@ One `ContainerMetrics` per container. One pod with 3 containers = 3 `ContainerMe
 
 ### Test Architecture
 
+Tests live in `tests/` at the project root. Run with:
 ```
-go test ./internal/api/ -v
-        ↓
-init()         → os.Chdir("../..") — move to project root so migrations/ is found
+go test ./tests/... -count=1 -p 1
+```
+
+```
+go test ./tests/... -count=1 -p 1
         ↓
 TestMain(m)    → SETUP:
   1. adminURL  → connect to default "postgres" database
@@ -724,15 +768,17 @@ TestMain(m)    → SETUP:
   3.            → CREATE DATABASE podoptix_test  (clean slate every run)
   4. testDBURL → run SyncSchema (create tables via migrations)
   5.            → store.New() — open connection pool
-  6.            → NewServer(db) — create test server
-  7.            → print "Running PodOptix API Tests..."
+  6. Redis     → connects to Redis DB index 1 (isolated from dev data)
+  7.            → Start real TCP server on port 9090
+  8.            → print "Running PodOptix API Tests..."
         ↓
 m.Run()        → Go scans all _test.go files, runs every func TestXxx(t *testing.T)
         ↓
 TestMain(m)    → TEARDOWN:
-  8.            → db.Close()
-  9. adminURL  → DROP DATABASE podoptix_test WITH (FORCE)
-  10.           → print Total / Passed / Failed
+  9.            → server.Shutdown()
+  10.           → db.Close()
+  11. adminURL → DROP DATABASE podoptix_test WITH (FORCE)
+  12.           → print Total / Passed / Failed
         ↓
 os.Exit(code)  → 0 = all passed, 1 = some failed
 ```
@@ -746,21 +792,19 @@ testDBURL = "postgres://...@localhost:5432/podoptix_test"  // our test DB
 
 PostgreSQL cannot drop a database while connected to it. `adminURL` connects to the neutral `postgres` database to CREATE and DROP `podoptix_test`. `testDBURL` connects to `podoptix_test` to run migrations and tests.
 
-### httptest — In-Memory Request Simulation
+### Real TCP Server on Port 9090
 
-No real TCP server is started. Requests are simulated in memory:
+Tests use a real TCP server started on `localhost:9090` — not `httptest.NewRecorder`. All requests are made over a real HTTP connection:
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-w   := httptest.NewRecorder()
-testServer.router.ServeHTTP(w, req)
+resp, err := http.Get("http://localhost:9090/healthz")
 
 // check results
-w.Code          // HTTP status code
-w.Body.String() // response body
+resp.StatusCode         // HTTP status code
+body, _ := io.ReadAll(resp.Body)  // response body
 ```
 
-The full middleware stack runs: `RequestIDMiddleware → JWTMiddleware → handler → store → real PostgreSQL`.
+The full middleware stack runs: `RequestIDMiddleware → JWTMiddleware → handler → store → real PostgreSQL + Redis`.
 
 ### Fake Prometheus Server (collector tests)
 
@@ -780,15 +824,16 @@ metrics, err := collector.Collect(ctx, "7d")
 
 This tests our request building, response parsing, auth header attachment, and error handling — without needing a real Prometheus instance.
 
-### Test File Order
+### Test File Organization
 
 ```
-00_health_test.go   → TestHealthz
-01_auth_test.go     → TestRegister, TestLogin, TestProtectedRoute_*
-02_clusters_test.go → TestCreateCluster, TestListClusters, TestGetCluster, TestDeleteCluster
+tests/
+  health_test.go    → TestHealthz, TestReadyz
+  auth_test.go      → TestRegister, TestLogin, TestProtectedRoute_*
+  clusters_test.go  → TestCreateCluster, TestListClusters, TestGetCluster, TestDeleteCluster
 ```
 
-Files prefixed with numbers ensure alphabetical = execution order. Auth tests run before cluster tests because auth must work before protected routes can be tested.
+Tests are run with `-p 1` (sequential) to prevent parallel database conflicts. The `-count=1` flag disables test result caching.
 
 ### Current Test Coverage
 
@@ -816,8 +861,9 @@ Files prefixed with numbers ensure alphabetical = execution order. Auth tests ru
 
 | | Integration tests (current) | E2E tests (planned) |
 |--|---|---|
-| Server | In-memory via `httptest` | Real running server |
+| Server | Real TCP server on port 9090 | Real running server |
 | Database | `podoptix_test` (auto-created) | Staging/dev cluster |
+| Redis | DB index 1 (isolated) | Staging Redis |
 | Speed | Fast — milliseconds | Slow — seconds |
 | When | Every commit | Before deployment |
 | Catches | Code bugs | Deployment and config bugs |

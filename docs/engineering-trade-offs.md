@@ -325,23 +325,24 @@ This is clearly labeled as an estimate, not a real recommendation.
 
 ## 12. Cluster Status Values
 
-### Decision: pending / healthy / unhealthy
+### Decision: connected / disconnected
 
-When a cluster is registered, its status goes through:
+When a cluster is registered, Prometheus is pinged immediately (10s timeout) to set the status:
 
 | Status | When | Meaning |
 |--------|------|---------|
-| `pending` | Immediately after registration | Registered but not yet queried by scheduler |
-| `healthy` | After successful collection job | Last Prometheus query succeeded |
-| `unhealthy` | After failed collection job | Prometheus unreachable, auth error, timeout, etc. |
+| `connected` | Prometheus ping succeeds during registration | Prometheus reachable |
+| `disconnected` | Prometheus ping fails during registration | Prometheus unreachable, auth error, timeout, etc. |
 
-**Why not just healthy/unhealthy:**
+Status is set **immediately on registration** — the cluster never stays in an unknown state. The user knows right away whether the Prometheus endpoint is reachable.
 
-A newly registered cluster has never been queried. Calling it "unhealthy" would be wrong — the scheduler hasn't tried yet. `pending` correctly communicates "registered, waiting for first collection run."
+**Why not `healthy` / `unhealthy`:**
 
-**Why not `ok` / `error`:**
+`connected` and `disconnected` describe the connectivity state more precisely. `healthy`/`unhealthy` imply something about the cluster's workloads — `connected`/`disconnected` describes the Hub's ability to reach Prometheus.
 
-`healthy` and `unhealthy` are the standard Kubernetes health terminology. Platform engineers immediately understand these values without needing to look them up.
+**Why not `pending`:**
+
+There is no intermediate state. The registration flow pings Prometheus synchronously before returning 201 — by the time the response reaches the user, the status reflects real connectivity.
 
 ---
 
@@ -451,7 +452,7 @@ One row per container, always showing the latest values. `updated_at` shows when
 
 **Two triggers for recalculation:**
 1. **Automatic** — scheduler runs once per day for all clusters
-2. **Manual** — "Recalculate" button in dashboard triggers on-demand refresh via Redis job queue
+2. **Manual** — `POST /clusters/:id/recalculate` triggers on-demand refresh; distributed Redis lock prevents duplicate runs
 
 ---
 
@@ -507,11 +508,11 @@ golang-migrate marks a migration dirty the moment it starts. If the app crashes 
 Step 1  POST /auth/login { email, password }
         Server verifies credentials → issues JWT token (24hr expiry)
 
-Step 2  GET /api/v1/clusters
+Step 2  GET /clusters
         Authorization: Bearer eyJhbGci...
         Server verifies signature (no database hit) → allows request
 
-Step 3  GET /api/v1/clusters (no token or expired)
+Step 3  GET /clusters (no token or expired)
         → 401 Unauthorized
 ```
 
@@ -548,28 +549,22 @@ Without this check, an attacker could set `"alg":"none"` to bypass signature ver
 
 ## 18. Redis — Purpose and Design
 
-### Decision: Redis as cache + distributed lock + job queue
+### Decision: Redis as cache + distributed lock
 
-Same Redis instance serves three roles:
+Same Redis instance serves two roles:
 
 | Role | Key Pattern | TTL | Why |
 |------|------------|-----|-----|
-| **Recommendations cache** | `cluster:{id}:recommendations` | 1 hour | Dashboard reads frequently — serve from Redis not PostgreSQL every request |
+| **Recommendations cache** | `cluster:{id}:recommendations` | 3 hours | Dashboard reads frequently — serve from Redis not PostgreSQL every request |
 | **Distributed lock** | `lock:cluster:{id}:recalculate` | 10 min | Prevent duplicate recalculate jobs for same cluster |
-| **Job queue** | `recalculate-jobs` | no TTL | Sequential processing — one cluster at a time, prevents server overload |
 
 **Why cache recommendations (not raw metrics):**
 
 Recommendations are already computed and stored in PostgreSQL by the scheduler. The dashboard reads them on every page load. Caching the final result in Redis means the dashboard never hits PostgreSQL directly — just Redis (sub-millisecond).
 
-**Why job queue for recalculate:**
+**Why distributed lock for recalculate:**
 
-100 clusters × 1000 pods = 100,000 containers to process. If all triggered simultaneously:
-- 200 concurrent Prometheus HTTP calls
-- 100,000 p99 computations
-- 100,000 DB upserts → server crash
-
-Queue ensures ONE cluster is processed at a time. User gets immediate "queued" response.
+A manual recalculate while the scheduler is already running for the same cluster would trigger duplicate Prometheus queries and redundant DB upserts. The SetNX lock prevents this — `POST /clusters/:id/recalculate` returns 429 immediately if a recalculation is already in progress.
 
 ---
 
@@ -666,21 +661,24 @@ return 401, "Invalid email or password"
 ```go
 // What the customer sends:
 type CreateClusterRequest struct {
-    Name           string `json:"name"            binding:"required"`
-    PrometheusURL  string `json:"prometheus_url"  binding:"required"`
-    Token          string `json:"token"           binding:"required"`
-    LookbackWindow string `json:"lookback_window" binding:"required"`
+    ClusterName     string `json:"cluster_name"      binding:"required"`
+    PrometheusURL   string `json:"prometheus_url"    binding:"required"`
+    PrometheusToken string `json:"prometheus_token"  binding:"required"`
+    LookbackWindow  string `json:"lookback_window"   binding:"required"`
 }
 
 // What lives in the database (server-generated fields added by handler):
 type Cluster struct {
-    ClusterID      string    `json:"cluster_id"`
-    Name           string    `json:"name"`
-    PrometheusURL  string    `json:"prometheus_url"`
-    Token          string    `json:"-"`          // never in API response
-    LookbackWindow string    `json:"lookback_window"`
-    CreatedAt      time.Time `json:"created_at"`
-    UpdatedAt      time.Time `json:"updated_at"`
+    ClusterID       string    `json:"cluster_id"`
+    ClusterName     string    `json:"cluster_name"`
+    PrometheusURL   string    `json:"prometheus_url"`
+    PrometheusToken string    `json:"-"`          // never in API response
+    LookbackWindow  string    `json:"lookback_window"`
+    Status          string    `json:"status"`
+    CreatedBy       string    `json:"created_by"`
+    LastSyncedAt    string    `json:"last_synced_at"`
+    CreatedAt       time.Time `json:"created_at"`
+    UpdatedAt       time.Time `json:"updated_at"`
 }
 ```
 
