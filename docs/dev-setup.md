@@ -133,7 +133,7 @@ curl http://localhost:8080/healthz
 # {"status":"ok"}
 
 curl http://localhost:8080/readyz
-# {"status":"healthy","checks":{"database":"ok","redis":"ok"}}
+# {"status":"ok","checks":{"postgres":"ok","redis":"ok"}}
 ```
 
 ---
@@ -158,13 +158,13 @@ Authorization: Bearer <jwt_token>
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/clusters` | List all clusters |
-| `POST` | `/api/v1/clusters` | Register a new cluster |
-| `GET` | `/api/v1/clusters/:id` | Get a cluster by ID |
-| `PUT` | `/api/v1/clusters/:id` | Update cluster config (all fields optional) |
-| `DELETE` | `/api/v1/clusters/:id` | Remove a cluster |
-| `GET` | `/api/v1/clusters/:id/recommendations` | Get resource recommendations |
-| `POST` | `/api/v1/clusters/:id/recalculate` | Trigger manual recalculation |
+| `GET` | `/clusters` | List all clusters |
+| `POST` | `/clusters` | Register a new cluster |
+| `GET` | `/clusters/:id` | Get a cluster by ID |
+| `PUT` | `/clusters/:id` | Update cluster config (all fields optional) |
+| `DELETE` | `/clusters/:id` | Remove a cluster |
+| `GET` | `/clusters/:id/recommendations` | Get resource recommendations |
+| `POST` | `/clusters/:id/recalculate` | Trigger manual recalculation |
 
 ### Cluster Status Values
 
@@ -209,7 +209,7 @@ curl -X POST http://localhost:8080/auth/login \
 ### 3. Register a cluster
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/clusters \
+curl -X POST http://localhost:8080/clusters \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{
@@ -240,7 +240,7 @@ Response:
 ### 4. Update a cluster
 
 ```bash
-curl -X PUT http://localhost:8080/api/v1/clusters/<cluster-id> \
+curl -X PUT http://localhost:8080/clusters/<cluster-id> \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{
@@ -254,14 +254,14 @@ curl -X PUT http://localhost:8080/api/v1/clusters/<cluster-id> \
 ### 5. Delete a cluster
 
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/clusters/<cluster-id> \
+curl -X DELETE http://localhost:8080/clusters/<cluster-id> \
   -H "Authorization: Bearer <token>"
 ```
 
 ### 6. Get recommendations
 
 ```bash
-curl http://localhost:8080/api/v1/clusters/<cluster-id>/recommendations \
+curl http://localhost:8080/clusters/<cluster-id>/recommendations \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -294,7 +294,7 @@ Response:
 ### 7. Trigger manual recalculation
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/clusters/<cluster-id>/recalculate \
+curl -X POST http://localhost:8080/clusters/<cluster-id>/recalculate \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -306,34 +306,58 @@ Response: `202 Accepted` — recalculation runs in background, check recommendat
 
 ## Running Tests
 
-> Requires docker-compose to be running (PostgreSQL on 5432, Redis on 6379).
+All tests live in `tests/` at the project root.
 
-Tests use an isolated environment:
-- PostgreSQL database: `podoptix_test` (created and dropped automatically)
-- Redis index: `1` (production uses `0` — no key collisions)
-- Server port: `9090` (production uses `8080`)
+Tests use an isolated environment — no production data is touched:
+- PostgreSQL: `podoptix_test` database (created fresh and dropped after every run)
+- Redis: index `1` (production uses `0` — no key collisions)
+- Server: port `9090` (production uses `8080`)
+
+> Requires `docker compose up -d` before running tests.
+
+### Run all tests
 
 ```bash
-# Run everything (requires docker compose up -d)
-# -p 1 runs packages sequentially — prevents interleaved output from parallel packages
-go test ./... -count=1 -p 1
+go test ./tests/... -count=1 -p 1
+```
 
-# Run only API integration tests
-go test ./tests/... -count=1
+`-count=1` disables Go's test cache — always runs fresh.  
+`-p 1` runs sequentially — prevents interleaved output from parallel packages.
 
-# Run a specific test group
-go test ./tests/... -run TestClusters -count=1
-go test ./tests/... -run TestRecommendations -count=1
-go test ./tests/... -run TestAuth -count=1
-go test ./tests/... -run TestHealth -count=1
+### Run a specific test group
 
-# Run a specific subtest
-go test ./tests/... -run TestClusters/POST -count=1
+```bash
+go test ./tests/... -run TestClusters -count=1 -p 1
+go test ./tests/... -run TestRecommendations -count=1 -p 1
+go test ./tests/... -run TestAuth -count=1 -p 1
+go test ./tests/... -run TestHealth -count=1 -p 1
+go test ./tests/... -run TestGenerate -count=1 -p 1
+go test ./tests/... -run TestComputeP99 -count=1 -p 1
+go test ./tests/... -run TestEncryptDecrypt -count=1 -p 1
+go test ./tests/... -run TestCollect -count=1 -p 1
+```
 
-# Run unit tests only (no docker needed)
-go test ./internal/compute/... -count=1
-go test ./internal/collector/... -count=1
-go test ./internal/recommender/... -count=1
+### Run a specific subtest
+
+```bash
+go test ./tests/... -run TestClusters/POST -count=1 -p 1
+go test ./tests/... -run TestClusters/DELETE -count=1 -p 1
+```
+
+### Test output format
+
+Each test prints a numbered line as it completes:
+
+```
+  Running PodOptix Tests...
+  Server: http://localhost:9090
+  ──────────────────────────────────────
+  [ 1]  ✓  success_returns_201_with_cluster_id_and_not_yet_synced
+  [ 2]  ✓  missing_required_fields_returns_400
+  ...
+  Total: 63  |  Passed: 63  |  Failed: 0
+  ✓ All tests passed
+  ──────────────────────────────────────
 ```
 
 ---
@@ -344,8 +368,8 @@ go test ./internal/recommender/... -count=1
 |---------|-------------|
 | `go run ./cmd/hub` | Run the app |
 | `go build ./...` | Build all packages |
-| `go test ./tests/... -v` | Run API tests |
-| `go test ./...` | Run all tests |
+| `go test ./tests/... -count=1 -p 1` | Run all tests |
+| `go test ./tests/... -run TestClusters -count=1 -p 1` | Run a specific group |
 | `go fmt ./...` | Format all Go files |
 | `docker compose up -d` | Start PostgreSQL + Redis |
 | `docker compose down` | Stop containers |
