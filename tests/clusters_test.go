@@ -1,4 +1,4 @@
-package testkit
+package tests
 
 import (
 	"encoding/json"

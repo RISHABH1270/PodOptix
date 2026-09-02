@@ -13,7 +13,7 @@ import (
 
 // generate computes p99 CPU/memory from usage history and pairs it with the container's
 // current resource limits (from kube-state-metrics via ContainerMetrics).
-func generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Recommendation, error) {
+func Generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Recommendation, error) {
 	if metrics == nil {
 		return nil, fmt.Errorf("metrics cannot be nil")
 	}
@@ -69,7 +69,7 @@ func GenerateAll(clusterID string, allMetrics []*collector.ContainerMetrics) ([]
 			continue
 		}
 
-		rec, err := generate(clusterID, m)
+		rec, err := Generate(clusterID, m)
 		if err != nil {
 			return nil, fmt.Errorf("generate recommendation: %w", err)
 		}

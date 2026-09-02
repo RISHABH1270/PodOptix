@@ -1,4 +1,4 @@
-package testkit
+package tests
 
 import (
 	"bytes"
@@ -44,7 +44,7 @@ func log(format string, args ...any) {
 }
 
 func init() {
-	os.Chdir("../../..")
+	os.Chdir("..")
 	var err error
 	tty, err = os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	if err != nil {

@@ -319,16 +319,16 @@ Tests use an isolated environment:
 go test ./... -count=1 -p 1
 
 # Run only API integration tests
-go test ./internal/api/testkit/... -count=1
+go test ./tests/... -count=1
 
 # Run a specific test group
-go test ./internal/api/testkit/... -run TestClusters -count=1
-go test ./internal/api/testkit/... -run TestRecommendations -count=1
-go test ./internal/api/testkit/... -run TestAuth -count=1
-go test ./internal/api/testkit/... -run TestHealth -count=1
+go test ./tests/... -run TestClusters -count=1
+go test ./tests/... -run TestRecommendations -count=1
+go test ./tests/... -run TestAuth -count=1
+go test ./tests/... -run TestHealth -count=1
 
 # Run a specific subtest
-go test ./internal/api/testkit/... -run TestClusters/POST -count=1
+go test ./tests/... -run TestClusters/POST -count=1
 
 # Run unit tests only (no docker needed)
 go test ./internal/compute/... -count=1
@@ -344,7 +344,7 @@ go test ./internal/recommender/... -count=1
 |---------|-------------|
 | `go run ./cmd/hub` | Run the app |
 | `go build ./...` | Build all packages |
-| `go test ./internal/api/testkit/... -v` | Run API tests |
+| `go test ./tests/... -v` | Run API tests |
 | `go test ./...` | Run all tests |
 | `go fmt ./...` | Format all Go files |
 | `docker compose up -d` | Start PostgreSQL + Redis |
