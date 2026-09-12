@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -44,6 +45,7 @@ func New(prometheusURL string, token string) *Collector {
 // Ping checks reachability and auth by running a lightweight instant query against Prometheus.
 // Used during cluster registration and update to set initial connectivity status.
 func (c *Collector) Ping(ctx context.Context) error {
+	startedAt := time.Now()
 	endpoint := c.prometheusURL + "/api/v1/query"
 	params := url.Values{}
 	params.Set("query", "up")
@@ -66,17 +68,20 @@ func (c *Collector) Ping(ctx context.Context) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("prometheus returned status %d", resp.StatusCode)
 	}
+	log.Printf("INFO  collector ping ok prometheus=%s took=%s", c.prometheusURL, time.Since(startedAt).Truncate(time.Millisecond))
 	return nil
 }
 
 // Collect queries Prometheus for CPU/memory usage and current resource limits for all containers.
 func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*ContainerMetrics, error) {
-	end := time.Now()
+	startedAt := time.Now()
+	end := startedAt
 	duration, err := ParseDuration(lookbackWindow)
 	if err != nil {
 		return nil, fmt.Errorf("parse lookback window: %w", err)
 	}
 	start := end.Add(-duration)
+	log.Printf("INFO  collector fetching prometheus=%s lookback=%s", c.prometheusURL, lookbackWindow)
 
 	cpuData, err := c.queryRange(ctx,
 		`rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]) * 1000`,
@@ -102,7 +107,9 @@ func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*Cont
 		`kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"} / 1048576`,
 	)
 
-	return mergeMetrics(cpuData, memData, cpuLimits, memLimits), nil
+	metrics := mergeMetrics(cpuData, memData, cpuLimits, memLimits)
+	log.Printf("INFO  collector done containers=%d took=%s", len(metrics), time.Since(startedAt).Truncate(time.Millisecond))
+	return metrics, nil
 }
 
 // prometheusResult represents a single time series returned by /api/v1/query_range.

@@ -2,6 +2,7 @@ package recommender
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -51,7 +52,10 @@ func Generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Re
 // GenerateAll generates recommendations for all containers in a cluster.
 // Containers with insufficient data are marked as new_service — check back after the cluster's lookback window.
 func GenerateAll(clusterID string, allMetrics []*collector.ContainerMetrics) ([]*models.Recommendation, error) {
+	startedAt := time.Now()
+	log.Printf("INFO  recommender generating cluster=%s containers=%d", clusterID, len(allMetrics))
 	var recommendations []*models.Recommendation
+	var newService int
 
 	for _, m := range allMetrics {
 		if len(m.CPUValues) == 0 || len(m.MemValues) == 0 {
@@ -66,6 +70,7 @@ func GenerateAll(clusterID string, allMetrics []*collector.ContainerMetrics) ([]
 				CreatedAt:        now,
 				UpdatedAt:        now,
 			})
+			newService++
 			continue
 		}
 
@@ -76,5 +81,7 @@ func GenerateAll(clusterID string, allMetrics []*collector.ContainerMetrics) ([]
 		recommendations = append(recommendations, rec)
 	}
 
+	log.Printf("INFO  recommender done cluster=%s ready=%d new_service=%d took=%s",
+		clusterID, len(recommendations)-newService, newService, time.Since(startedAt).Truncate(time.Millisecond))
 	return recommendations, nil
 }
