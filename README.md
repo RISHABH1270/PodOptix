@@ -131,7 +131,7 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 - [x] Config loader (environment variables)
 - [x] PostgreSQL — migrations, store layer, connection pool
 - [x] HTTP server (Gin) with middleware
-- [x] REST API — full CRUD for clusters
+- [x] REST API — full CRUD for clusters + recommendations
 - [x] Auth — JWT + bcrypt password hashing
 - [x] Token encryption at rest (AES-256-GCM)
 - [x] Prometheus metrics collector (PromQL API)
@@ -141,6 +141,7 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 - [x] Redis — recommendations cache + distributed lock
 - [x] Integration tests — real TCP server + PostgreSQL + Redis, isolated DB/port
 - [x] Readiness probe (/readyz)
+- [x] Graceful shutdown (SIGTERM/SIGINT)
 - [ ] Web Dashboard
 - [ ] Docker image
 - [ ] Helm chart (not yet available)

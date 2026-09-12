@@ -65,7 +65,7 @@
 │  │                                                               │  │
 │  │   ┌────────────────────────┐     ┌────────────────────────┐   │  │
 │  │   │        Database        │     │         Cache          │   │  │
-│  │   │  · clusters            │     │  · PromQL results      │   │  │
+│  │   │  · clusters            │     │  · recommendations      │   │  │
 │  │   │  · recommendations     │     │  · TTL: 3 hr           │   │  │
 │  │   │  · users               │     │                        │   │  │
 │  │   └────────────────────────┘     └────────────────────────┘   │  │
@@ -122,7 +122,7 @@ Authorization: Bearer eyJhbGci...
 ### Cluster Registration Flow
 
 ```
-User → POST /clusters { cluster_name, prometheus_url, prometheus_token, lookback_window }
+User → POST /api/v1/clusters { cluster_name, prometheus_url, prometheus_token, lookback_window }
           │
           ├── 1. JWTMiddleware validates token
           ├── 2. ShouldBindJSON → validate required fields
@@ -166,7 +166,7 @@ Scheduler (cron: daily)
 ### Dashboard Read Flow (recommendations)
 
 ```
-GET /clusters/:id/recommendations
+GET /api/v1/clusters/:id/recommendations
       │
       ├── 1. JWTMiddleware validates token
       ├── 2. Check Redis: cluster:{id}:recommendations
@@ -398,7 +398,7 @@ Authenticate and receive a JWT token.
 
 ---
 
-#### `GET /clusters`
+#### `GET /api/v1/clusters`
 
 List all registered clusters.
 
@@ -427,7 +427,7 @@ Returns `[]` (empty array) when no clusters exist — never `null`.
 
 ---
 
-#### `POST /clusters`
+#### `POST /api/v1/clusters`
 
 Register a new workload cluster.
 
@@ -443,7 +443,7 @@ Register a new workload cluster.
 }
 ```
 
-All fields required. `lookback_window` must be one of: `"7d"`, `"10d"`, `"30d"`.
+`cluster_name`, `prometheus_url`, and `prometheus_token` are required. `lookback_window` is optional — defaults to `"7d"` if omitted; allowed values: `"7d"`, `"10d"`, `"30d"`.
 
 **Response 201:**
 ```json
@@ -467,7 +467,7 @@ Status is `connected` or `disconnected` — never `pending`. Prometheus is pinge
 
 ---
 
-#### `GET /clusters/:id`
+#### `GET /api/v1/clusters/:id`
 
 Get a single cluster by ID.
 
@@ -480,7 +480,7 @@ Get a single cluster by ID.
 
 ---
 
-#### `PUT /clusters/:id`
+#### `PUT /api/v1/clusters/:id`
 
 Update a cluster's configuration.
 
@@ -504,7 +504,7 @@ Update a cluster's configuration.
 
 ---
 
-#### `DELETE /clusters/:id`
+#### `DELETE /api/v1/clusters/:id`
 
 Remove a cluster and all its recommendations.
 
@@ -517,7 +517,7 @@ Remove a cluster and all its recommendations.
 
 ---
 
-#### `GET /clusters/:id/recommendations`
+#### `GET /api/v1/clusters/:id/recommendations`
 
 Get all recommendations for a cluster.
 
@@ -553,7 +553,7 @@ CPU values in millicores. Memory values in MiB. Ordered by `created_at DESC`.
 
 ---
 
-#### `POST /clusters/:id/recalculate`
+#### `POST /api/v1/clusters/:id/recalculate`
 
 Trigger a manual recommendation recalculation for a cluster.
 
@@ -577,7 +577,7 @@ Trigger a manual recommendation recalculation for a cluster.
 **Cache-aside pattern for recommendations:**
 
 ```
-GET /clusters/:id/recommendations
+GET /api/v1/clusters/:id/recommendations
         ↓
 Redis GET cluster:{id}:recommendations
         ↓
@@ -828,9 +828,13 @@ This tests our request building, response parsing, auth header attachment, and e
 
 ```
 tests/
-  health_test.go    → TestHealthz, TestReadyz
-  auth_test.go      → TestRegister, TestLogin, TestProtectedRoute_*
-  clusters_test.go  → TestCreateCluster, TestListClusters, TestGetCluster, TestDeleteCluster
+  health_test.go          → TestHealth
+  auth_test.go            → TestAuth, TestEncryptDecrypt
+  clusters_test.go        → TestClusters
+  recommendations_test.go → TestRecommendations
+  recommender_test.go     → TestGenerate, TestGenerateAll
+  compute_test.go         → TestComputeP99, TestParseDuration
+  collector_test.go       → TestCollect, TestExtractValues
 ```
 
 Tests are run with `-p 1` (sequential) to prevent parallel database conflicts. The `-count=1` flag disables test result caching.

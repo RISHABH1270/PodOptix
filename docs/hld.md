@@ -126,7 +126,7 @@ The Hub stores the token encrypted at rest (AES-256-GCM) and begins scheduling d
 
 ```
   Step 1   User registers a cluster
-           Dashboard → POST /clusters { cluster_name, prometheus_url, prometheus_token }
+           Dashboard → POST /api/v1/clusters { cluster_name, prometheus_url, prometheus_token, lookback_window }
            Cluster Registry stores encrypted credentials in Database
            Prometheus is pinged immediately (10s timeout) → status = connected/disconnected
 
@@ -179,7 +179,7 @@ Scheduler (cron: once/day)
 
 **Two triggers for recalculation:**
 1. **Automatic** — scheduler runs once per day for all clusters (also runs on startup for all registered clusters)
-2. **Manual** — `POST /clusters/:id/recalculate` triggers on-demand refresh; returns 202 immediately; uses a distributed Redis lock (10 min) to prevent duplicate runs — returns 429 if already in progress
+2. **Manual** — `POST /api/v1/clusters/:id/recalculate` triggers on-demand refresh; returns 202 immediately; uses a distributed Redis lock (10 min) to prevent duplicate runs — returns 429 if already in progress
 
 ---
 
