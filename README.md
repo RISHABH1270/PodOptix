@@ -103,13 +103,13 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 | `POST` | `/auth/login` | — | Login and receive JWT token |
 | `GET` | `/healthz` | — | Liveness probe |
 | `GET` | `/readyz` | — | Readiness probe (checks DB + Redis) |
-| `GET` | `/clusters` | JWT | List all clusters |
-| `POST` | `/clusters` | JWT | Register a cluster |
-| `GET` | `/clusters/:id` | JWT | Get cluster by ID |
-| `PUT` | `/clusters/:id` | JWT | Update cluster details |
-| `DELETE` | `/clusters/:id` | JWT | Remove a cluster |
-| `GET` | `/clusters/:id/recommendations` | JWT | Get recommendations (cached) |
-| `POST` | `/clusters/:id/recalculate` | JWT | Trigger manual recalculation |
+| `GET` | `/api/v1/clusters` | JWT | List all clusters |
+| `POST` | `/api/v1/clusters` | JWT | Register a cluster |
+| `GET` | `/api/v1/clusters/:id` | JWT | Get cluster by ID |
+| `PUT` | `/api/v1/clusters/:id` | JWT | Update cluster details |
+| `DELETE` | `/api/v1/clusters/:id` | JWT | Remove a cluster |
+| `GET` | `/api/v1/clusters/:id/recommendations` | JWT | Get recommendations (cached) |
+| `POST` | `/api/v1/clusters/:id/recalculate` | JWT | Trigger manual recalculation |
 
 ---
 

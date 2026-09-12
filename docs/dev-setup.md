@@ -158,13 +158,13 @@ Authorization: Bearer <jwt_token>
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/clusters` | List all clusters |
-| `POST` | `/clusters` | Register a new cluster |
-| `GET` | `/clusters/:id` | Get a cluster by ID |
-| `PUT` | `/clusters/:id` | Update cluster config (all fields optional) |
-| `DELETE` | `/clusters/:id` | Remove a cluster |
-| `GET` | `/clusters/:id/recommendations` | Get resource recommendations |
-| `POST` | `/clusters/:id/recalculate` | Trigger manual recalculation |
+| `GET` | `/api/v1/clusters` | List all clusters |
+| `POST` | `/api/v1/clusters` | Register a new cluster |
+| `GET` | `/api/v1/clusters/:id` | Get a cluster by ID |
+| `PUT` | `/api/v1/clusters/:id` | Update cluster config (all fields optional) |
+| `DELETE` | `/api/v1/clusters/:id` | Remove a cluster |
+| `GET` | `/api/v1/clusters/:id/recommendations` | Get resource recommendations |
+| `POST` | `/api/v1/clusters/:id/recalculate` | Trigger manual recalculation |
 
 ### Cluster Status Values
 
@@ -209,7 +209,7 @@ curl -X POST http://localhost:8080/auth/login \
 ### 3. Register a cluster
 
 ```bash
-curl -X POST http://localhost:8080/clusters \
+curl -X POST http://localhost:8080/api/v1/clusters \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{
@@ -240,7 +240,7 @@ Response:
 ### 4. Update a cluster
 
 ```bash
-curl -X PUT http://localhost:8080/clusters/<cluster-id> \
+curl -X PUT http://localhost:8080/api/v1/clusters/<cluster-id> \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{
@@ -254,14 +254,14 @@ curl -X PUT http://localhost:8080/clusters/<cluster-id> \
 ### 5. Delete a cluster
 
 ```bash
-curl -X DELETE http://localhost:8080/clusters/<cluster-id> \
+curl -X DELETE http://localhost:8080/api/v1/clusters/<cluster-id> \
   -H "Authorization: Bearer <token>"
 ```
 
 ### 6. Get recommendations
 
 ```bash
-curl http://localhost:8080/clusters/<cluster-id>/recommendations \
+curl http://localhost:8080/api/v1/clusters/<cluster-id>/recommendations \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -294,7 +294,7 @@ Response:
 ### 7. Trigger manual recalculation
 
 ```bash
-curl -X POST http://localhost:8080/clusters/<cluster-id>/recalculate \
+curl -X POST http://localhost:8080/api/v1/clusters/<cluster-id>/recalculate \
   -H "Authorization: Bearer <token>"
 ```
 
