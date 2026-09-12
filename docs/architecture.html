@@ -383,8 +383,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
       <div class="ov-pl-step">
         <div class="ov-pl-num">3</div>
         <div class="ov-pl-body">
-          <div class="ov-pl-label">Scheduler pulls metrics from Prometheus</div>
-          <div class="ov-pl-detail">Runs immediately on startup + every 24h · <code>collector.Collect()</code> makes 4 PromQL queries: CPU usage · Memory usage · CPU limits · Memory limits · lookback = cluster's window (7d/10d/30d) · step = 3600s</div>
+          <div class="ov-pl-label">Scheduler triggers collector to pull metrics</div>
+          <div class="ov-pl-detail">Scheduler is the trigger (immediate on startup + every 24h ticker) · <code>collector.Collect()</code> makes the actual HTTP calls — 4 PromQL queries: CPU usage · Memory usage · CPU limits · Memory limits · lookback = cluster's window (7d/10d/30d) · step = 3600s</div>
         </div>
       </div>
       <div class="ov-pl-arrow">▼</div>
