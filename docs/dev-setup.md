@@ -308,58 +308,11 @@ Response: `202 Accepted` — recalculation runs in background, check recommendat
 
 ## Running Tests
 
-All tests live in `tests/` at the project root.
+See [tests/README.md](../tests/README.md) for the full testing guide — test structure, isolation, helpers, and how to add new tests.
 
-Tests use an isolated environment — no production data is touched:
-- PostgreSQL: `podoptix_test` database (created fresh and dropped after every run)
-- Redis: index `1` (production uses `0` — no key collisions)
-- Server: port `9090` (production uses `8080`)
-
-> Requires `docker compose up -d` before running tests.
-
-### Run all tests
-
+Quick command:
 ```bash
 go test ./tests/... -count=1 -p 1
-```
-
-`-count=1` disables Go's test cache — always runs fresh.  
-`-p 1` runs sequentially — prevents interleaved output from parallel packages.
-
-### Run a specific test group
-
-```bash
-go test ./tests/... -run TestClusters -count=1 -p 1
-go test ./tests/... -run TestRecommendations -count=1 -p 1
-go test ./tests/... -run TestAuth -count=1 -p 1
-go test ./tests/... -run TestHealth -count=1 -p 1
-go test ./tests/... -run TestGenerate -count=1 -p 1
-go test ./tests/... -run TestComputeP99 -count=1 -p 1
-go test ./tests/... -run TestEncryptDecrypt -count=1 -p 1
-go test ./tests/... -run TestCollect -count=1 -p 1
-```
-
-### Run a specific subtest
-
-```bash
-go test ./tests/... -run TestClusters/POST -count=1 -p 1
-go test ./tests/... -run TestClusters/DELETE -count=1 -p 1
-```
-
-### Test output format
-
-Each test prints a numbered line as it completes:
-
-```
-  Running PodOptix Tests...
-  Server: http://localhost:9090
-  ──────────────────────────────────────
-  [ 1]  ✓  success_returns_201_with_cluster_id_and_not_yet_synced
-  [ 2]  ✓  missing_required_fields_returns_400
-  ...
-  Total: 63  |  Passed: 63  |  Failed: 0
-  ✓ All tests passed
-  ──────────────────────────────────────
 ```
 
 ---
@@ -370,8 +323,7 @@ Each test prints a numbered line as it completes:
 |---------|-------------|
 | `go run ./cmd/hub` | Run the app |
 | `go build ./...` | Build all packages |
-| `go test ./tests/... -count=1 -p 1` | Run all tests |
-| `go test ./tests/... -run TestClusters -count=1 -p 1` | Run a specific group |
+| `go test ./tests/... -count=1 -p 1` | Run all tests (see [tests/README.md](../tests/README.md)) |
 | `go fmt ./...` | Format all Go files |
 | `docker compose up -d` | Start PostgreSQL + Redis |
 | `docker compose down` | Stop containers |
