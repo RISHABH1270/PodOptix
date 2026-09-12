@@ -308,7 +308,7 @@ Response: `202 Accepted` — recalculation runs in background, check recommendat
 
 ## Running Tests
 
-See [tests/README.md](../tests/README.md) for the full testing guide — test structure, isolation, helpers, and how to add new tests.
+See [tests/TESTING.md](../tests/TESTING.md) for the full testing guide — test structure, isolation, helpers, and how to add new tests.
 
 Quick command:
 ```bash
@@ -323,7 +323,7 @@ go test ./tests/... -count=1 -p 1
 |---------|-------------|
 | `go run ./cmd/hub` | Run the app |
 | `go build ./...` | Build all packages |
-| `go test ./tests/... -count=1 -p 1` | Run all tests (see [tests/README.md](../tests/README.md)) |
+| `go test ./tests/... -count=1 -p 1` | Run all tests (see [tests/TESTING.md](../tests/TESTING.md)) |
 | `go fmt ./...` | Format all Go files |
 | `docker compose up -d` | Start PostgreSQL + Redis |
 | `docker compose down` | Stop containers |
