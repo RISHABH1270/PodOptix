@@ -224,6 +224,36 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 /* dsec */
 .dsec-title{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
 
+/* ── system overview ── */
+.overview-grid{display:flex;align-items:stretch;gap:12px;margin:24px 0 36px;flex-wrap:wrap}
+.ov-card{flex:1;min-width:200px;background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,0.08);transition:box-shadow .25s,border-color .25s}
+.ov-card:hover{box-shadow:0 4px 12px rgba(79,70,229,0.12);border-color:rgba(79,70,229,0.2)}
+.ov-icon{font-size:24px;margin-bottom:8px}
+.ov-title{font-size:16px;font-weight:700;color:var(--text-strong);margin-bottom:4px}
+.ov-desc{font-size:12.5px;color:var(--text);line-height:1.6;margin-bottom:10px}
+.ov-tech{font-size:10.5px;color:var(--accent);font-family:'SF Mono',Consolas,monospace;letter-spacing:.3px}
+.ov-arrow{align-self:center;color:var(--dim);font-size:22px;flex:0 0 auto}
+
+.ov-pipeline{background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:28px}
+.ov-pl-title{font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+.ov-pl-flow{display:flex;flex-direction:column;gap:0}
+.ov-pl-step{display:flex;align-items:flex-start;gap:14px;padding:10px 0}
+.ov-pl-num{flex:0 0 28px;height:28px;border-radius:50%;background:var(--accent);color:#ffffff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ov-pl-body{flex:1;padding-top:2px}
+.ov-pl-label{font-size:13.5px;font-weight:600;color:var(--text-strong);margin-bottom:4px}
+.ov-pl-detail{font-size:12px;color:var(--text);line-height:1.6}
+.ov-pl-detail code{background:#f1f5f9;color:var(--text-strong);padding:1px 5px;border-radius:3px;font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.ov-pl-arrow{margin-left:12px;color:#cbd5e1;font-size:11px;line-height:1}
+
+.ov-deep{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:20px}
+.ov-deep-title{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.ov-deep-links{display:flex;gap:12px;flex-wrap:wrap}
+.ov-deep-link{display:flex;align-items:center;gap:9px;background:#ffffff;border:1px solid var(--border);border-radius:6px;padding:8px 14px;text-decoration:none;color:var(--text-strong);font-size:12.5px;font-weight:600;transition:all .18s}
+.ov-deep-link:hover{border-color:var(--accent);background:rgba(79,70,229,0.04);color:var(--accent)}
+.ov-deep-dot{width:8px;height:8px;border-radius:50%}
+.ov-deep-arrow{margin-left:auto;color:var(--dim);font-size:12px}
+.ov-deep-link:hover .ov-deep-arrow{color:var(--accent)}
+
 /* tooltip */
 .tooltip{position:fixed;bottom:24px;right:24px;background:#ffffff;border:1px solid rgba(79,70,229,0.25);border-radius:10px;padding:16px 18px;max-width:320px;z-index:999;box-shadow:0 4px 20px rgba(79,70,229,0.12),0 1px 4px rgba(0,0,0,0.06);display:none}
 .tooltip.show{display:block}
@@ -253,7 +283,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     </div>
   </div>
 
-  <div class="sb-section-label">Entities</div>
+  <div class="sb-section-label">Overview</div>
+  <a class="sb-item" href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;" style="padding-left:20px"><span class="sb-dot" style="background:var(--accent)"></span>System Overview</a>
+
+  <div class="sb-section-label" style="margin-top:12px">Entities</div>
   <div class="sb-group-toggle" onclick="toggleCluster()">
     <span class="sb-arrow open" id="sb-arrow">▶</span>
     <span>Cluster</span>
@@ -299,8 +332,110 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <!-- ══ MAIN ══ -->
 <main class="main">
 
-  <h1 class="page-title">Cluster Entity <span>Pipeline</span></h1>
-  <p class="page-desc">End-to-end flow from the connection pool through the schema, Go model, data access layer, HTTP API, and into the client response.</p>
+  <!-- ══ SYSTEM OVERVIEW ══ -->
+  <h1 class="page-title">System <span>Overview</span></h1>
+  <p class="page-desc">PodOptix is a Kubernetes resource right-sizing engine. Users authenticate, register their workload clusters, and PodOptix queries each cluster's Prometheus every 24 hours to generate recommended CPU/memory limits at p99 × 2. Three entities work together: Users manage Clusters, and each Cluster generates Recommendations.</p>
+
+  <!-- ── Component grid ── -->
+  <div class="overview-grid">
+    <div class="ov-card">
+      <div class="ov-icon">👤</div>
+      <div class="ov-title">User</div>
+      <div class="ov-desc">Register → Login → Get JWT · 24h expiry</div>
+      <div class="ov-tech">bcrypt · HMAC-SHA256</div>
+    </div>
+    <div class="ov-arrow">→</div>
+    <div class="ov-card">
+      <div class="ov-icon">🎛</div>
+      <div class="ov-title">Cluster</div>
+      <div class="ov-desc">Register Prometheus URL + token · Immediate 10s ping · status = connected</div>
+      <div class="ov-tech">AES-256-GCM · pgxpool</div>
+    </div>
+    <div class="ov-arrow">→</div>
+    <div class="ov-card">
+      <div class="ov-icon">📊</div>
+      <div class="ov-title">Recommendation</div>
+      <div class="ov-desc">Scheduler pulls metrics every 24h · p99 × 2 = recommended limit</div>
+      <div class="ov-tech">Prometheus · Redis cache 3h</div>
+    </div>
+  </div>
+
+  <!-- ── End-to-end pipeline ── -->
+  <div class="ov-pipeline">
+    <div class="ov-pl-title">END-TO-END DATA FLOW</div>
+    <div class="ov-pl-flow">
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">1</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">User authenticates</div>
+          <div class="ov-pl-detail"><code>POST /auth/register</code> → bcrypt hash → PostgreSQL → JWT signed with HS256, 24h expiry</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">2</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">User registers a cluster</div>
+          <div class="ov-pl-detail"><code>POST /api/v1/clusters</code> → JWT verified → 10s Prometheus ping → status connected/disconnected → AES-256-GCM encrypt token → INSERT · created_by = user email · background sync fires</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">3</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Scheduler pulls metrics from Prometheus</div>
+          <div class="ov-pl-detail">Runs immediately on startup + every 24h · <code>collector.Collect()</code> makes 4 PromQL queries: CPU usage · Memory usage · CPU limits · Memory limits · lookback = cluster's window (7d/10d/30d) · step = 3600s</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">4</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Compute p99 → Generate recommendations</div>
+          <div class="ov-pl-detail">For each container: <code>ComputeP99(values)</code> sorts · picks <code>ceil(0.99×n)−1</code> · <code>RecommendedLimit = ceil(p99 × 2)</code> · empty data → status <code>new_service</code></div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">5</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Upsert to PostgreSQL · Invalidate cache</div>
+          <div class="ov-pl-detail"><code>INSERT ... ON CONFLICT DO UPDATE</code> — one row per container updated in place · <code>applied</code> flag preserved · <code>UpdateClusterHealth()</code> stamps last_synced_at · <code>Redis DEL cluster:{id}:recommendations</code></div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">6</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Dashboard reads recommendations</div>
+          <div class="ov-pl-detail"><code>GET /api/v1/clusters/:id/recommendations</code> → cache-aside: Redis HIT (&lt;1ms) or MISS → PostgreSQL → Redis SET 3h TTL → return JSON</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">7</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Manual recalculate (optional)</div>
+          <div class="ov-pl-detail"><code>POST /api/v1/clusters/:id/recalculate</code> → Redis <code>SETNX</code> lock (10min TTL) · 429 if held · 202 fire-and-forget · background goroutine repeats steps 3-5</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Deep dive nav ── -->
+  <div class="ov-deep">
+    <div class="ov-deep-title">Deep-dive into each entity:</div>
+    <div class="ov-deep-links">
+      <a href="#n1" onclick="scrollTo('n1')" class="ov-deep-link"><span class="ov-deep-dot" style="background:var(--purple)"></span>Cluster Pipeline<span class="ov-deep-arrow">→</span></a>
+      <a href="#r2" onclick="scrollTo('r2')" class="ov-deep-link"><span class="ov-deep-dot" style="background:var(--cyan)"></span>Recommendation Pipeline<span class="ov-deep-arrow">→</span></a>
+      <a href="#u1" onclick="scrollTo('u1')" class="ov-deep-link"><span class="ov-deep-dot" style="background:var(--green)"></span>User Pipeline<span class="ov-deep-arrow">→</span></a>
+    </div>
+  </div>
+
+  <div style="margin-top:64px;padding-top:40px;border-top:1px solid var(--border)">
+    <h1 class="page-title" style="margin-bottom:8px">Cluster Entity <span>Pipeline</span></h1>
+    <p class="page-desc">End-to-end flow from the connection pool through the schema, Go model, data access layer, HTTP API, and into the client response.</p>
+  </div>
 
   <div class="flow-bar">
     <span class="flow-label">POST /clusters flow</span>
