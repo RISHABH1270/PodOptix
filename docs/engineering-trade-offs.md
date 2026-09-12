@@ -10,7 +10,7 @@ Every decision here was made intentionally. This doc records what we chose, what
 |-----------|--------|------------|
 | Language | Go | K8s ecosystem · single binary |
 | Database | PostgreSQL | ACID · structured data · pgx driver |
-| Cache | Redis | TTL · PromQL result caching |
+| Cache | Redis | TTL · recommendations caching |
 | API Framework | Gin | Fast · widely adopted in Go |
 | Deployment | Helm | Industry standard K8s distribution |
 | Prometheus client | prometheus/client_golang | Official · battle-tested |
@@ -74,7 +74,7 @@ pool settings:
 | In-memory (Go map) | Zero config · Fast | Lost on restart · Not shareable across Hub instances · No TTL |
 | Memcached | Simple · Fast | No persistence · No TTL per key · No data structures |
 
-**Why Redis:** PromQL queries against large clusters can be expensive. Redis lets us cache results with a TTL (default: 1 hr) so repeated requests don't hammer Prometheus. Redis also supports future use cases like session storage and pub/sub for live dashboard updates.
+**Why Redis:** Recommendation reads on every dashboard load can be expensive at scale. Redis lets us cache the final results with a TTL (3 hours) so repeated requests don't hit PostgreSQL on every page load. Redis also supports future use cases like session storage and pub/sub for live dashboard updates.
 
 ### Cache-Aside Pattern
 
@@ -452,7 +452,7 @@ One row per container, always showing the latest values. `updated_at` shows when
 
 **Two triggers for recalculation:**
 1. **Automatic** — scheduler runs once per day for all clusters
-2. **Manual** — `POST /clusters/:id/recalculate` triggers on-demand refresh; distributed Redis lock prevents duplicate runs
+2. **Manual** — `POST /api/v1/clusters/:id/recalculate` triggers on-demand refresh; distributed Redis lock prevents duplicate runs
 
 ---
 
@@ -564,7 +564,7 @@ Recommendations are already computed and stored in PostgreSQL by the scheduler. 
 
 **Why distributed lock for recalculate:**
 
-A manual recalculate while the scheduler is already running for the same cluster would trigger duplicate Prometheus queries and redundant DB upserts. The SetNX lock prevents this — `POST /clusters/:id/recalculate` returns 429 immediately if a recalculation is already in progress.
+A manual recalculate while the scheduler is already running for the same cluster would trigger duplicate Prometheus queries and redundant DB upserts. The SetNX lock prevents this — `POST /api/v1/clusters/:id/recalculate` returns 429 immediately if a recalculation is already in progress.
 
 ---
 

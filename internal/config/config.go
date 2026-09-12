@@ -5,18 +5,16 @@ import (
 	"os"
 )
 
-// Config holds all configuration values for the Hub.
 // All values are read from environment variables — never hardcoded.
 type Config struct {
 	Port          string
-	DatabaseURL   string // postgres://user:password@host:port/dbname?sslmode=disable
-	RedisURL      string // redis://host:port
-	JWTSecret     string // long random string — signs and verifies JWT tokens
-	EncryptionKey string // exactly 32 bytes — AES-256 key for Prometheus token encryption at rest
+	DatabaseURL   string 
+	RedisURL      string 
+	JWTSecret     string 
+	EncryptionKey string 
 }
 
-// Load reads environment variables and returns a Config.
-// Returns an error if any required variable is missing — app must not start without them.
+// Load reads environment variables and returns a Config struct pointer.
 func Load() (*Config, error) {
 	databaseURL, err := mustGetEnv("DATABASE_URL")
 	if err != nil {

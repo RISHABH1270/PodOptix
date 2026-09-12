@@ -93,17 +93,19 @@ docker ps
 export $(cat .env | xargs) && go run ./cmd/hub
 ```
 
-**7-step startup sequence (automatic):**
+**9-step startup sequence (automatic):**
 
 ```
-1. config.Load()          → reads env vars — panics if any required var is missing
-2. store.EnsureDatabase() → connects to default "postgres" DB, CREATE DATABASE podoptix if absent
-3. store.SyncSchema()     → runs migration files in order (001, 002, 003) — skips already applied
-                            auto-fixes dirty migration state on crash recovery
-4. store.New()            → opens pgxpool connection pool (max 10, min 2, lifetime 1h, idle 30m)
-5. cache.New()            → connects to Redis, verifies with PING
-6. scheduler.Start()      → background goroutine — runs collect→recommend→upsert every 24h
-7. server.Listen(:8080)   → binds TCP port and starts accepting requests
+1. config.Load()              → reads env vars — panics if any required var is missing
+2. store.EnsureDatabase()     → connects to default "postgres" DB, CREATE DATABASE podoptix if absent
+3. store.SyncSchema()         → runs migration files in order (001, 002, 003) — skips already applied
+                                auto-fixes dirty migration state on crash recovery
+4. store.New()                → opens pgxpool connection pool (max 10, min 2, lifetime 1h, idle 30m)
+5. cache.New()                → connects to Redis, verifies with PING
+6. signal.NotifyContext()     → registers SIGTERM/SIGINT for graceful shutdown
+7. scheduler.Start()          → background goroutine — runs collect→recommend→upsert every 24h
+8. server.Listen(:8080)       → binds TCP port
+9. server.Serve()             → accepts requests (blocks until shutdown signal)
 ```
 
 Expected output:
@@ -158,13 +160,13 @@ Authorization: Bearer <jwt_token>
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/clusters` | List all clusters |
-| `POST` | `/clusters` | Register a new cluster |
-| `GET` | `/clusters/:id` | Get a cluster by ID |
-| `PUT` | `/clusters/:id` | Update cluster config (all fields optional) |
-| `DELETE` | `/clusters/:id` | Remove a cluster |
-| `GET` | `/clusters/:id/recommendations` | Get resource recommendations |
-| `POST` | `/clusters/:id/recalculate` | Trigger manual recalculation |
+| `GET` | `/api/v1/clusters` | List all clusters |
+| `POST` | `/api/v1/clusters` | Register a new cluster |
+| `GET` | `/api/v1/clusters/:id` | Get a cluster by ID |
+| `PUT` | `/api/v1/clusters/:id` | Update cluster config (all fields optional) |
+| `DELETE` | `/api/v1/clusters/:id` | Remove a cluster |
+| `GET` | `/api/v1/clusters/:id/recommendations` | Get resource recommendations |
+| `POST` | `/api/v1/clusters/:id/recalculate` | Trigger manual recalculation |
 
 ### Cluster Status Values
 
@@ -209,7 +211,7 @@ curl -X POST http://localhost:8080/auth/login \
 ### 3. Register a cluster
 
 ```bash
-curl -X POST http://localhost:8080/clusters \
+curl -X POST http://localhost:8080/api/v1/clusters \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{
@@ -240,7 +242,7 @@ Response:
 ### 4. Update a cluster
 
 ```bash
-curl -X PUT http://localhost:8080/clusters/<cluster-id> \
+curl -X PUT http://localhost:8080/api/v1/clusters/<cluster-id> \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <token>" \
   -d '{
@@ -254,14 +256,14 @@ curl -X PUT http://localhost:8080/clusters/<cluster-id> \
 ### 5. Delete a cluster
 
 ```bash
-curl -X DELETE http://localhost:8080/clusters/<cluster-id> \
+curl -X DELETE http://localhost:8080/api/v1/clusters/<cluster-id> \
   -H "Authorization: Bearer <token>"
 ```
 
 ### 6. Get recommendations
 
 ```bash
-curl http://localhost:8080/clusters/<cluster-id>/recommendations \
+curl http://localhost:8080/api/v1/clusters/<cluster-id>/recommendations \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -294,7 +296,7 @@ Response:
 ### 7. Trigger manual recalculation
 
 ```bash
-curl -X POST http://localhost:8080/clusters/<cluster-id>/recalculate \
+curl -X POST http://localhost:8080/api/v1/clusters/<cluster-id>/recalculate \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -385,7 +387,6 @@ PodOptix/
 ├── cmd/hub/                ← entry point (main.go)
 ├── internal/
 │   ├── api/                ← HTTP server, routes, handlers, middleware
-│   │   └── testkit/        ← integration tests (table-driven, real TCP)
 │   ├── auth/               ← JWT + bcrypt + AES-256-GCM
 │   ├── cache/              ← Redis client
 │   ├── collector/          ← Prometheus HTTP client (PromQL)
@@ -396,6 +397,7 @@ PodOptix/
 │   └── store/              ← PostgreSQL CRUD + migrations + connection pool
 ├── pkg/models/             ← shared data models (Cluster, Recommendation, User)
 ├── migrations/             ← SQL migration files (run in numeric order)
+├── tests/                  ← all integration tests (package tests, real TCP server)
 ├── docs/                   ← architecture.html, design docs
 ├── assets/                 ← banner.svg, logo.svg
 ├── docker-compose.yml      ← local PostgreSQL 16 + Redis 7

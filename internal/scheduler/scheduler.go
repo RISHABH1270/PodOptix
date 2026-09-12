@@ -87,7 +87,9 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 	metrics, err := collector.New(prometheusURL, token).Collect(ctx, lookbackWindow)
 	if err != nil {
 		log.Printf("ERROR scheduler collect cluster=%s: %v", clusterID, err)
-		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now())
+		if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now()); err != nil {
+			log.Printf("WARN  scheduler health update cluster=%s: %v", clusterID, err)
+		}
 		return
 	}
 
@@ -111,5 +113,7 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 
 	log.Printf("INFO  scheduler saved %d/%d recommendations for cluster=%s", saved, len(recommendations), clusterID)
 
-	s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
+	if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now()); err != nil {
+		log.Printf("WARN  scheduler health update cluster=%s: %v", clusterID, err)
+	}
 }
