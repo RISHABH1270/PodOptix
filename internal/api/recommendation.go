@@ -140,6 +140,7 @@ func (s *Server) recalculate(c *gin.Context) {
 		log.Printf("INFO  recalculate completed cluster=%s saved=%d", clusterID, len(recs))
 	}()
 
+	log.Printf("INFO  recalculate accepted cluster=%s req=%s", clusterID, requestID)
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":    "Recalculation started. Check recommendations in a few minutes.",
 		"cluster_id": clusterID,

@@ -72,6 +72,7 @@ func (s *Server) register(c *gin.Context) {
 		return
 	}
 
+	log.Printf("INFO  user registered email=%s user_id=%s req=%s", user.Email, user.UserID, requestID)
 	c.JSON(http.StatusCreated, gin.H{
 		"token":   token,
 		"user_id": user.UserID,
@@ -120,6 +121,7 @@ func (s *Server) login(c *gin.Context) {
 		return
 	}
 
+	log.Printf("INFO  user login email=%s req=%s", user.Email, requestID)
 	c.JSON(http.StatusOK, gin.H{
 		"token":   token,
 		"user_id": user.UserID,
