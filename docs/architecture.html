@@ -282,9 +282,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   </div>
 
   <div class="sb-section-label">Overview</div>
-  <a class="sb-item" href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;" style="padding-left:20px"><span class="sb-dot" style="background:var(--accent)"></span>System Overview</a>
+  <a class="sb-item" href="#top" onclick="scrollTop(); return false;">System Overview</a>
 
-  <div class="sb-section-label" style="margin-top:12px">Entities</div>
+  <div class="sb-section-label">Entities</div>
   <div class="sb-group-toggle" onclick="toggleCluster()">
     <span class="sb-arrow open" id="sb-arrow">▶</span>
     <span>Cluster</span>
@@ -1043,6 +1043,12 @@ function toggleUser() {
   const arrow = document.getElementById('sb-arrow-user');
   const hidden = items.classList.toggle('hidden');
   arrow.classList.toggle('open', !hidden);
+}
+
+// ── scroll to top (overview) ──
+function scrollTop() {
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 // ── scroll to node ──
