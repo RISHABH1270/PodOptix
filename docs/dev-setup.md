@@ -6,11 +6,11 @@ Everything you need to go from zero to a running local development environment.
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Go | 1.26.4+ | `brew install go` |
-| Docker | 28+ | [docker.com/get-started](https://www.docker.com/get-started) |
-| Git | Any | `brew install git` |
+| Tool | Version | macOS / Linux | Windows |
+|------|---------|---------------|---------|
+| Go | 1.26.4+ | `brew install go` | `winget install GoLang.Go` or [go.dev/dl](https://go.dev/dl/) |
+| Docker | 28+ | [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop) | [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop) (WSL2 backend) |
+| Git | Any | `brew install git` | `winget install Git.Git` or [git-scm.com](https://git-scm.com/download/win) |
 
 Verify:
 ```bash
