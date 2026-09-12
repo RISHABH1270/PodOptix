@@ -111,7 +111,9 @@ func (s *Server) recalculate(c *gin.Context) {
 		metrics, err := collector.New(cluster.PrometheusURL, plainToken).Collect(ctx, cluster.LookbackWindow)
 		if err != nil {
 			log.Printf("ERROR recalculate collect cluster=%s: %v", clusterID, err)
-			s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now())
+			if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now()); err != nil {
+				log.Printf("WARN  recalculate health update cluster=%s: %v", clusterID, err)
+			}
 			return
 		}
 
@@ -127,7 +129,9 @@ func (s *Server) recalculate(c *gin.Context) {
 			}
 		}
 
-		s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now())
+		if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now()); err != nil {
+			log.Printf("WARN  recalculate health update cluster=%s: %v", clusterID, err)
+		}
 
 		if s.cache != nil {
 			s.cache.InvalidateRecommendations(ctx, clusterID)

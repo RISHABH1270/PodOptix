@@ -270,7 +270,7 @@ func (s *Server) updateCluster(c *gin.Context) {
 			log.Printf("INFO [%s] updateCluster connectivity check failed: %v", requestID, err)
 			newStatus = models.ClusterStatusDisconnected
 		}
-		s.store.UpdateClusterHealth(c.Request.Context(), clusterID, newStatus, time.Now())
+		if err := s.store.UpdateClusterHealth(c.Request.Context(), clusterID, newStatus, time.Now()); err != nil { log.Printf("WARN  updateCluster health: %v", err) }
 		cluster.Status = newStatus
 	}
 
