@@ -357,9 +357,9 @@ Register a new user account.
 **Response 201:**
 ```json
 {
+  "email":   "user@example.com",
   "token":   "eyJhbGci...",
-  "user_id": "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-  "email":   "user@example.com"
+  "user_id": "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d"
 }
 ```
 
@@ -386,9 +386,9 @@ Authenticate and receive a JWT token.
 **Response 200:**
 ```json
 {
+  "email":   "user@example.com",
   "token":   "eyJhbGci...",
-  "user_id": "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-  "email":   "user@example.com"
+  "user_id": "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d"
 }
 ```
 

@@ -140,6 +140,8 @@ func (s *Server) createCluster(c *gin.Context) {
 		go s.scheduler.RunForCluster(context.Background(), clusterID, prometheusURL, plainToken, lookbackWindow)
 	}
 
+	log.Printf("INFO  cluster registered name=%s id=%s status=%s by=%s req=%s",
+		cluster.ClusterName, cluster.ClusterID, cluster.Status, cluster.CreatedBy, requestID)
 	c.JSON(http.StatusCreated, toClusterResponse(cluster))
 }
 
@@ -297,5 +299,6 @@ func (s *Server) deleteCluster(c *gin.Context) {
 		return
 	}
 
+	log.Printf("INFO  cluster deleted id=%s req=%s", clusterID, requestID)
 	c.Status(http.StatusNoContent)
 }

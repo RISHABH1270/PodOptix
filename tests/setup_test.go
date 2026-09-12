@@ -29,7 +29,7 @@ var (
 
 const (
 	adminURL  = "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
-	testDBURL = "postgres://postgres:password@localhost:5432/podoptix_test?sslmode=disable"
+	testDBURL = "postgres://postgres:password@localhost:5432/podoptix_test?sslmode=disable" // Isolated test database
 	redisURL  = "redis://localhost:6379/1" // Redis index 1 — production uses 0, tests use 1 to avoid key collisions
 	jwtSecret = "test-jwt-secret-key-for-testing"
 	encKey    = "test-32-byte-encryption-key!!!!1"

@@ -68,19 +68,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .sb-items.hidden{display:none}
 
 .sb-item{
-  display:flex;align-items:center;gap:9px;
-  padding:6px 20px 6px 34px;
+  display:flex;align-items:center;
+  padding:5px 20px 5px 34px;
   font-size:12.5px;color:var(--dim);
   text-decoration:none;
   border-left:2px solid transparent;
-  transition:all .18s;
+  transition:all .15s;
 }
-.sb-item:hover{color:var(--text-strong);background:rgba(79,70,229,0.04)}
-.sb-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(79,70,229,0.06)}
+.sb-item:hover{color:var(--text-strong)}
+.sb-item.active{color:var(--accent);border-left-color:var(--accent);font-weight:600}
 
-.sb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.d1{background:var(--purple)} .d2{background:var(--amber)} .d3{background:var(--cyan)}
-.d4{background:var(--purple)} .d5{background:var(--green)} .d6{background:var(--red)}
+.sb-dot{display:none}
 
 .sb-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
 .sb-status{width:6px;height:6px;border-radius:50%;background:var(--green)}
@@ -224,6 +222,36 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 /* dsec */
 .dsec-title{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
 
+/* ── system overview ── */
+.overview-grid{display:flex;align-items:stretch;gap:12px;margin:24px 0 36px;flex-wrap:wrap}
+.ov-card{flex:1;min-width:200px;background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,0.08);transition:box-shadow .25s,border-color .25s}
+.ov-card:hover{box-shadow:0 4px 12px rgba(79,70,229,0.12);border-color:rgba(79,70,229,0.2)}
+.ov-icon{font-size:24px;margin-bottom:8px}
+.ov-title{font-size:16px;font-weight:700;color:var(--text-strong);margin-bottom:4px}
+.ov-desc{font-size:12.5px;color:var(--text);line-height:1.6;margin-bottom:10px}
+.ov-tech{font-size:10.5px;color:var(--accent);font-family:'SF Mono',Consolas,monospace;letter-spacing:.3px}
+.ov-arrow{align-self:center;color:var(--dim);font-size:22px;flex:0 0 auto}
+
+.ov-pipeline{background:#ffffff;border:1px solid var(--border);border-radius:10px;padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:28px}
+.ov-pl-title{font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:18px}
+.ov-pl-flow{display:flex;flex-direction:column;gap:0}
+.ov-pl-step{display:flex;align-items:flex-start;gap:14px;padding:10px 0}
+.ov-pl-num{flex:0 0 28px;height:28px;border-radius:50%;background:var(--accent);color:#ffffff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ov-pl-body{flex:1;padding-top:2px}
+.ov-pl-label{font-size:13.5px;font-weight:600;color:var(--text-strong);margin-bottom:4px}
+.ov-pl-detail{font-size:12px;color:var(--text);line-height:1.6}
+.ov-pl-detail code{background:#f1f5f9;color:var(--text-strong);padding:1px 5px;border-radius:3px;font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.ov-pl-arrow{margin-left:12px;color:#cbd5e1;font-size:11px;line-height:1}
+
+.ov-deep{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:20px}
+.ov-deep-title{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.ov-deep-links{display:flex;gap:12px;flex-wrap:wrap}
+.ov-deep-link{display:flex;align-items:center;gap:9px;background:#ffffff;border:1px solid var(--border);border-radius:6px;padding:8px 14px;text-decoration:none;color:var(--text-strong);font-size:12.5px;font-weight:600;transition:all .18s}
+.ov-deep-link:hover{border-color:var(--accent);background:rgba(79,70,229,0.04);color:var(--accent)}
+.ov-deep-dot{width:8px;height:8px;border-radius:50%}
+.ov-deep-arrow{margin-left:auto;color:var(--dim);font-size:12px}
+.ov-deep-link:hover .ov-deep-arrow{color:var(--accent)}
+
 /* tooltip */
 .tooltip{position:fixed;bottom:24px;right:24px;background:#ffffff;border:1px solid rgba(79,70,229,0.25);border-radius:10px;padding:16px 18px;max-width:320px;z-index:999;box-shadow:0 4px 20px rgba(79,70,229,0.12),0 1px 4px rgba(0,0,0,0.06);display:none}
 .tooltip.show{display:block}
@@ -253,6 +281,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     </div>
   </div>
 
+  <div class="sb-section-label">Overview</div>
+  <a class="sb-item" href="#top" onclick="scrollTop(); return false;">System Overview</a>
+
   <div class="sb-section-label">Entities</div>
   <div class="sb-group-toggle" onclick="toggleCluster()">
     <span class="sb-arrow open" id="sb-arrow">▶</span>
@@ -279,6 +310,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <a class="sb-item" href="#r6" onclick="scrollTo('r6')"><span class="sb-dot" style="background:var(--red)"></span>HTTP API</a>
   </div>
 
+  <div class="sb-group-toggle" onclick="toggleUser()">
+    <span class="sb-arrow open" id="sb-arrow-user">▶</span>
+    <span>User</span>
+  </div>
+  <div class="sb-items" id="sb-items-user">
+    <a class="sb-item" href="#u1" onclick="scrollTo('u1')"><span class="sb-dot" style="background:var(--amber)"></span>PostgreSQL Migration</a>
+    <a class="sb-item" href="#u2" onclick="scrollTo('u2')"><span class="sb-dot" style="background:var(--cyan)"></span>Go Data Model</a>
+    <a class="sb-item" href="#u3" onclick="scrollTo('u3')"><span class="sb-dot" style="background:var(--purple)"></span>Data Access Layer</a>
+    <a class="sb-item" href="#u4" onclick="scrollTo('u4')"><span class="sb-dot" style="background:var(--green)"></span>HTTP API</a>
+  </div>
+
   <div class="sb-footer">
     <span class="sb-status"></span>
     <span>Go 1.26 · PostgreSQL 16</span>
@@ -288,8 +330,110 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 <!-- ══ MAIN ══ -->
 <main class="main">
 
-  <h1 class="page-title">Cluster Entity <span>Pipeline</span></h1>
-  <p class="page-desc">End-to-end flow from the connection pool through the schema, Go model, data access layer, HTTP API, and into the client response.</p>
+  <!-- ══ SYSTEM OVERVIEW ══ -->
+  <h1 class="page-title">System <span>Overview</span></h1>
+  <p class="page-desc">PodOptix is a Kubernetes resource right-sizing engine. Users authenticate, register their workload clusters, and PodOptix queries each cluster's Prometheus every 24 hours to generate recommended CPU/memory limits at p99 × 2. Three entities work together: Users manage Clusters, and each Cluster generates Recommendations.</p>
+
+  <!-- ── Component grid ── -->
+  <div class="overview-grid">
+    <div class="ov-card">
+      <div class="ov-icon">👤</div>
+      <div class="ov-title">User</div>
+      <div class="ov-desc">Register → Login → Get JWT · 24h expiry</div>
+      <div class="ov-tech">bcrypt · HMAC-SHA256</div>
+    </div>
+    <div class="ov-arrow">→</div>
+    <div class="ov-card">
+      <div class="ov-icon">🎛</div>
+      <div class="ov-title">Cluster</div>
+      <div class="ov-desc">Register Prometheus URL + token · Immediate 10s ping · status = connected</div>
+      <div class="ov-tech">AES-256-GCM · pgxpool</div>
+    </div>
+    <div class="ov-arrow">→</div>
+    <div class="ov-card">
+      <div class="ov-icon">📊</div>
+      <div class="ov-title">Recommendation</div>
+      <div class="ov-desc">Scheduler pulls metrics every 24h · p99 × 2 = recommended limit</div>
+      <div class="ov-tech">Prometheus · Redis cache 3h</div>
+    </div>
+  </div>
+
+  <!-- ── End-to-end pipeline ── -->
+  <div class="ov-pipeline">
+    <div class="ov-pl-title">END-TO-END DATA FLOW</div>
+    <div class="ov-pl-flow">
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">1</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">User authenticates</div>
+          <div class="ov-pl-detail"><code>POST /auth/register</code> → bcrypt hash → PostgreSQL → JWT signed with HS256, 24h expiry</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">2</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">User registers a cluster</div>
+          <div class="ov-pl-detail"><code>POST /api/v1/clusters</code> → JWT verified → 10s Prometheus ping → status connected/disconnected → AES-256-GCM encrypt token → INSERT · created_by = user email · background sync fires</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">3</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Scheduler triggers collector to pull metrics</div>
+          <div class="ov-pl-detail">Scheduler is the trigger (immediate on startup + every 24h ticker) · <code>collector.Collect()</code> makes the actual HTTP calls — 4 PromQL queries: CPU usage · Memory usage · CPU limits · Memory limits · lookback = cluster's window (7d/10d/30d) · step = 3600s</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">4</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Compute p99 → Generate recommendations</div>
+          <div class="ov-pl-detail">For each container: <code>ComputeP99(values)</code> sorts · picks <code>ceil(0.99×n)−1</code> · <code>RecommendedLimit = ceil(p99 × 2)</code> · empty data → status <code>new_service</code></div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">5</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Upsert to PostgreSQL · Invalidate cache</div>
+          <div class="ov-pl-detail"><code>INSERT ... ON CONFLICT DO UPDATE</code> — one row per container updated in place · <code>applied</code> flag preserved · <code>UpdateClusterHealth()</code> stamps last_synced_at · <code>Redis DEL cluster:{id}:recommendations</code></div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">6</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Dashboard reads recommendations</div>
+          <div class="ov-pl-detail"><code>GET /api/v1/clusters/:id/recommendations</code> → cache-aside: Redis HIT (&lt;1ms) or MISS → PostgreSQL → Redis SET 3h TTL → return JSON</div>
+        </div>
+      </div>
+      <div class="ov-pl-arrow">▼</div>
+      <div class="ov-pl-step">
+        <div class="ov-pl-num">7</div>
+        <div class="ov-pl-body">
+          <div class="ov-pl-label">Manual recalculate (optional)</div>
+          <div class="ov-pl-detail"><code>POST /api/v1/clusters/:id/recalculate</code> → Redis <code>SETNX</code> lock (10min TTL) · 429 if held · 202 fire-and-forget · background goroutine repeats steps 3-5</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Deep dive nav ── -->
+  <div class="ov-deep">
+    <div class="ov-deep-title">Deep-dive into each entity:</div>
+    <div class="ov-deep-links">
+      <a href="#n1" onclick="scrollTo('n1')" class="ov-deep-link"><span class="ov-deep-dot" style="background:var(--purple)"></span>Cluster Pipeline<span class="ov-deep-arrow">→</span></a>
+      <a href="#r2" onclick="scrollTo('r2')" class="ov-deep-link"><span class="ov-deep-dot" style="background:var(--cyan)"></span>Recommendation Pipeline<span class="ov-deep-arrow">→</span></a>
+      <a href="#u1" onclick="scrollTo('u1')" class="ov-deep-link"><span class="ov-deep-dot" style="background:var(--green)"></span>User Pipeline<span class="ov-deep-arrow">→</span></a>
+    </div>
+  </div>
+
+  <div style="margin-top:64px;padding-top:40px;border-top:1px solid var(--border)">
+    <h1 class="page-title" style="margin-bottom:8px">Cluster Entity <span>Pipeline</span></h1>
+    <p class="page-desc">End-to-end flow from the connection pool through the schema, Go model, data access layer, HTTP API, and into the client response.</p>
+  </div>
 
   <div class="flow-bar">
     <span class="flow-label">POST /clusters flow</span>
@@ -691,6 +835,171 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
   </div><!-- /rec-pipeline -->
 
+  <!-- ══ USER ENTITY ══ -->
+  <div style="margin-top:64px;padding-top:40px;border-top:1px solid var(--border)">
+    <h1 class="page-title" style="margin-bottom:8px">User Entity <span>Pipeline</span></h1>
+    <p class="page-desc">Authentication flow — how users register, login, and access protected routes via JWT. bcrypt for passwords, AES-256-GCM for Prometheus tokens, HMAC-SHA256 for JWT signing.</p>
+  </div>
+
+  <!-- User flow bar -->
+  <div class="flow-bar" style="margin-top:24px">
+    <span class="flow-label">POST /auth/register flow</span>
+    <button class="flow-btn" onclick="userStartFlow()">▶ Start</button>
+    <button class="reset-btn" onclick="userPrevStep()">← Prev</button>
+    <button class="reset-btn" onclick="userNextStep()">Next →</button>
+    <button class="reset-btn" onclick="userResetFlow()">↺ Reset</button>
+    <div class="step-dots">
+      <div class="sdot" id="usd0"></div>
+      <div class="sdot" id="usd1"></div>
+      <div class="sdot" id="usd2"></div>
+      <div class="sdot" id="usd3"></div>
+      <div class="sdot" id="usd4"></div>
+    </div>
+  </div>
+
+  <div id="user-pipeline" style="display:flex;flex-direction:column;gap:0;margin-top:24px">
+
+    <!-- ══ U1: Migration ══ -->
+    <div class="node-card" id="u1" onclick="toggle('u1')">
+      <div class="node-header">
+        <div class="node-icon">🗄</div>
+        <div class="node-info">
+          <div class="node-tag">Schema</div>
+          <div class="node-title">PostgreSQL Migration</div>
+          <div class="node-path">migrations/000003_create_users.up.sql</div>
+        </div>
+        <div class="node-badges"><span class="badge b2">5 columns</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <table class="ftable">
+          <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="td-name">user_id</td><td class="td-type">VARCHAR(36)</td><td class="td-note"><span class="ctag">PK</span> UUID v4</td></tr>
+            <tr><td class="td-name">email</td><td class="td-type">VARCHAR(255)</td><td class="td-note">NOT NULL <span class="ctag">UNIQUE</span> — one account per email</td></tr>
+            <tr><td class="td-name">password_hash</td><td class="td-type">TEXT</td><td class="td-note">NOT NULL · bcrypt hash — TEXT future-proofs hash length changes</td></tr>
+            <tr><td class="td-name">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">NOT NULL · DEFAULT NOW()</td></tr>
+            <tr><td class="td-name">updated_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">NOT NULL · DEFAULT NOW()</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- ══ U2: Model ══ -->
+    <div class="node-card" id="u2" onclick="toggle('u2')">
+      <div class="node-header">
+        <div class="node-icon">📐</div>
+        <div class="node-info">
+          <div class="node-tag">Go Data Model</div>
+          <div class="node-title">User struct</div>
+          <div class="node-path">pkg/models/user.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b3">5 fields</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="dsec-title" style="margin-bottom:10px">type User struct</div>
+        <div class="code-block">
+          <span class="kw">type</span> <span class="sn">User</span> <span class="kw">struct</span> <span class="br">{</span><br>
+          <span class="ind"><span class="sn">UserID</span>       <span class="tp">string</span>    <span class="tg">`json:"user_id"    db:"user_id"`</span></span>
+          <span class="ind"><span class="sn">Email</span>        <span class="tp">string</span>    <span class="tg">`json:"email"      db:"email"`</span></span>
+          <span class="ind"><span class="sn">PasswordHash</span> <span class="tp">string</span>    <span class="tg">`json:"-"          db:"password_hash"`</span> <span class="cm">// never in API response</span></span>
+          <span class="ind"><span class="sn">CreatedAt</span>    <span class="tp">time.Time</span> <span class="tg">`json:"created_at" db:"created_at"`</span></span>
+          <span class="ind"><span class="sn">UpdatedAt</span>    <span class="tp">time.Time</span> <span class="tg">`json:"updated_at" db:"updated_at"`</span></span>
+          <span class="br">}</span>
+        </div>
+        <div style="margin-top:14px;font-size:12.5px;color:var(--dim);line-height:1.7">
+          <div>→ <code style="color:var(--cyan)">PasswordHash</code> has <code style="color:var(--amber)">json:"-"</code> — never serialised in any API response even by accident</div>
+          <div>→ <code style="color:var(--cyan)">TEXT</code> for password_hash — bcrypt is ~60 chars today, TEXT future-proofs against longer algorithm outputs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- ══ U3: Store ══ -->
+    <div class="node-card" id="u3" onclick="toggle('u3')">
+      <div class="node-header">
+        <div class="node-icon">⚙</div>
+        <div class="node-info">
+          <div class="node-tag">Data Access Layer</div>
+          <div class="node-title">Store — user.go</div>
+          <div class="node-path">internal/store/user.go</div>
+        </div>
+        <div class="node-badges"><span class="badge b4">2 functions</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+        <div class="fn-list">
+          <div class="fn-item"><span class="method m-post">INSERT</span><div><div class="fn-sig">CreateUser(ctx, *models.User) error</div><div class="fn-desc">INSERT with UNIQUE constraint on email. Returns error if email already registered — API returns 409 Conflict.</div></div></div>
+          <div class="fn-item"><span class="method m-get">SELECT</span><div><div class="fn-sig">GetUserByEmail(ctx, email string) (*models.User, error)</div><div class="fn-desc">SELECT by email — used during login to fetch stored bcrypt hash for comparison. Returns error if not found — API returns 401 (same message as wrong password to prevent user enumeration).</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="conn-line"></div><div class="conn-arrow">▼</div></div>
+
+    <!-- ══ U4: Auth + API ══ -->
+    <div class="node-card" id="u4" onclick="toggle('u4')">
+      <div class="node-header">
+        <div class="node-icon">🔐</div>
+        <div class="node-info">
+          <div class="node-tag">HTTP API + Auth Layer</div>
+          <div class="node-title">Auth API — Register · Login · JWT</div>
+          <div class="node-path">internal/api/auth.go · internal/auth/</div>
+        </div>
+        <div class="node-badges"><span class="badge b5">2 endpoints</span></div>
+        <span class="node-chev">▾</span>
+      </div>
+      <div class="node-drawer">
+        <hr class="drawer-sep">
+
+        <!-- Register flow -->
+        <div class="ep-row ep-post">
+          <div class="ep-left"><span class="method m-post">POST</span><span class="ep-path">/auth/register</span><span class="ep-code">201/400/409</span></div>
+          <div class="ep-body">
+            <div class="ep-title">register — create account and return JWT</div>
+            <div class="ep-flow">ShouldBindJSON(email, password) → auth.HashPassword() → uuid.New() → store.CreateUser() → auth.GenerateToken() → 201 {token, user_id, email}</div>
+          </div>
+        </div>
+
+        <!-- Login flow -->
+        <div class="ep-row">
+          <div class="ep-left"><span class="method m-post">POST</span><span class="ep-path">/auth/login</span><span class="ep-code">200/400/401</span></div>
+          <div class="ep-body">
+            <div class="ep-title">login — verify credentials and return JWT</div>
+            <div class="ep-flow">ShouldBindJSON → store.GetUserByEmail() → auth.CheckPassword() → auth.GenerateToken() → 200 {token, user_id, email}</div>
+          </div>
+        </div>
+
+        <!-- Auth internals -->
+        <div class="go-box" style="margin-top:12px">
+          <div class="go-lbl">internal/auth/ — cryptographic primitives</div>
+          <div class="go-step"><span class="go-num">pw</span><span><strong>bcrypt</strong> (cost=10, ~100ms) — random 128-bit salt auto-generated, embedded in output. Same password → different hash every time. Brute force 1B passwords ≈ 3,000 years.</span></div>
+          <div class="go-step"><span class="go-num">jwt</span><span><strong>HMAC-SHA256</strong> · 24h expiry · payload: {user_id, email, exp, iat}. Explicit <code style="color:var(--cyan)">t.Method.(*jwt.SigningMethodHMAC)</code> check prevents alg:none attacks.</span></div>
+          <div class="go-step"><span class="go-num">enc</span><span><strong>AES-256-GCM</strong> · random 12-byte nonce per encryption. Used for Prometheus tokens at rest — stolen DB = useless tokens without ENCRYPTION_KEY.</span></div>
+          <div class="go-step"><span class="go-num">mid</span><span><strong>JWTMiddleware</strong> on all /api/v1/* routes — extracts Bearer token, validates signature + expiry, sets user_id + email in Gin context for downstream handlers.</span></div>
+        </div>
+
+        <!-- JWT flow -->
+        <div class="go-box" style="margin-top:10px;background:rgba(14,165,233,0.06);border-color:rgba(14,165,233,0.25)">
+          <div class="go-lbl" style="color:var(--cyan)">every protected request flow</div>
+          <div class="go-step"><span class="go-num">1</span><span>Client sends <code style="color:var(--amber)">Authorization: Bearer eyJhbGci...</code></span></div>
+          <div class="go-step"><span class="go-num">2</span><span>JWTMiddleware splits on " " → validates HMAC-SHA256 signature + expiry</span></div>
+          <div class="go-step"><span class="go-num">3</span><span>Sets <code style="color:var(--cyan)">c.Set("user_id", claims.UserID)</code> and <code style="color:var(--cyan)">c.Set("email", claims.Email)</code></span></div>
+          <div class="go-step"><span class="go-num">4</span><span>Handler runs — reads user_id/email from context as needed (e.g. created_by on cluster registration)</span></div>
+          <div class="go-step"><span class="go-num">✗</span><span>Invalid/expired token → <code style="color:var(--red)">401 "Invalid or expired token"</code> · handler never runs</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /user-pipeline -->
+
 </main>
 </div><!-- /layout -->
 
@@ -729,6 +1038,19 @@ function toggleRec() {
   arrow.classList.toggle('open', !hidden);
 }
 
+function toggleUser() {
+  const items = document.getElementById('sb-items-user');
+  const arrow = document.getElementById('sb-arrow-user');
+  const hidden = items.classList.toggle('hidden');
+  arrow.classList.toggle('open', !hidden);
+}
+
+// ── scroll to top (overview) ──
+function scrollTop() {
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
 // ── scroll to node ──
 function scrollTo(id) {
   const el = document.getElementById(id);
@@ -737,7 +1059,7 @@ function scrollTo(id) {
 }
 
 // ── sidebar active on scroll ──
-const nodes = ['n1','n2','n3','n4','n5','n6','r2','r3','r4','r5','r6'];
+const nodes = ['n1','n2','n3','n4','n5','n6','r2','r3','r4','r5','r6','u1','u2','u3','u4'];
 const sbLinks = document.querySelectorAll('.sb-item');
 
 function updateSidebar() {
@@ -795,8 +1117,64 @@ function nextStep()  { showStep(flowStep + 1); }
 function prevStep()  { showStep(flowStep - 1); }
 
 // routes tooltip Prev/Next to whichever flow is currently active
-function activeFlowNext() { if (recFlowStep >= 0) recNextStep(); else nextStep(); }
-function activeFlowPrev() { if (recFlowStep >= 0) recPrevStep(); else prevStep(); }
+function activeFlowNext() {
+  if (userFlowStep >= 0) userNextStep();
+  else if (recFlowStep >= 0) recNextStep();
+  else nextStep();
+}
+function activeFlowPrev() {
+  if (userFlowStep >= 0) userPrevStep();
+  else if (recFlowStep >= 0) recPrevStep();
+  else prevStep();
+}
+
+// ── User flow animation ──
+const userFlowSteps = [
+  { node:'u4', num:'Step 1 / 5', title:'ShouldBindJSON', body:'Gin parses {email, password}. Both fields required — binding:"required" rejects missing fields with 400 before handler logic runs.' },
+  { node:'u4', num:'Step 2 / 5', title:'auth.HashPassword()', body:'bcrypt(password, cost=10) — generates random 128-bit salt, hashes 1024 rounds (~100ms). Same password hashed twice gives different output. Impossible to reverse.' },
+  { node:'u3', num:'Step 3 / 5', title:'store.CreateUser()', body:'INSERT into users table. UNIQUE constraint on email — returns error if email already registered. API returns 409 Conflict with "already exists" message.' },
+  { node:'u4', num:'Step 4 / 5', title:'auth.GenerateToken()', body:'HMAC-SHA256 signed JWT. Payload: {user_id, email, exp=now+24h, iat=now}. Signed with JWT_SECRET from environment — never stored in DB.' },
+  { node:'u4', num:'Step 5 / 5', title:'201 Created', body:'Returns {token, user_id, email}. PasswordHash never included — json:"-" enforced at model level. Token ready to use immediately on all /api/v1/* routes.' },
+];
+let userFlowStep = -1;
+
+function userShowStep(i) {
+  if (i < 0 || i >= userFlowSteps.length) return;
+  userFlowStep = i;
+  const s = userFlowSteps[userFlowStep];
+  ['u1','u2','u3','u4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('flow-active','open');
+  });
+  const active = document.getElementById(s.node);
+  if (active) { active.classList.add('flow-active','open'); active.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  for (let j = 0; j < userFlowSteps.length; j++) {
+    const d = document.getElementById('usd'+j);
+    if (d) {
+      if (j < userFlowStep) d.className = 'sdot done';
+      else if (j === userFlowStep) d.className = 'sdot active';
+      else d.className = 'sdot';
+    }
+  }
+  document.getElementById('tt-num').textContent   = s.num;
+  document.getElementById('tt-title').textContent = s.title;
+  document.getElementById('tt-body').textContent  = s.body;
+  document.getElementById('tooltip').classList.add('show');
+}
+
+function userStartFlow() { resetFlow(); recResetFlow(); userShowStep(0); }
+function userNextStep()  { userShowStep(userFlowStep + 1); }
+function userPrevStep()  { userShowStep(userFlowStep - 1); }
+
+function userResetFlow() {
+  userFlowStep = -1;
+  ['u1','u2','u3','u4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('flow-active','open');
+  });
+  for (let i = 0; i < 5; i++) { const d = document.getElementById('usd'+i); if (d) d.className = 'sdot'; }
+  document.getElementById('tooltip').classList.remove('show');
+}
 
 function resetFlow() {
   flowStep = -1;
