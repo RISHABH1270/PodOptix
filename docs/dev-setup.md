@@ -194,7 +194,7 @@ curl -X POST http://localhost:8080/auth/register \
 
 Response:
 ```json
-{ "token": "eyJhbGci...", "user_id": "...", "email": "user@example.com" }
+{ "email": "user@example.com", "token": "eyJhbGci...", "user_id": "..." }
 ```
 
 ### 2. Login
