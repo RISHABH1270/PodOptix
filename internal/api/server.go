@@ -23,11 +23,11 @@ type Server struct {
 
 // NewServer creates a new HTTP server and registers all routes.
 func NewServer(st *store.Store, ca *cache.Cache, sched *scheduler.Scheduler, jwtSecret string, encryptionKey string) *Server {
-	gin.SetMode(gin.ReleaseMode) // suppress debug route logs — not useful in production or tests
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	router.Use(gin.Recovery())    // keep panic recovery
+	router.Use(gin.Recovery())
 	router.Use(RequestIDMiddleware())
-	router.SetTrustedProxies(nil) // direct connection only — no reverse proxy trust
+	router.SetTrustedProxies(nil) // **direct connection only — no reverse proxy trust**
 
 	server := &Server{
 		router:        router,
