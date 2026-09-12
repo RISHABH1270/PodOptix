@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── global base ─────────────────────────────────────────────── */
+:root { color-scheme: dark; }
+html, body, #root { height: 100%; }
+body { background: #0b0f14; }
+
+/* subtle grid background — very faint dot pattern for that ops-monitoring feel */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root { position: relative; z-index: 1; }
+
+/* scrollbar — subtle */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+/* focus ring — consistent green */
+:focus-visible { outline: 2px solid #22c55e; outline-offset: 2px; border-radius: 2px; }
+
+/* buttons default reset */
+button { font: inherit; }

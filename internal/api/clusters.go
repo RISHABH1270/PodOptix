@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -84,6 +85,15 @@ func (s *Server) createCluster(c *gin.Context) {
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":      "Invalid lookback_window — allowed values: 7d, 10d, 30d",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	// validate URL — must be a well-formed http:// or https:// endpoint
+	if u, err := url.Parse(req.PrometheusURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "Invalid prometheus_url — must be a full URL like https://prometheus.example.com",
 			"request_id": requestID,
 		})
 		return
@@ -214,6 +224,13 @@ func (s *Server) updateCluster(c *gin.Context) {
 		cluster.ClusterName = req.ClusterName
 	}
 	if req.PrometheusURL != "" {
+		if u, err := url.Parse(req.PrometheusURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":      "Invalid prometheus_url — must be a full URL like https://prometheus.example.com",
+				"request_id": requestID,
+			})
+			return
+		}
 		cluster.PrometheusURL = req.PrometheusURL
 	}
 	if req.PrometheusToken != "" {
