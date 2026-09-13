@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Layers, LogOut, Activity } from 'lucide-react'
+import { Layers, LogOut } from 'lucide-react'
 import { auth } from '../lib/auth'
 import { Logo } from './Logo'
 
@@ -29,7 +29,6 @@ export function Layout() {
             Overview
           </div>
           <SideLink to="/clusters" icon={<Layers className="w-4 h-4" />} label="Clusters" />
-          <SideLink to="/activity" icon={<Activity className="w-4 h-4" />} label="Activity" disabled />
         </nav>
 
         <div className="border-t border-border p-3">
@@ -57,18 +56,7 @@ export function Layout() {
   )
 }
 
-function SideLink({
-  to, icon, label, disabled,
-}: { to: string; icon: React.ReactNode; label: string; disabled?: boolean }) {
-  if (disabled) {
-    return (
-      <div className="px-5 py-2 flex items-center gap-3 text-sm text-dim cursor-not-allowed">
-        {icon}
-        <span>{label}</span>
-        <span className="ml-auto text-[9px] uppercase tracking-widest text-dim">soon</span>
-      </div>
-    )
-  }
+function SideLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
   return (
     <NavLink
       to={to}
