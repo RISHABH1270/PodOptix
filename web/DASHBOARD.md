@@ -43,12 +43,3 @@ web/
 └── package.json
 ```
 
-## Design language
-
-Grafana-style dark data dashboard:
-- Background `#0b0f14` with subtle dot grid
-- Cards `#141a20` with soft shadows
-- Accent green `#22c55e` (health/success)
-- Status pills (ok / warn / danger / info)
-- Monospace numbers for metrics
-- Inter font for text, JetBrains Mono for values
