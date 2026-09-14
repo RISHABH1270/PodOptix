@@ -683,3 +683,80 @@ type Cluster struct {
 ```
 
 **Why:** If the customer sends `cluster_id` in their request JSON, Gin ignores it completely — it is not in the request struct. Server-generated fields (`cluster_id`, `created_at`, `updated_at`) can never be overridden by the customer.
+
+---
+
+## 23. Frontend Framework — React 18 + TypeScript
+
+### Decision: React + TypeScript
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **React + TypeScript** ✅ | Industry standard · Huge ecosystem · TS catches bugs before runtime · Matches most engineers' skill set | Bigger bundle than lighter alternatives |
+| Vue | Cleaner API for beginners | Smaller ecosystem for infra dashboards |
+| Svelte | Smallest bundle · Compile-time reactive | Less mature tooling · Smaller talent pool |
+| HTMX + Go templates | Zero JS to write | No interactivity beyond page swaps — insufficient for cluster editing, recalculate polling, filters |
+
+**Why React:** Every Kubernetes-adjacent dashboard (Grafana, Prometheus UI, Argo, Lens, Rancher) is React. Hiring signal is strongest. TypeScript catches JSX prop mismatches at compile time — like Go's compiler for the frontend.
+
+---
+
+## 24. Build Tool — Vite
+
+### Decision: Vite
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Vite** ✅ | Cold start under 300ms · HMR is instant · Native ES modules in dev · Rollup for production bundle | Not much |
+| webpack | Battle-tested | Dev server is 5-10× slower · complex config |
+| Next.js | SSR + routing out of the box | Overkill — we don't need SSR, we ship as static files embedded in a Go binary |
+
+Vite is what every new React project starts with in 2025+. Nothing to defend.
+
+---
+
+## 25. Styling — Tailwind CSS
+
+### Decision: Tailwind
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Tailwind** ✅ | Utility-first — no CSS files · Consistent design tokens · Small final CSS (only used classes) | Verbose HTML |
+| Plain CSS/SCSS | Familiar | Naming things is hard · CSS files diverge from components |
+| CSS-in-JS (styled-components, emotion) | Component-scoped by default | Runtime cost · Extra library |
+| MUI / Chakra / Ant Design | Ready-made components | Every project ends up looking the same · Hard to escape the framework's opinions |
+
+**Why Tailwind:** Matches the design language of `architecture.html` (same utility approach). Tailwind's dark-mode support is built-in. We define our Grafana palette in `tailwind.config.js` once, use it everywhere as `bg-surface`, `text-accent`, etc.
+
+---
+
+## 26. UI Testing — Playwright
+
+### Decision: Playwright
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Playwright** ✅ | Real browsers (Chromium, Firefox, WebKit) · Auto-wait built into assertions · TypeScript-native · Fast · Great tracing/debugging · Microsoft-backed | ~150 MB browser download |
+| Cypress | Historically the popular choice | Slower · Weaker multi-tab handling · Was the standard until ~2024 |
+| Selenium | Broad language support | Verbose API · Manual sleeps everywhere · Flakier |
+| Component testing (Vitest + Testing Library) | Fast, no browser | Doesn't cover full user flows — misses routing, auth, real API calls |
+
+**Why Playwright:** Auto-waiting kills the biggest source of E2E test flakes — timing bugs. `expect(page.getByRole('button')).toBeVisible()` retries for 5s automatically; no `sleep(1000)` needed. Trace viewer lets us time-travel through a failing test to see the exact DOM state at the moment of failure.
+
+Cypress was the leader through ~2023 but Playwright surpassed it in 2024 with faster runs, better parallelism, and native support for multiple browser contexts. New projects should default to Playwright.
+
+---
+
+## 27. Dashboard Packaging Strategy — go:embed (planned)
+
+### Decision: Embed built dashboard into the Go binary
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **`go:embed` the `web/dist/` folder** ✅ (planned) | Single binary — one artifact, one image, one Helm chart · No CORS · No separate frontend deploy · Simple TLS story | Rebuild binary when dashboard changes |
+| Serve dashboard from CDN, backend separately | Frontend deploys independently | Requires CORS setup · Two systems to monitor · Two TLS certs |
+| Serve dashboard from nginx sidecar | Familiar pattern | Two containers in one pod for no real benefit at our scale |
+
+**Why embed:** PodOptix is a self-hosted internal tool. Operators want to `helm install podoptix` and get a working URL. A single binary with everything baked in is the simplest possible deployment story — matches Prometheus, Grafana, Traefik, and every other self-hosted infra tool.
+
+**Not yet implemented** — build pipeline will be: `npm run build` in CI → commits `web/dist/` → Go binary embeds it via `//go:embed all:web/dist`. Tracked in the roadmap.
