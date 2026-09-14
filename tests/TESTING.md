@@ -1,6 +1,22 @@
-# PodOptix — Testing Guide
+# PodOptix — API Testing Guide
 
-Everything you need to understand, run, and extend the PodOptix test suite.
+Everything you need to understand, run, and extend the PodOptix backend test suite.
+
+---
+
+## Tooling
+
+| Piece | What we use | Why |
+|-------|-------------|-----|
+| Test runner       | Go's built-in `testing` package                              | Ships with Go, zero extra deps |
+| Assertions        | [`stretchr/testify/assert`](https://github.com/stretchr/testify) | Readable one-line assertions vs verbose `if` blocks |
+| HTTP server       | `httptest.NewServer` (Go stdlib)                             | Spins up a real TCP listener on a random port — no mocks |
+| DB driver         | `pgx/v5`                                                     | Same driver as production — tests exercise the real code path |
+| Migrations        | `golang-migrate/migrate/v4`                                  | Same tool as production |
+| Isolated DB       | Separate `podoptix_test` database in the same PostgreSQL container | Full isolation, zero infra cost |
+| Isolated Redis    | Redis logical index `1` (production uses `0`)                | Same container, no key collisions |
+
+**No mocking.** Every test hits real PostgreSQL, real Redis, real Gin router, real middleware. If a test passes here, it works in production.
 
 ---
 

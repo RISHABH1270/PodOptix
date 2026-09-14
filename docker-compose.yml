@@ -28,5 +28,20 @@ services:
       timeout: 3s
       retries: 5
 
+  # Local Prometheus for testing the PodOptix pipeline end-to-end.
+  # Uses the image's default config (scrapes itself only).
+  # Register a cluster in PodOptix pointing at http://localhost:9090 to test connectivity + recalculate.
+  # For real recommendations, point PodOptix at a Prometheus scraping cAdvisor + kube-state-metrics.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: podoptix-prometheus
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
