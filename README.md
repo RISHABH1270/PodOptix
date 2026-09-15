@@ -74,6 +74,16 @@ Register a cluster with its Prometheus URL + auth token. Recommendations are gen
 
 ---
 
+## Web Dashboard
+
+PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tailwind, styled to match Grafana's dark theme.
+
+Pages: Login · Register · Clusters list · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate).
+
+Lives in [`web/`](web/). Run locally with `cd web && npm run dev` — Vite serves on `:5173` and proxies API calls to the Go backend on `:8080`. See [web/DASHBOARD.md](web/DASHBOARD.md) for the full guide.
+
+---
+
 ## Quick Start
 
 Deploy PodOptix Hub in your management or ops Kubernetes cluster:
@@ -121,6 +131,9 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 | [LLD](docs/lld.md) | Low Level Design — DB schema, API contract, Redis design, security model |
 | [Engineering Trade-offs](docs/engineering-trade-offs.md) | Every technical decision with full reasoning |
 | [Dev Setup](docs/dev-setup.md) | How to run locally in 5 minutes |
+| [API Testing Guide](tests/TESTING.md) | Backend Go test suite — structure, isolation, helpers |
+| [Dashboard Guide](web/DASHBOARD.md) | React dashboard — dev server, structure, build |
+| [UI Testing Guide](web/tests-e2e/UI_TESTING.md) | Playwright end-to-end tests — isolation, commands, debugging |
 
 ---
 
@@ -130,21 +143,29 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 - [x] Data models (Cluster, Recommendation, User)
 - [x] Config loader (environment variables)
 - [x] PostgreSQL — migrations, store layer, connection pool
-- [x] HTTP server (Gin) with middleware
+- [x] HTTP server (Gin) with middleware (RequestID + JWT)
 - [x] REST API — full CRUD for clusters + recommendations
 - [x] Auth — JWT + bcrypt password hashing
 - [x] Token encryption at rest (AES-256-GCM)
 - [x] Prometheus metrics collector (PromQL API)
-- [x] p99 computation engine (100% test coverage)
+- [x] p99 computation engine
 - [x] Recommendation engine
-- [x] Scheduler — daily collection pipeline
+- [x] Scheduler — 24h ticker + immediate on startup
 - [x] Redis — recommendations cache + distributed lock
-- [x] Integration tests — real TCP server + PostgreSQL + Redis, isolated DB/port
+- [x] Backend integration tests — 63 tests, real TCP server + PostgreSQL + Redis, isolated DB/port
 - [x] Readiness probe (/readyz)
 - [x] Graceful shutdown (SIGTERM/SIGINT)
-- [ ] Web Dashboard
-- [ ] Docker image
-- [ ] Helm chart (not yet available)
+- [x] Structured logging (INFO/WARN/ERROR + request_id + duration)
+- [x] Interactive architecture docs ([docs/architecture.html](docs/architecture.html))
+- [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind (Grafana-dark theme)
+- [x] UI end-to-end tests — Playwright + Chromium, 9 tests
+- [ ] Dockerfile for the Go binary
+- [ ] Embed dashboard into Go binary via `go:embed` (single-binary deployment)
+- [ ] Helm chart
+- [ ] CI/CD (GitHub Actions)
+- [ ] User password change endpoint
+- [ ] Cross-cluster recommendations view
+- [ ] Cost savings dashboard
 
 ---
 
