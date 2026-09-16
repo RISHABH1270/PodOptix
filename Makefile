@@ -1,8 +1,10 @@
 # Container image config — override with `make docker-push IMAGE=my/name TAG=v1`
-IMAGE ?= ghcr.io/rishabh1270/podoptix
-TAG   ?= dev
+IMAGE      ?= ghcr.io/rishabh1270/podoptix
+TAG        ?= dev
+HELM_CHART := ./deploy/helm/podoptix
+HELM_REPO  ?= oci://ghcr.io/rishabh1270/charts    # Helm supports OCI registries natively (Helm 3.8+)
 
-.PHONY: help dev dashboard build test test-api test-ui clean vendor docker-build docker-push docker-run
+.PHONY: help dev dashboard build test test-api test-ui clean vendor docker-build docker-push docker-run helm-lint helm-package helm-push
 
 help:
 	@echo "PodOptix — common commands"
@@ -16,6 +18,9 @@ help:
 	@echo "  make docker-build   Build local single-arch Docker image (podoptix:local)"
 	@echo "  make docker-run     Run the local image against docker compose services"
 	@echo "  make docker-push    Multi-arch build + push (amd64 + arm64) — needs registry login"
+	@echo "  make helm-lint      Lint the Helm chart"
+	@echo "  make helm-package   Package the Helm chart into a .tgz"
+	@echo "  make helm-push      Push chart to OCI registry (same as docker: ghcr.io)"
 	@echo "  make clean          Remove bin/, node_modules/, and built dashboard"
 
 dev:
@@ -77,3 +82,25 @@ docker-push: vendor
 	  .
 	@echo ""
 	@echo "  ✓ Pushed $(IMAGE):$(TAG) — amd64 + arm64"
+
+# ── Helm ──────────────────────────────────────────────────────────────
+
+helm-lint:
+	helm lint $(HELM_CHART)
+
+# Package the chart into a versioned .tgz (reads version from Chart.yaml).
+helm-package:
+	mkdir -p bin
+	helm package $(HELM_CHART) -d bin/
+	@echo ""
+	@echo "  ✓ Chart packaged into bin/"
+
+# Push to OCI registry — Helm 3.8+ uses same auth as docker login.
+# Example: make helm-push HELM_REPO=oci://ghcr.io/rishabh1270/charts
+helm-push: helm-package
+	@CHART_TGZ=$$(ls -t bin/podoptix-*.tgz | head -1); \
+	  echo "  Pushing $$CHART_TGZ to $(HELM_REPO)..."; \
+	  helm push $$CHART_TGZ $(HELM_REPO)
+	@echo ""
+	@echo "  ✓ Chart pushed — customers can now install with:"
+	@echo "      helm install podoptix $(HELM_REPO)/podoptix --version <ver>"

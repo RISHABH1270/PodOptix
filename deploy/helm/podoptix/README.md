@@ -24,13 +24,27 @@ Deploy PodOptix on any Kubernetes cluster with a single `helm install`.
 - Helm 3
 - A default `StorageClass` in your cluster (for the Postgres PVC)
 
-## Quick install
+## Quick install (from the OCI registry — no clone needed)
 
 ```bash
-helm install podoptix ./deploy/helm/podoptix
+helm install podoptix oci://ghcr.io/rishabh1270/charts/podoptix \
+  --version 0.1.0 \
+  -n podoptix --create-namespace
 ```
 
-Follow the on-screen NOTES to access the dashboard (default: `kubectl port-forward`).
+That single command:
+1. Pulls the chart from ghcr.io
+2. Creates the namespace
+3. Deploys the 3 workloads (PodOptix Deployment + Postgres StatefulSet + Redis Deployment)
+
+Follow the on-screen NOTES to access the dashboard.
+
+### Alternative — install from a local clone
+
+```bash
+git clone https://github.com/RISHABH1270/PodOptix.git
+helm install podoptix ./PodOptix/deploy/helm/podoptix
+```
 
 ## Production install
 

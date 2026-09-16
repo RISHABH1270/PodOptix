@@ -128,10 +128,26 @@ make docker-run                                # runs against docker compose Pos
 
 Multi-arch push (linux/amd64 + linux/arm64) once you have a registry:
 ```bash
-make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=v0.1.0
+make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=0.1.0
 ```
 
-> Helm chart coming next (see roadmap).
+### Option D — Kubernetes (production)
+
+One `helm install` — deploys PodOptix + Postgres StatefulSet + Redis, no repo clone needed:
+
+```bash
+helm install podoptix oci://ghcr.io/rishabh1270/charts/podoptix \
+  --version 0.1.0 \
+  -n podoptix --create-namespace \
+  --set service.type=LoadBalancer
+```
+
+Then wait for the LoadBalancer's external IP:
+```bash
+kubectl get svc podoptix -n podoptix --watch
+```
+
+See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all options.
 
 ---
 
