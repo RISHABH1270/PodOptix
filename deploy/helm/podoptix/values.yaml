@@ -1,0 +1,55 @@
+# PodOptix Helm Chart values
+# Override any of these with `--set key=value` or `-f custom-values.yaml`.
+
+# ── Container image ──────────────────────────────────────────────────
+image:
+  repository: ghcr.io/rishabh1270/podoptix
+  tag: 0.1.0
+  pullPolicy: IfNotPresent
+  pullSecrets: []    # e.g. [{name: my-regcred}] for private registries
+
+# ── PodOptix workload (stateless) ────────────────────────────────────
+podoptix:
+  replicaCount: 1    # can scale to N — all replicas share the same Postgres/Redis
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+  # Required secrets — MUST be overridden in production
+  jwtSecret: ""      # ≥32 chars; auto-generated if empty (regenerates every upgrade — DON'T rely on that in prod)
+  encryptionKey: ""  # exactly 32 bytes; auto-generated if empty (same warning)
+
+# ── PostgreSQL (stateful, StatefulSet + PVC) ─────────────────────────
+postgres:
+  image: postgres:16-alpine
+  password: ""       # auto-generated if empty; MUST override in production and keep stable
+  storage:
+    size: 10Gi
+    storageClass: "" # blank = cluster default StorageClass
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+# ── Redis (ephemeral cache, Deployment + emptyDir) ───────────────────
+redis:
+  image: redis:7-alpine
+  resources:
+    requests: { cpu: 50m,  memory: 64Mi  }
+    limits:   { cpu: 200m, memory: 128Mi }
+
+# ── Service exposing PodOptix ────────────────────────────────────────
+service:
+  type: ClusterIP        # ClusterIP | NodePort | LoadBalancer
+  port: 8080
+  annotations: {}        # e.g. for AWS NLB / GCP LB tuning
+  # Example — AWS Network Load Balancer:
+  #   service:
+  #     type: LoadBalancer
+  #     annotations:
+  #       service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+# ── Global scheduling / pod hygiene ──────────────────────────────────
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+podLabels: {}

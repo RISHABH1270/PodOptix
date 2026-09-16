@@ -1,0 +1,67 @@
+╭──────────────────────────────────────────────────────────────╮
+│   PodOptix — Kubernetes Resource Right-Sizing installed ✓    │
+╰──────────────────────────────────────────────────────────────╯
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Version:   {{ .Chart.AppVersion }}
+
+──────────────────────────────────────────────────────────────
+  1. Wait for pods to be ready
+──────────────────────────────────────────────────────────────
+
+  kubectl rollout status statefulset/{{ include "podoptix.postgresName" . }} -n {{ .Release.Namespace }}
+  kubectl rollout status deployment/{{ include "podoptix.redisName" . }}     -n {{ .Release.Namespace }}
+  kubectl rollout status deployment/{{ include "podoptix.fullname" . }}      -n {{ .Release.Namespace }}
+
+──────────────────────────────────────────────────────────────
+  2. Access the dashboard
+──────────────────────────────────────────────────────────────
+
+{{- if eq .Values.service.type "LoadBalancer" }}
+
+  Wait for the LoadBalancer to get an external IP:
+
+    kubectl get svc {{ include "podoptix.fullname" . }} -n {{ .Release.Namespace }} --watch
+
+  Then open: http://<EXTERNAL-IP>:{{ .Values.service.port }}
+
+{{- else if eq .Values.service.type "NodePort" }}
+
+  Get the NodePort and any node's IP:
+
+    NODE_PORT=$(kubectl get svc {{ include "podoptix.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='{.spec.ports[0].nodePort}')
+    NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+    echo "http://$NODE_IP:$NODE_PORT"
+
+{{- else }}
+
+  ClusterIP service — access from your workstation via port-forward:
+
+    kubectl port-forward svc/{{ include "podoptix.fullname" . }} 8080:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+
+  Then open: http://localhost:8080
+
+  For production, set service.type=LoadBalancer:
+    helm upgrade {{ .Release.Name }} <chart> --set service.type=LoadBalancer
+
+{{- end }}
+
+──────────────────────────────────────────────────────────────
+  3. Register a user (first-time setup)
+──────────────────────────────────────────────────────────────
+
+  Open the dashboard → click "Create one" on the login screen → register a user.
+
+  Or via curl:
+
+    curl -X POST http://<URL>/auth/register \
+      -H 'Content-Type: application/json' \
+      -d '{"email":"you@example.com","password":"a-strong-password"}'
+
+──────────────────────────────────────────────────────────────
+  Secrets — retrieve auto-generated credentials
+──────────────────────────────────────────────────────────────
+
+  kubectl get secret {{ include "podoptix.secretName" . }} -n {{ .Release.Namespace }} \
+    -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d

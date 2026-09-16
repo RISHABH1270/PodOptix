@@ -1,0 +1,17 @@
+apiVersion: v2
+name: podoptix
+description: Kubernetes pod resource right-sizing — analyzes Prometheus metrics and recommends CPU/memory limits at p99 × 2.
+type: application
+version: 0.1.0        # chart version — bump when the chart itself changes
+appVersion: "0.1.0"   # PodOptix binary version
+keywords:
+  - kubernetes
+  - resource-optimization
+  - prometheus
+  - right-sizing
+home: https://github.com/RISHABH1270/PodOptix
+sources:
+  - https://github.com/RISHABH1270/PodOptix
+maintainers:
+  - name: Rishabh Singh
+    email: rishabh.singh@whatfix.com

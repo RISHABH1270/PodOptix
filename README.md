@@ -164,6 +164,7 @@ make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=v0.1.0
 | [API Testing Guide](tests/TESTING.md) | Backend Go test suite — structure, isolation, helpers |
 | [Dashboard Guide](web/DASHBOARD.md) | React dashboard — dev server, structure, build |
 | [UI Testing Guide](web/tests-e2e/UI_TESTING.md) | Playwright end-to-end tests — isolation, commands, debugging |
+| [Helm Chart](deploy/helm/podoptix/README.md) | Kubernetes install — Deployment + StatefulSet + Services |
 
 ---
 
@@ -191,7 +192,7 @@ make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=v0.1.0
 - [x] UI end-to-end tests — Playwright + Chromium, 9 tests
 - [x] Embed dashboard into Go binary via `go:embed` — single-binary build via `make build`
 - [x] Multi-arch Docker image (linux/amd64 + linux/arm64) — 44 MB distroless, `make docker-build` / `make docker-push`
-- [ ] Helm chart
+- [x] Helm chart — stateless Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
 - [ ] Cross-cluster recommendations view
