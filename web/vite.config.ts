@@ -20,7 +20,10 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
-    emptyOutDir: true,
+    // Output straight into internal/dashboard/dist so //go:embed picks it up.
+    // outDir is outside the Vite project root — Vite won't clear it automatically;
+    // the npm build script does a targeted clean of assets/ before running.
+    outDir: '../internal/dashboard/dist',
+    emptyOutDir: false,
   },
 })

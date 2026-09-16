@@ -89,9 +89,40 @@ docker ps
 
 ## Step 5 — Run the App
 
+You have **two ways** to run PodOptix locally. Pick based on what you're doing.
+
+### Option A — Development mode (hot reload)
+
+Two terminals. Backend + Vite dev server, separate processes:
+
 ```bash
+# Terminal 1 — backend on :8080
 export $(cat .env | xargs) && go run ./cmd/hub
+
+# Terminal 2 — dashboard on :5173 (proxies /api/* to :8080)
+cd web && npm run dev
 ```
+
+Open <http://localhost:5173>. Edit any `.tsx` file → browser updates instantly (Vite HMR).
+
+**Use this when:** editing frontend code, iterating on UI, debugging in the browser DevTools.
+
+### Option B — Production mode (single binary)
+
+One terminal. Dashboard is compiled into the Go binary via `//go:embed` — one process serves everything on one port:
+
+```bash
+make build                                    # builds React → embeds → compiles Go → bin/podoptix
+export $(cat .env | xargs) && ./bin/podoptix  # serves API + dashboard on :8080
+```
+
+Open <http://localhost:8080>. Dashboard and API on the same origin — this is exactly what ships to production.
+
+**Use this when:** testing the real production experience, verifying a build works end-to-end, or just running the app to demo it.
+
+---
+
+### Startup sequence (both options)
 
 **9-step startup sequence (automatic):**
 
@@ -308,12 +339,23 @@ Response: `202 Accepted` — recalculation runs in background, check recommendat
 
 ## Running Tests
 
-See [tests/TESTING.md](../tests/TESTING.md) for the full testing guide — test structure, isolation, helpers, and how to add new tests.
+Two independent test suites live in this repo:
 
-Quick command:
+| Suite | Location | Framework | Guide |
+|-------|----------|-----------|-------|
+| Backend API tests (63 tests) | [`../tests/`](../tests) | Go `testing` + testify + httptest | [../tests/TESTING.md](../tests/TESTING.md) |
+| UI end-to-end tests (9 tests) | [`../web/tests-e2e/`](../web/tests-e2e) | Playwright + Chromium | [../web/tests-e2e/UI_TESTING.md](../web/tests-e2e/UI_TESTING.md) |
+
+Quick commands:
 ```bash
+# Backend
 go test ./tests/... -count=1 -p 1
+
+# UI (from web/)
+cd web && npm run test:e2e
 ```
+
+Both suites are fully isolated from the dev database — see the isolation matrix in each guide.
 
 ---
 
@@ -345,12 +387,15 @@ PodOptix/
 │   ├── compute/            ← p99 algorithm
 │   ├── config/             ← environment variable loading
 │   ├── recommender/        ← p99 × 2 = recommended limit
-│   ├── scheduler/          ← cron pipeline (24h interval)
+│   ├── scheduler/          ← 24h ticker + immediate on startup
 │   └── store/              ← PostgreSQL CRUD + migrations + connection pool
 ├── pkg/models/             ← shared data models (Cluster, Recommendation, User)
 ├── migrations/             ← SQL migration files (run in numeric order)
-├── tests/                  ← all integration tests (package tests, real TCP server)
-├── docs/                   ← architecture.html, design docs
+├── tests/                  ← backend integration + unit tests (63 tests) — see TESTING.md
+├── web/                    ← React 18 + TS + Vite + Tailwind dashboard — see DASHBOARD.md
+│   ├── src/                ← pages, components, api client
+│   └── tests-e2e/          ← Playwright UI tests (9 tests) — see UI_TESTING.md
+├── docs/                   ← architecture.html, hld.md, lld.md, trade-offs
 ├── assets/                 ← banner.svg, logo.svg
 ├── docker-compose.yml      ← local PostgreSQL 16 + Redis 7
 ├── .env.example            ← environment variable template

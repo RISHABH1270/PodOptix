@@ -74,24 +74,80 @@ Register a cluster with its Prometheus URL + auth token. Recommendations are gen
 
 ---
 
+## Web Dashboard
+
+PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tailwind, styled to match Grafana's dark theme.
+
+Pages: Login · Register · Clusters list · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate).
+
+Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
+
+**Production ships as a single binary.** `make build` compiles the React dashboard, embeds `web/dist/` into the Go binary via `//go:embed`, and outputs `bin/podoptix` — one artifact serving the API and dashboard on the same origin. No separate frontend server. No CORS. See [web/DASHBOARD.md](web/DASHBOARD.md) for the full guide.
+
+---
+
 ## Quick Start
 
-Deploy PodOptix Hub in your management or ops Kubernetes cluster:
+**Prerequisites:** Go 1.26+, Node.js 20+, Docker. Full setup in [docs/dev-setup.md](docs/dev-setup.md).
 
 ```bash
-helm repo add podoptix https://charts.podoptix.io
-helm repo update
-
-helm install podoptix podoptix/hub \
-  --namespace podoptix \
-  --create-namespace \
-  --set secrets.databaseURL="postgres://..." \
-  --set secrets.redisURL="redis://..." \
-  --set secrets.jwtSecret="your-secret" \
-  --set secrets.encryptionKey="your-32-byte-key"
+git clone https://github.com/RISHABH1270/PodOptix.git && cd PodOptix
+cp .env.example .env
+docker compose up -d           # PostgreSQL + Redis + local Prometheus
 ```
 
-Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and register your first cluster.
+Then pick one:
+
+### Option A — Development (hot reload)
+
+```bash
+# Terminal 1 — backend on :8080
+export $(cat .env | xargs) && go run ./cmd/hub
+
+# Terminal 2 — dashboard on :5173 (Vite dev server)
+cd web && npm install && npm run dev
+```
+
+Open <http://localhost:5173>. Edit any `.tsx` → instant reload.
+
+### Option B — Single binary (production-style)
+
+```bash
+make build                                     # builds dashboard + Go binary → bin/podoptix
+export $(cat .env | xargs) && ./bin/podoptix   # one process, one port
+```
+
+Open <http://localhost:8080>. Dashboard and API on the same origin — same as production.
+
+### Option C — Docker container
+
+```bash
+make docker-build                              # builds podoptix:local (44 MB distroless image)
+make docker-run                                # runs against docker compose Postgres/Redis
+```
+
+Multi-arch push (linux/amd64 + linux/arm64) once you have a registry:
+```bash
+make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=0.1.0
+```
+
+### Option D — Kubernetes (production)
+
+One `helm install` — deploys PodOptix + Postgres StatefulSet + Redis, no repo clone needed:
+
+```bash
+helm install podoptix oci://ghcr.io/rishabh1270/charts/podoptix \
+  --version 0.1.0 \
+  -n podoptix --create-namespace \
+  --set service.type=LoadBalancer
+```
+
+Then wait for the LoadBalancer's external IP:
+```bash
+kubectl get svc podoptix -n podoptix --watch
+```
+
+See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all options.
 
 ---
 
@@ -121,6 +177,10 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 | [LLD](docs/lld.md) | Low Level Design — DB schema, API contract, Redis design, security model |
 | [Engineering Trade-offs](docs/engineering-trade-offs.md) | Every technical decision with full reasoning |
 | [Dev Setup](docs/dev-setup.md) | How to run locally in 5 minutes |
+| [API Testing Guide](tests/TESTING.md) | Backend Go test suite — structure, isolation, helpers |
+| [Dashboard Guide](web/DASHBOARD.md) | React dashboard — dev server, structure, build |
+| [UI Testing Guide](web/tests-e2e/UI_TESTING.md) | Playwright end-to-end tests — isolation, commands, debugging |
+| [Helm Chart](deploy/helm/podoptix/README.md) | Kubernetes install — Deployment + StatefulSet + Services |
 
 ---
 
@@ -130,21 +190,29 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 - [x] Data models (Cluster, Recommendation, User)
 - [x] Config loader (environment variables)
 - [x] PostgreSQL — migrations, store layer, connection pool
-- [x] HTTP server (Gin) with middleware
+- [x] HTTP server (Gin) with middleware (RequestID + JWT)
 - [x] REST API — full CRUD for clusters + recommendations
 - [x] Auth — JWT + bcrypt password hashing
 - [x] Token encryption at rest (AES-256-GCM)
 - [x] Prometheus metrics collector (PromQL API)
-- [x] p99 computation engine (100% test coverage)
+- [x] p99 computation engine
 - [x] Recommendation engine
-- [x] Scheduler — daily collection pipeline
+- [x] Scheduler — 24h ticker + immediate on startup
 - [x] Redis — recommendations cache + distributed lock
-- [x] Integration tests — real TCP server + PostgreSQL + Redis, isolated DB/port
+- [x] Backend integration tests — 63 tests, real TCP server + PostgreSQL + Redis, isolated DB/port
 - [x] Readiness probe (/readyz)
 - [x] Graceful shutdown (SIGTERM/SIGINT)
-- [ ] Web Dashboard
-- [ ] Docker image
-- [ ] Helm chart (not yet available)
+- [x] Structured logging (INFO/WARN/ERROR + request_id + duration)
+- [x] Interactive architecture docs ([docs/architecture.html](docs/architecture.html))
+- [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind (Grafana-dark theme)
+- [x] UI end-to-end tests — Playwright + Chromium, 9 tests
+- [x] Embed dashboard into Go binary via `go:embed` — single-binary build via `make build`
+- [x] Multi-arch Docker image (linux/amd64 + linux/arm64) — 44 MB distroless, `make docker-build` / `make docker-push`
+- [x] Helm chart — stateless Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
+- [ ] CI/CD (GitHub Actions)
+- [ ] User password change endpoint
+- [ ] Cross-cluster recommendations view
+- [ ] Cost savings dashboard
 
 ---
 

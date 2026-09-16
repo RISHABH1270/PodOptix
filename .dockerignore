@@ -1,0 +1,41 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Docker itself
+Dockerfile
+.dockerignore
+
+# Environment (never bake real secrets into the image)
+.env
+.env.*
+!.env.example
+
+# Go build output
+bin/
+*.exe
+*.test
+*.out
+
+# Frontend build artifacts — rebuilt inside the container by web-builder stage
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+
+# Embedded dashboard placeholder — rebuilt fresh inside the container
+internal/dashboard/dist/
+
+# IDE + OS files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docs — not needed at runtime
+docs/
+tests/
+*.md
+!README.md

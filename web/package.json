@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "rm -rf ../internal/dashboard/dist/assets && tsc && vite build",
     "preview": "vite preview",
     "test:e2e:reset": "docker exec podoptix-db psql -U postgres -c \"DROP DATABASE IF EXISTS podoptix_ui_test WITH (FORCE)\" && docker exec podoptix-redis redis-cli -n 2 FLUSHDB",
     "test:e2e": "npm run test:e2e:reset && playwright test",
