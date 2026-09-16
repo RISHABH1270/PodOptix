@@ -89,9 +89,40 @@ docker ps
 
 ## Step 5 — Run the App
 
+You have **two ways** to run PodOptix locally. Pick based on what you're doing.
+
+### Option A — Development mode (hot reload)
+
+Two terminals. Backend + Vite dev server, separate processes:
+
 ```bash
+# Terminal 1 — backend on :8080
 export $(cat .env | xargs) && go run ./cmd/hub
+
+# Terminal 2 — dashboard on :5173 (proxies /api/* to :8080)
+cd web && npm run dev
 ```
+
+Open <http://localhost:5173>. Edit any `.tsx` file → browser updates instantly (Vite HMR).
+
+**Use this when:** editing frontend code, iterating on UI, debugging in the browser DevTools.
+
+### Option B — Production mode (single binary)
+
+One terminal. Dashboard is compiled into the Go binary via `//go:embed` — one process serves everything on one port:
+
+```bash
+make build                                    # builds React → embeds → compiles Go → bin/podoptix
+export $(cat .env | xargs) && ./bin/podoptix  # serves API + dashboard on :8080
+```
+
+Open <http://localhost:8080>. Dashboard and API on the same origin — this is exactly what ships to production.
+
+**Use this when:** testing the real production experience, verifying a build works end-to-end, or just running the app to demo it.
+
+---
+
+### Startup sequence (both options)
 
 **9-step startup sequence (automatic):**
 
@@ -137,22 +168,6 @@ curl http://localhost:8080/healthz
 curl http://localhost:8080/readyz
 # {"status":"ok","checks":{"postgres":"ok","redis":"ok"}}
 ```
-
----
-
-## Step 7 — Run the Web Dashboard
-
-The React dashboard lives in [`../web/`](../web). It's a separate dev server that proxies API calls to the Go backend on `:8080`.
-
-```bash
-cd web
-npm install          # once
-npm run dev          # starts Vite on http://localhost:5173
-```
-
-Open <http://localhost:5173> and register a user — the dashboard hits the same `/auth/*` and `/api/v1/*` routes your Go backend serves.
-
-See [../web/DASHBOARD.md](../web/DASHBOARD.md) for stack details, structure, and the production build workflow.
 
 ---
 

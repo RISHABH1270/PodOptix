@@ -88,22 +88,38 @@ Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5
 
 ## Quick Start
 
-Deploy PodOptix Hub in your management or ops Kubernetes cluster:
+**Prerequisites:** Go 1.26+, Node.js 20+, Docker. Full setup in [docs/dev-setup.md](docs/dev-setup.md).
 
 ```bash
-helm repo add podoptix https://charts.podoptix.io
-helm repo update
-
-helm install podoptix podoptix/hub \
-  --namespace podoptix \
-  --create-namespace \
-  --set secrets.databaseURL="postgres://..." \
-  --set secrets.redisURL="redis://..." \
-  --set secrets.jwtSecret="your-secret" \
-  --set secrets.encryptionKey="your-32-byte-key"
+git clone https://github.com/RISHABH1270/PodOptix.git && cd PodOptix
+cp .env.example .env
+docker compose up -d           # PostgreSQL + Redis + local Prometheus
 ```
 
-Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and register your first cluster.
+Then pick one:
+
+### Option A — Development (hot reload)
+
+```bash
+# Terminal 1 — backend on :8080
+export $(cat .env | xargs) && go run ./cmd/hub
+
+# Terminal 2 — dashboard on :5173 (Vite dev server)
+cd web && npm install && npm run dev
+```
+
+Open <http://localhost:5173>. Edit any `.tsx` → instant reload.
+
+### Option B — Single binary (production-style)
+
+```bash
+make build                                     # builds dashboard + Go binary → bin/podoptix
+export $(cat .env | xargs) && ./bin/podoptix   # one process, one port
+```
+
+Open <http://localhost:8080>. Dashboard and API on the same origin — same as production.
+
+> Helm chart + Docker image coming soon (see roadmap).
 
 ---
 
