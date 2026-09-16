@@ -2,7 +2,8 @@
 IMAGE      ?= ghcr.io/rishabh1270/podoptix
 TAG        ?= dev
 HELM_CHART := ./deploy/helm/podoptix
-HELM_REPO  ?= oci://ghcr.io/rishabh1270/charts    # Helm supports OCI registries natively (Helm 3.8+)
+# Helm 3.8+ pushes charts to OCI registries — same host + auth as docker.
+HELM_REPO  ?= oci://ghcr.io/rishabh1270/charts
 
 .PHONY: help dev dashboard build test test-api test-ui clean vendor docker-build docker-push docker-run helm-lint helm-package helm-push
 
