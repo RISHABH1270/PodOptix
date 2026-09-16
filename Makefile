@@ -1,15 +1,22 @@
-.PHONY: help dev dashboard build test test-api test-ui clean
+# Container image config — override with `make docker-push IMAGE=my/name TAG=v1`
+IMAGE ?= ghcr.io/rishabh1270/podoptix
+TAG   ?= dev
+
+.PHONY: help dev dashboard build test test-api test-ui clean vendor docker-build docker-push docker-run
 
 help:
 	@echo "PodOptix — common commands"
 	@echo ""
-	@echo "  make dev         Run the Go backend (needs docker compose up -d first)"
-	@echo "  make dashboard   Build the React dashboard into internal/dashboard/dist/"
-	@echo "  make build       Build the dashboard + Go binary at bin/podoptix"
-	@echo "  make test        Run all tests (backend API + UI e2e)"
-	@echo "  make test-api    Run backend Go tests only"
-	@echo "  make test-ui     Run Playwright UI tests only"
-	@echo "  make clean       Remove bin/, node_modules/, and built dashboard"
+	@echo "  make dev            Run the Go backend (needs docker compose up -d first)"
+	@echo "  make dashboard      Build the React dashboard into internal/dashboard/dist/"
+	@echo "  make build          Build the dashboard + Go binary at bin/podoptix"
+	@echo "  make test           Run all tests (backend API + UI e2e)"
+	@echo "  make test-api       Run backend Go tests only"
+	@echo "  make test-ui        Run Playwright UI tests only"
+	@echo "  make docker-build   Build local single-arch Docker image (podoptix:local)"
+	@echo "  make docker-run     Run the local image against docker compose services"
+	@echo "  make docker-push    Multi-arch build + push (amd64 + arm64) — needs registry login"
+	@echo "  make clean          Remove bin/, node_modules/, and built dashboard"
 
 dev:
 	go run ./cmd/hub
@@ -36,3 +43,37 @@ test-ui:
 clean:
 	rm -rf bin web/node_modules web/dist
 	find internal/dashboard/dist -mindepth 1 ! -name '.gitkeep' -exec rm -rf {} +
+
+# ── Docker ────────────────────────────────────────────────────────────
+
+# Refresh vendored Go deps — required before any docker build so the container
+# doesn't need network access to proxy.golang.org (bypasses corporate SSL intercept).
+vendor:
+	go mod vendor
+
+# Build a single-arch image for the CURRENT machine (fast, loads into local docker).
+# Use this to test the container locally before pushing.
+docker-build: vendor
+	docker buildx build --load -t podoptix:local .
+	@echo ""
+	@echo "  ✓ Built podoptix:local — try: make docker-run"
+
+# Run the local image, connecting to docker compose Postgres/Redis via host.docker.internal.
+docker-run:
+	docker run --rm -p 8080:8080 \
+	  -e DATABASE_URL='postgres://postgres:password@host.docker.internal:5432/podoptix?sslmode=disable' \
+	  -e REDIS_URL='redis://host.docker.internal:6379' \
+	  -e JWT_SECRET='dev-jwt-secret' \
+	  -e ENCRYPTION_KEY='dev-32-byte-encryption-key!!!!!!' \
+	  podoptix:local
+
+# Multi-arch build + push to registry. Requires `docker login` to the registry first.
+# Example: make docker-push IMAGE=ghcr.io/your-user/podoptix TAG=v0.1.0
+docker-push: vendor
+	docker buildx build \
+	  --platform linux/amd64,linux/arm64 \
+	  -t $(IMAGE):$(TAG) \
+	  --push \
+	  .
+	@echo ""
+	@echo "  ✓ Pushed $(IMAGE):$(TAG) — amd64 + arm64"

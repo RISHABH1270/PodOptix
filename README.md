@@ -119,7 +119,19 @@ export $(cat .env | xargs) && ./bin/podoptix   # one process, one port
 
 Open <http://localhost:8080>. Dashboard and API on the same origin — same as production.
 
-> Helm chart + Docker image coming soon (see roadmap).
+### Option C — Docker container
+
+```bash
+make docker-build                              # builds podoptix:local (44 MB distroless image)
+make docker-run                                # runs against docker compose Postgres/Redis
+```
+
+Multi-arch push (linux/amd64 + linux/arm64) once you have a registry:
+```bash
+make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=v0.1.0
+```
+
+> Helm chart coming next (see roadmap).
 
 ---
 
@@ -178,7 +190,7 @@ Open <http://localhost:8080>. Dashboard and API on the same origin — same as p
 - [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind (Grafana-dark theme)
 - [x] UI end-to-end tests — Playwright + Chromium, 9 tests
 - [x] Embed dashboard into Go binary via `go:embed` — single-binary build via `make build`
-- [ ] Dockerfile for the Go binary
+- [x] Multi-arch Docker image (linux/amd64 + linux/arm64) — 44 MB distroless, `make docker-build` / `make docker-push`
 - [ ] Helm chart
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
