@@ -18,9 +18,10 @@ A single Hub that connects to your workload clusters' Prometheus, computes p99 C
 |-------------|---------|
 | Kubernetes (for Helm install) | 1.24+ |
 | Helm | 3.8+ (OCI support required) |
-| Access to `ghcr.io` from the cluster | Read-only pull |
 | A Prometheus endpoint per cluster you want to analyze | Reachable from the Hub with a bearer token |
 | `kube-state-metrics` scraped by Prometheus | Optional — needed to see current limits alongside recommendations |
+
+> **Air-gapped clusters:** the image + chart live at `ghcr.io/rishabh1270/podoptix` and `ghcr.io/rishabh1270/charts/podoptix` — both public, no auth. Mirror them to your internal registry and override `image.repository` in Helm values.
 
 ---
 
