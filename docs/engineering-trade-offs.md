@@ -747,7 +747,7 @@ Cypress was the leader through ~2023 but Playwright surpassed it in 2024 with fa
 
 ---
 
-## 27. Dashboard Packaging Strategy — go:embed (planned)
+## 27. Dashboard Packaging Strategy — go:embed
 
 ### Decision: Embed built dashboard into the Go binary
 
@@ -759,4 +759,10 @@ Cypress was the leader through ~2023 but Playwright surpassed it in 2024 with fa
 
 **Why embed:** PodOptix is a self-hosted internal tool. Operators want to `helm install podoptix` and get a working URL. A single binary with everything baked in is the simplest possible deployment story — matches Prometheus, Grafana, Traefik, and every other self-hosted infra tool.
 
-**Not yet implemented** — build pipeline will be: `npm run build` in CI → commits `web/dist/` → Go binary embeds it via `//go:embed all:web/dist`. Tracked in the roadmap.
+**Implementation:**
+- `internal/dashboard/dashboard.go` — `//go:embed all:dist var distFS embed.FS` and an HTTP handler that serves static assets or falls back to `index.html` for React Router paths
+- `web/vite.config.ts` — `outDir: '../internal/dashboard/dist'` so Vite builds directly into the embed target
+- `Makefile` — `make build` runs `npm run build` then `go build -o bin/podoptix ./cmd/hub`
+- `internal/api/routes.go` — `router.NoRoute` wires the dashboard handler; `/api/*` and `/auth/*` paths still return proper 404s
+
+Result: a 41 MB single binary that serves the API on `/api/v1/*` and the dashboard on everything else, from one port.

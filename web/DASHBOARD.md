@@ -23,7 +23,20 @@ Open <http://localhost:5173> — the dashboard proxies API calls to the Go backe
 npm run build
 ```
 
-Outputs to `dist/`. In production, the Go binary will `//go:embed` this folder and serve it directly (single-binary deployment — no separate frontend server needed).
+Outputs directly to `../internal/dashboard/dist/`. Go's `//go:embed` picks it up on the next `go build` and bakes everything into a single binary.
+
+**Full single-artifact build** (dashboard + backend in one binary at `bin/podoptix`):
+
+```bash
+make build       # from project root
+```
+
+Run the binary — it serves the dashboard on `/` and the API on `/api/v1/*`, both on the same origin:
+
+```bash
+./bin/podoptix
+open http://localhost:8080
+```
 
 ## Structure
 

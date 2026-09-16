@@ -80,7 +80,9 @@ PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tail
 
 Pages: Login · Register · Clusters list · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate).
 
-Lives in [`web/`](web/). Run locally with `cd web && npm run dev` — Vite serves on `:5173` and proxies API calls to the Go backend on `:8080`. See [web/DASHBOARD.md](web/DASHBOARD.md) for the full guide.
+Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
+
+**Production ships as a single binary.** `make build` compiles the React dashboard, embeds `web/dist/` into the Go binary via `//go:embed`, and outputs `bin/podoptix` — one artifact serving the API and dashboard on the same origin. No separate frontend server. No CORS. See [web/DASHBOARD.md](web/DASHBOARD.md) for the full guide.
 
 ---
 
@@ -159,8 +161,8 @@ Once deployed, open the PodOptix dashboard at `http://<your-hub-ip>:8080` and re
 - [x] Interactive architecture docs ([docs/architecture.html](docs/architecture.html))
 - [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind (Grafana-dark theme)
 - [x] UI end-to-end tests — Playwright + Chromium, 9 tests
+- [x] Embed dashboard into Go binary via `go:embed` — single-binary build via `make build`
 - [ ] Dockerfile for the Go binary
-- [ ] Embed dashboard into Go binary via `go:embed` (single-binary deployment)
 - [ ] Helm chart
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint

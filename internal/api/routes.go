@@ -1,5 +1,13 @@
 package api
 
+import (
+	"net/http"
+	"strings"
+
+	"github.com/RISHABH1270/PodOptix/internal/dashboard"
+	"github.com/gin-gonic/gin"
+)
+
 // registerRoutes wires up all HTTP routes to their handler functions.
 func (s *Server) registerRoutes() {
 
@@ -24,4 +32,16 @@ func (s *Server) registerRoutes() {
 		v1.GET("/clusters/:id/recommendations", s.listRecommendations)
 		v1.POST("/clusters/:id/recalculate", s.recalculate)
 	}
+
+	// Any unmatched route → the embedded React dashboard (SPA).
+	// API paths that don't exist still return 404 so clients see a real error.
+	dashboardHandler := dashboard.Handler()
+	s.router.NoRoute(func(c *gin.Context) {
+		p := c.Request.URL.Path
+		if strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/auth/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not found", "path": p})
+			return
+		}
+		dashboardHandler.ServeHTTP(c.Writer, c.Request)
+	})
 }
