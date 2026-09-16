@@ -173,6 +173,7 @@ See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all opt
 
 | Doc | Description |
 |-----|-------------|
+| **[User Manual](USER_MANUAL.md)** | **End-user install + first cluster setup + troubleshooting** |
 | [HLD](docs/hld.md) | High Level Design — system overview, architecture, data flow |
 | [LLD](docs/lld.md) | Low Level Design — DB schema, API contract, Redis design, security model |
 | [Engineering Trade-offs](docs/engineering-trade-offs.md) | Every technical decision with full reasoning |
