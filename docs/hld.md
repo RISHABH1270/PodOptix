@@ -84,8 +84,8 @@ PodOptix queries historical usage data from Prometheus, computes the 99th percen
 
 | Component | Layer | Description |
 |-----------|-------|-------------|
-| **Web Dashboard** | Presentation | UI to view recommendations per cluster, namespace, and pod |
-| **REST API Server** | Presentation | HTTP server — CRUD for clusters, serve recommendations as JSON or YAML |
+| **Web Dashboard** | Presentation | React 18 + TypeScript + Vite + Tailwind — Grafana-style dark theme. Pages: Login, Register, Clusters, Register/Edit Cluster, Cluster Detail (recommendations + recalculate). Talks to backend via `/auth/*` and `/api/v1/*`. Details: [web/DASHBOARD.md](../web/DASHBOARD.md). |
+| **REST API Server** | Presentation | HTTP server (Gin) — CRUD for clusters + recommendations, JWT-protected `/api/v1/*` routes. Serves JSON. |
 | **Auth Service** | Service | User registration + login · bcrypt password hashing · JWT token issuance · middleware verifies all protected routes |
 | **Cluster Registry** | Service | Stores Prometheus endpoint URLs and encrypted auth tokens |
 | **Scheduler** | Service | Cron-based job runner — triggers data collection per cluster once per day |

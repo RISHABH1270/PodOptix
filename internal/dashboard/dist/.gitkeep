@@ -1,0 +1,2 @@
+# Placeholder — satisfies //go:embed all:dist even when the dashboard hasn't been built yet.
+# Run `cd web && npm run build` to populate this folder with the real bundle.

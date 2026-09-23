@@ -750,9 +750,45 @@ One `ContainerMetrics` per container. One pod with 3 containers = 3 `ContainerMe
 
 ---
 
+## Web Dashboard
+
+React 18 + TypeScript + Vite + Tailwind CSS + React Router v7. Grafana-style dark theme (background `#0b0f14`, accent green `#22c55e`), PodOptix gauge logo, lucide-react icons.
+
+**Pages:** Login · Register · Clusters (list) · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate with disconnected warning).
+
+**Auth:** JWT stored in `localStorage`, auto-redirect to `/login` on 401.
+
+**API client:** single `src/lib/api.ts` wrapper — attaches Bearer token, parses JSON, throws on non-2xx.
+
+**Local dev:** `cd web && npm run dev` → Vite on `:5173` proxying `/api/*`, `/auth/*`, `/healthz`, `/readyz` to the Go backend on `:8080`. No CORS needed (same origin from the browser's view).
+
+**Production plan:** `npm run build` → `web/dist/` → `//go:embed` into the Go binary → single-artifact deployment, one origin, no CORS.
+
+Detailed guide: [../web/DASHBOARD.md](../web/DASHBOARD.md).
+
+---
+
 ## Testing Approach
 
-### Test Architecture
+Two independent test suites cover different layers:
+
+| Suite | Location | Framework | Tests | Guide |
+|-------|----------|-----------|-------|-------|
+| Backend API + unit | `tests/` | Go `testing` + testify + httptest + pgx + migrate | 63 | [../tests/TESTING.md](../tests/TESTING.md) |
+| UI end-to-end | `web/tests-e2e/` | Playwright + Chromium | 9 | [../web/tests-e2e/UI_TESTING.md](../web/tests-e2e/UI_TESTING.md) |
+
+### Isolation matrix — all three environments coexist
+
+|                | Production | API tests | UI tests |
+|----------------|-----------|-----------|----------|
+| Server port    | 8080      | 9090      | 9091     |
+| Vite port      | —         | —         | 5174     |
+| PostgreSQL DB  | podoptix  | podoptix_test | podoptix_ui_test |
+| Redis index    | 0         | 1         | 2        |
+
+Same PostgreSQL + Redis containers, fully isolated logical stores. Dev server, API tests, and UI tests can all run in parallel.
+
+### Backend Test Architecture
 
 Tests live in `tests/` at the project root. Run with:
 ```
@@ -861,13 +897,15 @@ Tests are run with `-p 1` (sequential) to prevent parallel database conflicts. T
 | `TestGetCluster_NotFound` | GET with fake ID returns 404 |
 | `TestDeleteCluster` | DELETE removes cluster, subsequent GET returns 404 |
 
-### Integration vs E2E
+### Backend integration vs UI E2E
 
-| | Integration tests (current) | E2E tests (planned) |
+| | Backend integration | UI end-to-end |
 |--|---|---|
-| Server | Real TCP server on port 9090 | Real running server |
-| Database | `podoptix_test` (auto-created) | Staging/dev cluster |
-| Redis | DB index 1 (isolated) | Staging Redis |
-| Speed | Fast — milliseconds | Slow — seconds |
-| When | Every commit | Before deployment |
-| Catches | Code bugs | Deployment and config bugs |
+| Location    | `tests/` | `web/tests-e2e/` |
+| Framework   | Go testing + testify + httptest | Playwright + Chromium |
+| Server      | Real TCP on 9090 | Real backend on 9091 + Vite on 5174 |
+| Database    | `podoptix_test` | `podoptix_ui_test` |
+| Redis       | Index 1 | Index 2 |
+| Tests       | 63 | 9 |
+| Speed       | ~2s total | ~17s total |
+| Catches     | Handler + store + logic bugs | UI regressions + user flow breakage |
