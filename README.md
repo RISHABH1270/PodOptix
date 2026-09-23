@@ -210,6 +210,11 @@ See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all opt
 - [x] Embed dashboard into Go binary via `go:embed` — single-binary build via `make build`
 - [x] Multi-arch Docker image (linux/amd64 + linux/arm64) — 44 MB distroless, `make docker-build` / `make docker-push`
 - [x] Helm chart — stateless Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
+- [x] Helm security hardening — PodSecurityContext (non-root, read-only FS, drop caps), optional NetworkPolicy
+- [x] Helm autoscaling — optional HorizontalPodAutoscaler (CPU + memory targets)
+- [x] Cross-cluster recommendations view — sortable by biggest waste
+- [x] Prometheus `/metrics` endpoint — self-observability (HTTP, scheduler, cache)
+- [x] Resource savings dashboard — potential + realized CPU/memory saved, top waste, per-cluster & per-namespace breakdown
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
 - [ ] Cross-cluster recommendations view
