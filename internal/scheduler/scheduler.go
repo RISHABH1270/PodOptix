@@ -7,6 +7,7 @@ import (
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
+	"github.com/RISHABH1270/PodOptix/internal/metrics"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
@@ -82,22 +83,28 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
+	start := time.Now()
 	log.Printf("INFO  scheduler collecting cluster=%s", clusterID)
 
-	metrics, err := collector.New(prometheusURL, token).Collect(ctx, lookbackWindow)
+	containerMetrics, err := collector.New(prometheusURL, token).Collect(ctx, lookbackWindow)
 	if err != nil {
 		log.Printf("ERROR scheduler collect cluster=%s: %v", clusterID, err)
+		metrics.SchedulerRunsTotal.WithLabelValues("failure").Inc()
+		metrics.SchedulerRunDuration.Observe(time.Since(start).Seconds())
 		if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusDisconnected, time.Now()); err != nil {
 			log.Printf("WARN  scheduler health update cluster=%s: %v", clusterID, err)
 		}
 		return
 	}
 
-	log.Printf("INFO  scheduler collected %d containers from cluster=%s", len(metrics), clusterID)
+	log.Printf("INFO  scheduler collected %d containers from cluster=%s", len(containerMetrics), clusterID)
+	metrics.SchedulerContainersScanned.Add(float64(len(containerMetrics)))
 
-	recommendations, err := recommender.GenerateAll(clusterID, metrics)
+	recommendations, err := recommender.GenerateAll(clusterID, containerMetrics)
 	if err != nil {
 		log.Printf("ERROR scheduler recommend cluster=%s: %v", clusterID, err)
+		metrics.SchedulerRunsTotal.WithLabelValues("failure").Inc()
+		metrics.SchedulerRunDuration.Observe(time.Since(start).Seconds())
 		return
 	}
 
@@ -116,4 +123,6 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 	if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now()); err != nil {
 		log.Printf("WARN  scheduler health update cluster=%s: %v", clusterID, err)
 	}
+	metrics.SchedulerRunsTotal.WithLabelValues("success").Inc()
+	metrics.SchedulerRunDuration.Observe(time.Since(start).Seconds())
 }

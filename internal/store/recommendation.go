@@ -102,3 +102,60 @@ func (s *Store) ListByCluster(ctx context.Context, clusterID string) ([]*models.
 	}
 	return recommendations, nil
 }
+
+// RecommendationWithCluster is a Recommendation joined with its cluster's human-readable name.
+// Used for the cross-cluster view.
+type RecommendationWithCluster struct {
+	*models.Recommendation
+	ClusterName string `json:"cluster_name" db:"cluster_name"`
+}
+
+// ListAllWithClusterName fetches every recommendation across every cluster,
+// joined with the cluster's name for display. Ordered by biggest CPU delta first —
+// the containers with the most over-provisioned CPU float to the top.
+func (s *Store) ListAllWithClusterName(ctx context.Context) ([]*RecommendationWithCluster, error) {
+	query := `
+		SELECT
+			r.recommendation_id, r.cluster_id, r.namespace, r.pod_name, r.container_name,
+			r.status, r.current_cpu_limit, r.current_mem_limit,
+			r.p99_cpu, r.p99_mem,
+			r.recommended_cpu_limit, r.recommended_mem_limit,
+			r.applied, r.created_at, r.updated_at,
+			c.cluster_name
+		FROM recommendations r
+		JOIN clusters c ON r.cluster_id = c.cluster_id
+		ORDER BY (r.current_cpu_limit - r.recommended_cpu_limit) DESC, c.cluster_name, r.namespace, r.pod_name
+	`
+	rows, err := s.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list all recommendations: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*RecommendationWithCluster{}
+	for rows.Next() {
+		item := &RecommendationWithCluster{Recommendation: &models.Recommendation{}}
+		if err := rows.Scan(
+			&item.RecommendationID,
+			&item.ClusterID,
+			&item.Namespace,
+			&item.PodName,
+			&item.ContainerName,
+			&item.Status,
+			&item.CurrentCPULimit,
+			&item.CurrentMemLimit,
+			&item.P99CPU,
+			&item.P99Mem,
+			&item.RecommendedCPULimit,
+			&item.RecommendedMemLimit,
+			&item.Applied,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.ClusterName,
+		); err != nil {
+			return nil, fmt.Errorf("scan recommendation with cluster: %w", err)
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
