@@ -31,6 +31,10 @@ export interface Recommendation {
   updated_at:            string
 }
 
+export interface RecommendationWithCluster extends Recommendation {
+  cluster_name: string
+}
+
 export interface ApiError { message: string; status: number; requestId?: string }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -102,6 +106,9 @@ export const api = {
   },
 
   // ── recommendations ──
+  listAllRecommendations() {
+    return request<RecommendationWithCluster[]>('GET', '/api/v1/recommendations')
+  },
   listRecommendations(clusterId: string) {
     return request<Recommendation[]>('GET', `/api/v1/clusters/${clusterId}/recommendations`)
   },

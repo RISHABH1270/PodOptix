@@ -6,6 +6,7 @@ import (
 
 	"github.com/RISHABH1270/PodOptix/internal/dashboard"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // registerRoutes wires up all HTTP routes to their handler functions.
@@ -16,6 +17,10 @@ func (s *Server) registerRoutes() {
 	s.router.GET("/readyz", s.handleReadyz)    // readiness — are dependencies ready?
 	s.router.POST("/auth/register", s.register)
 	s.router.POST("/auth/login", s.login)
+
+	// Prometheus scrape target — public because scrapers usually run without auth.
+	// Restrict via NetworkPolicy if scraping from outside the cluster.
+	s.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// protected routes — JWT required
 	v1 := s.router.Group("/api/v1")
@@ -29,6 +34,7 @@ func (s *Server) registerRoutes() {
 		v1.DELETE("/clusters/:id", s.deleteCluster)
 
 		// recommendations
+		v1.GET("/recommendations", s.listAllRecommendations)   // cross-cluster overview
 		v1.GET("/clusters/:id/recommendations", s.listRecommendations)
 		v1.POST("/clusters/:id/recalculate", s.recalculate)
 	}

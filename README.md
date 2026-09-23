@@ -78,7 +78,7 @@ Register a cluster with its Prometheus URL + auth token. Recommendations are gen
 
 PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tailwind, styled to match Grafana's dark theme.
 
-Pages: Login · Register · Clusters list · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate).
+Pages: Login · Register · Clusters list · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate) · Recommendations (cross-cluster view, sorted by biggest waste) · Savings (potential + realized CPU/memory reclaim, adoption %, top-10 waste, per-cluster + per-namespace breakdown).
 
 Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
 
@@ -159,13 +159,15 @@ See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all opt
 | `POST` | `/auth/login` | — | Login and receive JWT token |
 | `GET` | `/healthz` | — | Liveness probe |
 | `GET` | `/readyz` | — | Readiness probe (checks DB + Redis) |
+| `GET` | `/metrics` | — | Prometheus scrape endpoint — `podoptix_*` metrics (HTTP, scheduler, cache) |
 | `GET` | `/api/v1/clusters` | JWT | List all clusters |
 | `POST` | `/api/v1/clusters` | JWT | Register a cluster |
 | `GET` | `/api/v1/clusters/:id` | JWT | Get cluster by ID |
 | `PUT` | `/api/v1/clusters/:id` | JWT | Update cluster details |
 | `DELETE` | `/api/v1/clusters/:id` | JWT | Remove a cluster |
-| `GET` | `/api/v1/clusters/:id/recommendations` | JWT | Get recommendations (cached) |
+| `GET` | `/api/v1/clusters/:id/recommendations` | JWT | Get recommendations for one cluster (cached) |
 | `POST` | `/api/v1/clusters/:id/recalculate` | JWT | Trigger manual recalculation |
+| `GET` | `/api/v1/recommendations` | JWT | Cross-cluster recommendations — every cluster, joined with `cluster_name`, sorted by biggest CPU delta |
 
 ---
 
@@ -210,10 +212,13 @@ See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all opt
 - [x] Embed dashboard into Go binary via `go:embed` — single-binary build via `make build`
 - [x] Multi-arch Docker image (linux/amd64 + linux/arm64) — 44 MB distroless, `make docker-build` / `make docker-push`
 - [x] Helm chart — stateless Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
+- [x] Helm security hardening — PodSecurityContext (non-root, read-only FS, drop caps), optional NetworkPolicy
+- [x] Helm autoscaling — optional HorizontalPodAutoscaler (CPU + memory targets)
+- [x] Cross-cluster recommendations view — sortable by biggest waste
+- [x] Prometheus `/metrics` endpoint — self-observability (HTTP, scheduler, cache)
+- [x] Resource savings dashboard — potential + realized CPU/memory saved, top waste, per-cluster & per-namespace breakdown
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
-- [ ] Cross-cluster recommendations view
-- [ ] Cost savings dashboard
 
 ---
 

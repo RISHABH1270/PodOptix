@@ -108,6 +108,16 @@ Click **Register cluster**. Behind the scenes:
 - **`connected` + first sync running** → recommendations appear as they're computed
 - **`disconnected`** → check the URL and token, then click **Edit** to fix
 
+Once recommendations start populating, you have three views:
+
+| Page | URL | What it shows |
+|------|-----|---------------|
+| **Cluster Detail** | `/clusters/:id` | Every recommendation for one cluster |
+| **Recommendations** | `/recommendations` | Cross-cluster view — every container from every cluster, sorted by biggest CPU waste first |
+| **Savings** | `/savings` | Total CPU + memory you can reclaim, adoption %, top-10 waste, per-cluster + per-namespace breakdown |
+
+The Recommendations and Savings pages are the fastest way to see where the biggest wins are across your entire fleet.
+
 ### 4. Reviewing recommendations
 
 The cluster detail page shows a table with:
@@ -171,11 +181,15 @@ All configuration is via environment variables (for direct/binary/Docker) or Hel
 | Value | Default | Purpose |
 |-------|---------|---------|
 | `image.tag` | `0.1.0` | Container image version |
-| `podoptix.replicaCount` | `1` | Scale to N — PodOptix is stateless |
+| `podoptix.replicaCount` | `1` | Scale to N — PodOptix is stateless (ignored when `autoscaling.enabled`) |
 | `postgres.storage.size` | `10Gi` | PVC size for Postgres data |
 | `service.type` | `ClusterIP` | Set to `LoadBalancer` for public access |
 | `service.port` | `8080` | External port |
 | `service.annotations` | `{}` | e.g. AWS NLB / GCP LB tuning |
+| `autoscaling.enabled` | `false` | Turn on HPA — CPU target 70%, memory target 80%, min 1 / max 5 |
+| `networkPolicy.enabled` | `false` | Opt-in NetworkPolicy — restricts pod-to-pod traffic (requires a policy-enforcing CNI) |
+| `networkPolicy.extraIngressNamespaces` | `[]` | Extra namespaces allowed to reach PodOptix (e.g. `["ingress-nginx"]`) |
+| `securityContext.*` | secure defaults | Non-root UID 65532, read-only root FS, all caps dropped, seccomp `RuntimeDefault` — already applied |
 
 Full list: `helm show values oci://ghcr.io/rishabh1270/charts/podoptix --version 0.1.0`
 
@@ -291,6 +305,28 @@ Tested on 1.24+. Should work on older versions but not tested.
 
 **Q: What Prometheus versions are supported?**
 Any version supporting `/api/v1/query_range`. Tested on Prometheus 2.x.
+
+---
+
+## Monitoring PodOptix itself
+
+PodOptix exposes its own Prometheus metrics on `GET /metrics` (public, no auth). All metrics use the `podoptix_*` prefix and cover HTTP traffic, scheduler runs, cache hit rate, and container scan counts.
+
+Sample Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: podoptix
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['podoptix.podoptix.svc.cluster.local:8080']
+```
+
+Useful queries once scraped:
+- `rate(podoptix_http_requests_total[5m])` — request rate per endpoint
+- `histogram_quantile(0.99, rate(podoptix_http_request_duration_seconds_bucket[5m]))` — API p99 latency
+- `rate(podoptix_scheduler_runs_total{outcome="failure"}[1h])` — recent scheduler failures
+- `rate(podoptix_cache_hits_total[5m]) / (rate(podoptix_cache_hits_total[5m]) + rate(podoptix_cache_misses_total[5m]))` — Redis cache hit ratio
 
 ---
 

@@ -8,10 +8,29 @@ import (
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
+	"github.com/RISHABH1270/PodOptix/internal/metrics"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 )
+
+// listAllRecommendations returns every recommendation across every cluster,
+// joined with the cluster name. Used by the cross-cluster overview page.
+// Ordered by biggest CPU delta first — surfaces the biggest wins on top.
+func (s *Server) listAllRecommendations(c *gin.Context) {
+	requestID := c.GetString("request_id")
+
+	recs, err := s.store.ListAllWithClusterName(c.Request.Context())
+	if err != nil {
+		log.Printf("ERROR [%s] listAllRecommendations db: %v", requestID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to fetch recommendations",
+			"request_id": requestID,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, recs)
+}
 
 // listRecommendations returns all recommendations for a cluster.
 // Checks Redis cache first — falls back to PostgreSQL on miss.
@@ -27,9 +46,11 @@ func (s *Server) listRecommendations(c *gin.Context) {
 			log.Printf("WARN  [%s] listRecommendations cache get: %v", requestID, err)
 		}
 		if hit {
+			metrics.CacheHitsTotal.WithLabelValues("recommendations").Inc()
 			c.JSON(http.StatusOK, cached)
 			return
 		}
+		metrics.CacheMissesTotal.WithLabelValues("recommendations").Inc()
 	}
 
 	// cache miss — fetch from PostgreSQL

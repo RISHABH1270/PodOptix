@@ -43,8 +43,8 @@ open http://localhost:8080
 ```
 web/
 ├── src/
-│   ├── pages/           Login · Register · Clusters · RegisterCluster · ClusterDetail
-│   ├── components/      Layout (sidebar) · ProtectedRoute · StatusPill
+│   ├── pages/           Login · Register · Clusters · RegisterCluster · EditCluster · ClusterDetail · Recommendations (cross-cluster) · Savings (reclaimable CPU/mem, adoption, breakdowns)
+│   ├── components/      Layout (sidebar — 3 nav items: Clusters, Recommendations, Savings) · ProtectedRoute · StatusPill
 │   ├── lib/
 │   │   ├── api.ts       Typed fetch wrapper — attaches JWT, throws on non-2xx
 │   │   └── auth.ts      JWT storage in localStorage

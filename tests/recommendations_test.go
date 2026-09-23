@@ -10,6 +10,23 @@ import (
 func TestRecommendations(t *testing.T) {
 	tok := bearer(testToken())
 
+	t.Run("GET /recommendations (cross-cluster)", func(t *testing.T) {
+		t.Run("returns empty array when no recommendations exist", func(t *testing.T) {
+			track(t)
+			resp := do(t, http.MethodGet, "/api/v1/recommendations", "", tok)
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, byte('['), body[0]) // always array, never null
+		})
+
+		t.Run("no auth returns 401", func(t *testing.T) {
+			track(t)
+			resp := do(t, http.MethodGet, "/api/v1/recommendations", "", "")
+			resp.Body.Close()
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		})
+	})
+
 	t.Run("GET /clusters/:id/recommendations", func(t *testing.T) {
 		t.Run("returns empty array for new cluster", func(t *testing.T) {
 			track(t)

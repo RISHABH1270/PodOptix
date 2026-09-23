@@ -84,8 +84,9 @@ PodOptix queries historical usage data from Prometheus, computes the 99th percen
 
 | Component | Layer | Description |
 |-----------|-------|-------------|
-| **Web Dashboard** | Presentation | React 18 + TypeScript + Vite + Tailwind — Grafana-style dark theme. Pages: Login, Register, Clusters, Register/Edit Cluster, Cluster Detail (recommendations + recalculate). Talks to backend via `/auth/*` and `/api/v1/*`. Details: [web/DASHBOARD.md](../web/DASHBOARD.md). |
+| **Web Dashboard** | Presentation | React 18 + TypeScript + Vite + Tailwind — Grafana-style dark theme. Pages: Login, Register, Clusters, Register/Edit Cluster, Cluster Detail (per-cluster recommendations + recalculate), **Recommendations (cross-cluster view sorted by biggest waste)**, **Savings dashboard (reclaimable CPU/memory, adoption %, top waste, per-cluster & per-namespace breakdown)**. Talks to backend via `/auth/*` and `/api/v1/*`. Details: [web/DASHBOARD.md](../web/DASHBOARD.md). |
 | **REST API Server** | Presentation | HTTP server (Gin) — CRUD for clusters + recommendations, JWT-protected `/api/v1/*` routes. Serves JSON. |
+| **Metrics** | Presentation | Prometheus `/metrics` endpoint (public, no auth) — exposes `podoptix_*` families for HTTP traffic, scheduler runs, cache hit rate, containers scanned. Self-observability for operators. |
 | **Auth Service** | Service | User registration + login · bcrypt password hashing · JWT token issuance · middleware verifies all protected routes |
 | **Cluster Registry** | Service | Stores Prometheus endpoint URLs and encrypted auth tokens |
 | **Scheduler** | Service | Cron-based job runner — triggers data collection per cluster once per day |

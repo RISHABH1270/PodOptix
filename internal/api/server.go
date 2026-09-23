@@ -27,7 +27,8 @@ func NewServer(st *store.Store, ca *cache.Cache, sched *scheduler.Scheduler, jwt
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(RequestIDMiddleware())
-	router.SetTrustedProxies(nil) // **direct connection only — no reverse proxy trust**
+	router.Use(MetricsMiddleware()) // records latency + count per route into Prometheus metrics
+	router.SetTrustedProxies(nil)   // **direct connection only — no reverse proxy trust**
 
 	server := &Server{
 		router:        router,
