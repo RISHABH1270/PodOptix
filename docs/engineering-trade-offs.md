@@ -18,6 +18,7 @@ Every decision here was made intentionally. This doc records what we chose, what
 | ID Strategy | UUID v4 (string) | Globally unique · secure · no collision risk |
 | Recommendation storage | UPSERT | One row per container — clean dashboard |
 | Resource percentile | p99 × 2 | Real usage + smart buffer — not freak spikes |
+| Savings units | Cores + GiB (no $) | `$/core-hour` varies wildly per cloud/region/contract |
 
 ---
 
@@ -766,3 +767,43 @@ Cypress was the leader through ~2023 but Playwright surpassed it in 2024 with fa
 - `internal/api/routes.go` — `router.NoRoute` wires the dashboard handler; `/api/*` and `/auth/*` paths still return proper 404s
 
 Result: a 41 MB single binary that serves the API on `/api/v1/*` and the dashboard on everything else, from one port.
+
+---
+
+## 28. Savings Dashboard — Resource Units, Not Dollars
+
+### Decision: Report reclaimable CPU (cores) and memory (GiB) — no dollar figures
+
+The Savings page shows how much CPU and memory PodOptix's recommendations would reclaim across the fleet — as raw resource units. It never converts to `$` or a cloud bill line item.
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Resource units (cores + GiB)** ✅ | Honest · Verifiable · Same number regardless of cloud, region, contract | Operator does the final conversion if they want dollars |
+| Dollar figures (baked-in `$/core-hour` constant) | Marketing-friendly | Wrong for every customer — see below |
+| Full cost modeling (per-cloud pricing API + node type awareness) | Accurate | Massive scope creep — this is what Kubecost and OpenCost exist to do |
+
+**Why not dollars — `$/core-hour` is not a constant:**
+
+The same 1 core-hour costs radically different amounts depending on variables PodOptix has no visibility into:
+
+- **Cloud** — AWS, GCP, Azure, on-prem, bare metal all price CPU differently
+- **Region** — `us-east-1` vs `ap-south-1` vs `me-central-1` diverge 2–3×
+- **Instance family** — `m5`, `r5`, `c5`, Graviton (`m6g`), spot, reserved, savings-plans, committed use
+- **Enterprise contract** — private discounts, EDPs, committed spend rebates, marketplace credits
+- **Chargeback model** — some orgs allocate by node hours, some by pod requests, some by namespace tags
+
+Baking a single `$/core-hour` into the code would produce a number that is confidently wrong for every customer. Showing "You'll save $47,382/month" when the true figure is $8k or $110k destroys trust the first time a FinOps team checks the math.
+
+**What "real cost" needs:**
+
+Accurate cost attribution is [Kubecost](https://www.kubecost.com/) / [OpenCost](https://opencost.io/) territory — they scrape node prices, join with pod-to-node mappings, apply reservations and spot discounts, and reconcile against cloud billing exports. PodOptix intentionally does not duplicate that stack. If a customer wants dollar figures, they multiply our reclaimable cores/GiB by their own `$/core-hour` — a number they already know.
+
+**What we show instead:**
+
+- Potential reclaim: `Σ (current_cpu_limit − recommended_cpu_limit)` for `applied = false` rows → cores
+- Realized reclaim: same math for `applied = true` rows → cores (proof the tool paid off)
+- Same for memory in GiB
+- Adoption %: applied rows / total ready rows
+- Top-10 CPU + memory waste, per-cluster breakdown, per-namespace breakdown
+
+These are all verifiable from the raw recommendations table — an operator can spot-check any number by running SQL. No opaque cost model, no wrong-by-default numbers.

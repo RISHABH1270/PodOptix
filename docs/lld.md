@@ -293,7 +293,7 @@ All cluster endpoints require:
 Authorization: Bearer <jwt_token>
 ```
 
-Public endpoints (no auth required): `GET /healthz`, `GET /readyz`, `POST /auth/register`, `POST /auth/login`
+Public endpoints (no auth required): `GET /healthz`, `GET /readyz`, `GET /metrics`, `POST /auth/register`, `POST /auth/login`
 
 ### Error Response Format
 
@@ -564,6 +564,62 @@ Trigger a manual recommendation recalculation for a cluster.
 **Errors:**
 - `404` — "Cluster not found"
 - `429` — recalculation already in progress (distributed Redis lock held)
+
+---
+
+#### `GET /api/v1/recommendations`
+
+Cross-cluster recommendations view — every recommendation from every registered cluster, joined with the owning cluster's name. Ordered by biggest CPU delta (`current_cpu_limit - recommended_cpu_limit`) descending, so the biggest waste appears first. Powers the `/recommendations` dashboard page.
+
+**Auth:** JWT required
+
+**Response 200:**
+```json
+[
+  {
+    "recommendation_id":     "x7f3c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
+    "cluster_id":            "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
+    "cluster_name":          "production-us-east",
+    "namespace":             "payments",
+    "pod_name":              "payment-api-7d9f",
+    "container_name":        "payment-api",
+    "status":                "ready",
+    "current_cpu_limit":     2000,
+    "current_mem_limit":     2048,
+    "p99_cpu":               120.5,
+    "p99_mem":               180.2,
+    "recommended_cpu_limit": 241,
+    "recommended_mem_limit": 361,
+    "applied":               false,
+    "created_at":            "2026-06-24T00:00:00Z",
+    "updated_at":            "2026-06-24T00:00:00Z"
+  }
+]
+```
+
+Same shape as `GET /api/v1/clusters/:id/recommendations` with one extra field per row: `cluster_name`. Returns `[]` when no recommendations exist across any cluster — never `null`.
+
+---
+
+#### `GET /metrics`
+
+Prometheus scrape endpoint. Exposes PodOptix's own operational metrics using the `podoptix_*` prefix so operators can observe the Hub itself.
+
+**Auth:** None — public endpoint intended for Prometheus scrape
+
+**Response 200:** Prometheus text exposition format.
+
+**Metric families exposed** (source: [`internal/metrics/metrics.go`](../internal/metrics/metrics.go)):
+
+| Metric | Type | Labels | Meaning |
+|--------|------|--------|---------|
+| `podoptix_http_requests_total` | counter | `method`, `path`, `status` | HTTP requests processed by the API |
+| `podoptix_http_request_duration_seconds` | histogram | `method`, `path` | Per-endpoint latency, default buckets |
+| `podoptix_scheduler_runs_total` | counter | `outcome` (`success`\|`failure`) | Scheduler runs, per outcome |
+| `podoptix_scheduler_run_duration_seconds` | histogram | — | Wall-clock time of each scheduler tick |
+| `podoptix_scheduler_containers_scanned_total` | counter | — | Cumulative containers analysed |
+| `podoptix_cache_hits_total` | counter | `kind` | Redis cache hits, by key type |
+| `podoptix_cache_misses_total` | counter | `kind` | Redis cache misses, by key type |
 
 ---
 

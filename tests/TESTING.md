@@ -104,6 +104,11 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 ### `health_test.go` (1 test)
 - `GET /healthz` returns 200 + `{"status":"ok"}`
 
+### `metrics_test.go` (~3 tests)
+- `GET /metrics` returns 200 with Prometheus text exposition format (no auth required)
+- Response body contains the `podoptix_*` metric families (HTTP, scheduler, cache)
+- HTTP counter increments after a real request through the router
+
 ### `auth_test.go` (~10 tests)
 - Register creates user, returns JWT
 - Register with duplicate email → 409
