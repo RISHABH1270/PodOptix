@@ -19,18 +19,19 @@
 
 ## The Problem
 
-**3:12 AM. PagerDuty fires. The on-call engineer gets paged. `payment-api` is OOMKilled in production.**
+> **3:12 AM.** PagerDuty fires. The on-call engineer gets paged.
+> **`payment-api` is OOMKilled in production.**
 
-The root cause? Someone copied resource limits from an unrelated service six months ago. The fix takes 2 minutes. Finding it took 40. It will happen again.
+The root cause? Someone copied resource limits from an unrelated service six months ago. The fix takes 2 minutes. Finding it took 40 minutes. It will happen again.
 
-This is what happens when 150 containers across 50 microservices all have limits set by guesswork:
+This is what happens when 150 containers across 50 microservices all have limits set by guesswork in production:
 
 | Symptom | Reality |
 |---------|---------|
-| Pods OOMKilled at midnight | Limits set too low with no data |
-| Cloud bill up 40-60% | Limits set too high — paying for unused capacity |
+| Pods OOMKilled at midnight | Memory **limits** set too low with no data |
+| Cloud bill up 40-60% | **Requests** set too high — nodes reserve capacity nobody uses |
 | Engineers afraid to reduce limits | Nobody knows actual usage |
-| Cascading failures | Limits copied from unrelated workloads |
+| Cascading failures | Requests and limits copied from unrelated workloads |
 | Finance blind to cost drivers | No per-service visibility across clusters |
 
 **Every new microservice makes it worse. The problem compounds.**
@@ -39,13 +40,21 @@ This is what happens when 150 containers across 50 microservices all have limits
 
 ## The Solution
 
-PodOptix connects to your Prometheus, analyzes **real usage patterns**, and recommends BOTH `request` and `limit` for CPU and memory — `request = ceil(p99)` (what the scheduler reserves) and `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill). The engineering sweet spot between reliability and cost.
+PodOptix connects to your Prometheus, analyzes **real usage patterns**, and recommends both `requests` and `limits` — the engineering sweet spot between reliability and cost.
+
+**The formula** (same for CPU and memory):
 
 ```
-Actual Usage (p99)  →  Request = p99 · Limit = p99 × 2
-     120m CPU                  request: 120m · limit: 240m
-     180Mi RAM                 request: 180Mi · limit: 360Mi
+request = ceil(p99)         ← scheduler reserves this · pod is guaranteed this much
+limit   = ceil(p99 × 2)     ← hard ceiling · CPU gets throttled, memory gets OOMKilled above
 ```
+
+**Example** — a container averaging 120m CPU and 180Mi RAM at the 99th percentile:
+
+| Resource | p99 (actual usage) | Recommended request | Recommended limit |
+|----------|-------------------:|--------------------:|------------------:|
+| **CPU** | 120m | **120m** | **240m** |
+| **Memory** | 180Mi | **180Mi** | **360Mi** |
 
 No more guessing. No more waste.
 
@@ -76,9 +85,15 @@ Register a cluster with its Prometheus URL + auth token. Recommendations are gen
 
 ## Web Dashboard
 
-PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tailwind, styled to match Grafana's dark theme.
+PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tailwind.
 
-Pages: Login · Register · Clusters list · Register Cluster · Edit Cluster · Cluster Detail (recommendations table + one-click recalculate) · Recommendations (cross-cluster view, sorted by biggest waste) · Savings (potential + realized CPU/memory reclaim, adoption %, top-10 waste, per-cluster + per-namespace breakdown).
+**Pages:**
+- **Login / Register** — email + password, JWT in localStorage
+- **Clusters** — list all registered clusters with status pills + stat cards
+- **Register Cluster / Edit Cluster** — form with lookback picker (7d / 10d / 30d)
+- **Cluster Detail** — per-container recommendations table + one-click recalculate
+- **Recommendations** — cross-cluster view, sortable by biggest waste
+- **Savings** — potential + realized CPU/memory reclaim, adoption %, top-10 waste, per-cluster + per-namespace breakdown
 
 Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
 
