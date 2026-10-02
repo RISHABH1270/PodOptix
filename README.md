@@ -19,6 +19,7 @@
 
 ## The Problem
 
+> [!CAUTION]
 > **3:12 AM.** PagerDuty fires. The on-call engineer gets paged.
 > **`payment-api` is OOMKilled in production.**
 
