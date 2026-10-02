@@ -244,7 +244,7 @@ PodOptix/
 │   ├── config/                  env var loading
 │   ├── dashboard/               //go:embed of the built React app
 │   ├── metrics/                 Prometheus /metrics registrations
-│   ├── recommender/             p99 × 2 = recommended limit
+│   ├── recommender/             request = ceil(p99), limit = ceil(p99 × 2) — both CPU + mem
 │   ├── scheduler/               24h ticker that drives the pipeline
 │   └── store/                   PostgreSQL — pgxpool + migrations + CRUD
 │
@@ -376,14 +376,16 @@ Three files, each ~60 lines. Pure functions — no state, easy to test.
 
 ## 5.6 `internal/collector/` — Prometheus HTTP client
 
-**[internal/collector/prometheus.go](../internal/collector/prometheus.go)** — 4 PromQL queries wrapped in Go:
+**[internal/collector/prometheus.go](../internal/collector/prometheus.go)** — 6 PromQL queries wrapped in Go:
 
 1. `rate(container_cpu_usage_seconds_total[5m]) * 1000` — CPU usage in millicores, over the lookback window
 2. `container_memory_working_set_bytes / 1048576` — memory in MiB
-3. `kube_pod_container_resource_limits{resource="cpu"} * 1000` — current CPU limit (instant query)
-4. `kube_pod_container_resource_limits{resource="memory"} / 1048576` — current memory limit (instant query)
+3. `kube_pod_container_resource_requests{resource="cpu"} * 1000` — current CPU request (instant query)
+4. `kube_pod_container_resource_limits{resource="cpu"} * 1000` — current CPU limit (instant query)
+5. `kube_pod_container_resource_requests{resource="memory"} / 1048576` — current memory request (instant query)
+6. `kube_pod_container_resource_limits{resource="memory"} / 1048576` — current memory limit (instant query)
 
-`Collect()` runs all four, merges results by (namespace, pod, container) key, returns `[]*ContainerMetrics`. `Ping()` runs an `up` query — used by cluster registration.
+`Collect()` runs all six, merges results by (namespace, pod, container) key, returns `[]*ContainerMetrics`. `Ping()` runs an `up` query — used by cluster registration.
 
 ## 5.7 `internal/compute/` — the p99 algorithm
 
@@ -401,9 +403,9 @@ func ComputeP99(values []float64) (float64, error) {
 
 That's it. Doesn't know or care about clusters, containers, HTTP. Perfectly testable.
 
-## 5.8 `internal/recommender/` — p99 × 2
+## 5.8 `internal/recommender/` — request = ceil(p99), limit = ceil(p99 × 2)
 
-**[internal/recommender/recommender.go](../internal/recommender/recommender.go)** — pipes ContainerMetrics through ComputeP99, applies `× 2`, wraps in a Recommendation struct.
+**[internal/recommender/recommender.go](../internal/recommender/recommender.go)** — pipes ContainerMetrics through ComputeP99 and emits both a `request` (= `ceil(p99)` — what the scheduler reserves on the node) and a `limit` (= `ceil(p99 × 2)` — hard ceiling before CPU throttle / OOMKill) for CPU and memory. Four `Recommended*` fields written per container: `RecommendedCPURequest`, `RecommendedCPULimit`, `RecommendedMemRequest`, `RecommendedMemLimit`. Savings math downstream uses requests (not limits) because requests are what you actually pay for.
 
 Two entry points:
 - `Generate(clusterID, *ContainerMetrics)` — one container

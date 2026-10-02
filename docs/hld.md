@@ -23,7 +23,7 @@ Most Kubernetes teams set resource limits by guessing or copying from similar se
 1. **Over-provisioning** — limits set too high. You pay for CPU and memory that is never used. At scale (hundreds of pods), this waste compounds quickly.
 2. **Under-provisioning** — limits set too low. Pods get OOMKilled or CPU-throttled under load. Incidents happen.
 
-PodOptix queries historical usage data from Prometheus, computes the 99th percentile over a rolling 7-day window, and applies a 2× safety multiplier to produce a right-sized limit recommendation. No guesswork. No manual analysis.
+PodOptix queries historical usage data from Prometheus, computes the 99th percentile over a rolling 7-day window, and recommends BOTH `request` (= `ceil(p99)` — what the scheduler reserves) and `limit` (= `ceil(p99 × 2)` — hard ceiling before CPU throttle / OOMKill). No guesswork. No manual analysis.
 
 **Key design principle:** No agents. No sidecars. Nothing to deploy inside workload clusters. PodOptix runs as a single Hub in your management cluster and queries each workload cluster's existing Prometheus directly.
 
@@ -92,7 +92,7 @@ PodOptix queries historical usage data from Prometheus, computes the 99th percen
 | **Scheduler** | Service | Cron-based job runner — triggers data collection per cluster once per day |
 | **PromQL Engine** | Processing | Queries Prometheus `/api/v1/query_range` with PromQL expressions |
 | **p99 Computation Engine** | Processing | Computes 99th percentile from raw time series over a rolling 7-day window |
-| **Recommendation Engine** | Processing | Applies 2× multiplier · Formats output as YAML resource patches |
+| **Recommendation Engine** | Processing | Emits `request = ceil(p99)` and `limit = ceil(p99 × 2)` per container (CPU + memory) · Formats output as YAML resource patches |
 | **Database (PostgreSQL)** | Storage | Persists cluster config and recommendations — one row per container, updated daily |
 | **Cache (Redis)** | Storage | Caches recommendations per cluster — TTL: 3 hours |
 
@@ -143,9 +143,11 @@ The Hub stores the token encrypted at rest (AES-256-GCM) and begins scheduling d
   Step 4   p99 Computation Engine processes raw time series
            Computes 99th percentile over a rolling window (default: 7 days)
 
-  Step 5   Recommendation Engine calculates new limits
-           CPU  limit = p99_cpu × 2   (unit: millicores)
-           Mem  limit = p99_mem × 2   (unit: MiB)
+  Step 5   Recommendation Engine calculates new requests + limits
+           CPU  request = ceil(p99_cpu)       limit = ceil(p99_cpu × 2)   (unit: millicores)
+           Mem  request = ceil(p99_mem)       limit = ceil(p99_mem × 2)   (unit: MiB)
+           request = what the K8s scheduler reserves on the node (= what you pay for)
+           limit   = hard ceiling before CPU throttle / memory OOMKill
 
   Step 6   Recommendations UPSERTed — one row per container, updated in place
            Unique key: (cluster_id, namespace, pod_name, container_name)
@@ -171,7 +173,7 @@ Scheduler (cron: once/day)
         │         │
         │         ├── p99 Computation Engine → quantile(0.99, time_series)
         │         │
-        │         ├── Recommendation Engine → p99 × 2
+        │         ├── Recommendation Engine → request = ceil(p99), limit = ceil(p99 × 2)
         │         │
         │         └── UPSERT into recommendations table
         │

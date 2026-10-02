@@ -332,7 +332,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
   <!-- ══ SYSTEM OVERVIEW ══ -->
   <h1 class="page-title">System <span>Overview</span></h1>
-  <p class="page-desc">PodOptix is a Kubernetes resource right-sizing engine. Users authenticate, register their workload clusters, and PodOptix queries each cluster's Prometheus every 24 hours to generate recommended CPU/memory limits at p99 × 2. Three entities work together: Users manage Clusters, and each Cluster generates Recommendations.</p>
+  <p class="page-desc">PodOptix is a Kubernetes resource right-sizing engine. Users authenticate, register their workload clusters, and PodOptix queries each cluster's Prometheus every 24 hours to generate recommended CPU/memory requests + limits — request = ceil(p99), limit = ceil(p99 × 2). Three entities work together: Users manage Clusters, and each Cluster generates Recommendations.</p>
 
   <!-- ── Component grid ── -->
   <div class="overview-grid">
@@ -353,7 +353,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
     <div class="ov-card">
       <div class="ov-icon">📊</div>
       <div class="ov-title">Recommendation</div>
-      <div class="ov-desc">Scheduler pulls metrics every 24h · p99 × 2 = recommended limit</div>
+      <div class="ov-desc">Scheduler pulls metrics every 24h · request = ceil(p99) · limit = ceil(p99 × 2)</div>
       <div class="ov-tech">Prometheus · Redis cache 3h</div>
     </div>
   </div>
@@ -390,7 +390,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <div class="ov-pl-num">4</div>
         <div class="ov-pl-body">
           <div class="ov-pl-label">Compute p99 → Generate recommendations</div>
-          <div class="ov-pl-detail">For each container: <code>ComputeP99(values)</code> sorts · picks <code>ceil(0.99×n)−1</code> · <code>RecommendedLimit = ceil(p99 × 2)</code> · empty data → status <code>new_service</code></div>
+          <div class="ov-pl-detail">For each container: <code>ComputeP99(values)</code> sorts · picks <code>ceil(0.99×n)−1</code> · <code>RecommendedRequest = ceil(p99)</code> · <code>RecommendedLimit = ceil(p99 × 2)</code> · empty data → status <code>new_service</code></div>
         </div>
       </div>
       <div class="ov-pl-arrow">▼</div>
@@ -608,7 +608,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <div class="go-lbl">go func() — background sync</div>
         <div class="go-step"><span class="go-num">1</span><span>Forked from createCluster only when <code style="color:var(--green)">status == "connected"</code> — 10 min context timeout</span></div>
         <div class="go-step"><span class="go-num">2</span><span><code style="color:var(--cyan)">collector.Collect(ctx, lookbackWindow)</code> — queries Prometheus for CPU + memory + current limits</span></div>
-        <div class="go-step"><span class="go-num">3</span><span><code style="color:var(--cyan)">recommender.GenerateAll(clusterID, metrics)</code> → p99 × 2 = recommended limits</span></div>
+        <div class="go-step"><span class="go-num">3</span><span><code style="color:var(--cyan)">recommender.GenerateAll(clusterID, metrics)</code> → request = ceil(p99), limit = ceil(p99 × 2)</span></div>
         <div class="go-step"><span class="go-num">4</span><span><code style="color:var(--cyan)">store.UpsertRecommendation(rec)</code> for each container — idempotent</span></div>
         <div class="go-step"><span class="go-num">5</span><span><code style="color:#a78bfa">store.UpdateClusterHealth("connected", time.Now())</code> — stamps last_synced_at</span></div>
       </div>
@@ -698,12 +698,16 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
             <tr><td class="td-name">pod_name</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Pod name</td></tr>
             <tr><td class="td-name">container_name</td><td class="td-type">VARCHAR(255)</td><td class="td-note">Container name — UNIQUE with cluster_id + namespace + pod_name</td></tr>
             <tr><td class="td-name">status</td><td class="td-type">VARCHAR(20)</td><td class="td-note"><span class="ctag">DEFAULT 'new_service'</span> → ready when data available</td></tr>
+            <tr><td class="td-name">current_cpu_request</td><td class="td-type">INTEGER</td><td class="td-note">millicores — live from kube_pod_container_resource_requests</td></tr>
             <tr><td class="td-name">current_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">millicores — live from kube_pod_container_resource_limits</td></tr>
+            <tr><td class="td-name">current_mem_request</td><td class="td-type">INTEGER</td><td class="td-note">MiB — live from kube_pod_container_resource_requests</td></tr>
             <tr><td class="td-name">current_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">MiB — live from kube_pod_container_resource_limits</td></tr>
             <tr><td class="td-name">p99_cpu</td><td class="td-type">FLOAT</td><td class="td-note">millicores — 99th percentile over lookback window</td></tr>
             <tr><td class="td-name">p99_mem</td><td class="td-type">FLOAT</td><td class="td-note">MiB — 99th percentile over lookback window</td></tr>
-            <tr><td class="td-name">recommended_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_cpu × 2)</td></tr>
-            <tr><td class="td-name">recommended_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_mem × 2)</td></tr>
+            <tr><td class="td-name">recommended_cpu_request</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_cpu) — scheduler reservation</td></tr>
+            <tr><td class="td-name">recommended_cpu_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_cpu × 2) — hard ceiling (CPU throttle)</td></tr>
+            <tr><td class="td-name">recommended_mem_request</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_mem) — scheduler reservation</td></tr>
+            <tr><td class="td-name">recommended_mem_limit</td><td class="td-type">INTEGER</td><td class="td-note">ceil(p99_mem × 2) — hard ceiling (OOMKill)</td></tr>
             <tr><td class="td-name">applied</td><td class="td-type">BOOLEAN</td><td class="td-note"><span class="ctag">DEFAULT FALSE</span> toggled true when applied — enables cost savings tracking</td></tr>
             <tr><td class="td-name">created_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">when first generated</td></tr>
             <tr><td class="td-name">updated_at</td><td class="td-type">TIMESTAMPTZ</td><td class="td-note">last recalculated</td></tr>
@@ -737,12 +741,16 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
           <span class="ind"><span class="sn">PodName</span>             <span class="tp">string</span>    <span class="tg">`json:"pod_name"`</span></span>
           <span class="ind"><span class="sn">ContainerName</span>       <span class="tp">string</span>    <span class="tg">`json:"container_name"`</span></span>
           <span class="ind"><span class="sn">Status</span>              <span class="tp">string</span>    <span class="tg">`json:"status"`</span>  <span class="cm">// new_service | ready</span></span>
-          <span class="ind"><span class="sn">CurrentCPULimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_cpu_limit"`</span>  <span class="cm">// millicores</span></span>
-          <span class="ind"><span class="sn">CurrentMemLimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_mem_limit"`</span>  <span class="cm">// MiB</span></span>
-          <span class="ind"><span class="sn">P99CPU</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_cpu"`</span>            <span class="cm">// millicores</span></span>
-          <span class="ind"><span class="sn">P99Mem</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_mem"`</span>            <span class="cm">// MiB</span></span>
-          <span class="ind"><span class="sn">RecommendedCPULimit</span> <span class="tp">int</span>       <span class="tg">`json:"recommended_cpu_limit"`</span>  <span class="cm">// ceil(p99 × 2)</span></span>
-          <span class="ind"><span class="sn">RecommendedMemLimit</span> <span class="tp">int</span>       <span class="tg">`json:"recommended_mem_limit"`</span>  <span class="cm">// ceil(p99 × 2)</span></span>
+          <span class="ind"><span class="sn">CurrentCPURequest</span>   <span class="tp">int</span>       <span class="tg">`json:"current_cpu_request"`</span>  <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">CurrentCPULimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_cpu_limit"`</span>    <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">CurrentMemRequest</span>   <span class="tp">int</span>       <span class="tg">`json:"current_mem_request"`</span>  <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">CurrentMemLimit</span>     <span class="tp">int</span>       <span class="tg">`json:"current_mem_limit"`</span>    <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">P99CPU</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_cpu"`</span>              <span class="cm">// millicores</span></span>
+          <span class="ind"><span class="sn">P99Mem</span>              <span class="tp">float64</span>   <span class="tg">`json:"p99_mem"`</span>              <span class="cm">// MiB</span></span>
+          <span class="ind"><span class="sn">RecommendedCPURequest</span> <span class="tp">int</span>     <span class="tg">`json:"recommended_cpu_request"`</span>  <span class="cm">// ceil(p99)</span></span>
+          <span class="ind"><span class="sn">RecommendedCPULimit</span>   <span class="tp">int</span>     <span class="tg">`json:"recommended_cpu_limit"`</span>    <span class="cm">// ceil(p99 × 2)</span></span>
+          <span class="ind"><span class="sn">RecommendedMemRequest</span> <span class="tp">int</span>     <span class="tg">`json:"recommended_mem_request"`</span>  <span class="cm">// ceil(p99)</span></span>
+          <span class="ind"><span class="sn">RecommendedMemLimit</span>   <span class="tp">int</span>     <span class="tg">`json:"recommended_mem_limit"`</span>    <span class="cm">// ceil(p99 × 2)</span></span>
           <span class="ind"><span class="sn">Applied</span>             <span class="tp">bool</span>      <span class="tg">`json:"applied"`</span>  <span class="cm">// cost savings tracking</span></span>
           <span class="ind"><span class="sn">CreatedAt</span>           <span class="tp">time.Time</span> <span class="tg">`json:"created_at"`</span></span>
           <span class="ind"><span class="sn">UpdatedAt</span>           <span class="tp">time.Time</span> <span class="tg">`json:"updated_at"`</span></span>
@@ -800,7 +808,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
         <div class="fn-list">
           <div class="fn-item"><span class="method m-get">HTTP</span><div><div class="fn-sig">collector.Collect(ctx, lookbackWindow)</div><div class="fn-desc">4 Prometheus queries: CPU usage (query_range) · Memory usage (query_range) · CPU limits (instant) · Memory limits (instant). Results merged by (namespace, pod, container) key into []*ContainerMetrics.</div></div></div>
           <div class="fn-item"><span class="method m-sql">MATH</span><div><div class="fn-sig">compute.ComputeP99(values []float64)</div><div class="fn-desc">Sort values → index = ceil(0.99 × n) − 1. Never modifies the original slice. Returns error on empty dataset.</div></div></div>
-          <div class="fn-item accent"><span class="method m-sql">GEN</span><div><div class="fn-sig">recommender.GenerateAll(clusterID, metrics)</div><div class="fn-desc">For each container: if CPU or Mem values empty → status = new_service. Otherwise: p99CPU × 2 → ceil → RecommendedCPULimit. Same for memory. Returns []*Recommendation ready for UpsertRecommendation.</div></div></div>
+          <div class="fn-item accent"><span class="method m-sql">GEN</span><div><div class="fn-sig">recommender.GenerateAll(clusterID, metrics)</div><div class="fn-desc">For each container: if CPU or Mem values empty → status = new_service. Otherwise: ceil(p99CPU) → RecommendedCPURequest, ceil(p99CPU × 2) → RecommendedCPULimit. Same pair for memory. Returns []*Recommendation ready for UpsertRecommendation.</div></div></div>
         </div>
       </div>
     </div>
@@ -1190,7 +1198,7 @@ function resetFlow() {
 const recFlowSteps = [
   { node:'r6', num:'Step 1 / 5', title:'JWT + Lock', body:'Request authenticated via JWT. AcquireRecalculateLock (Redis SETNX, 10 min TTL) — if already locked, return 429. Otherwise lock acquired.' },
   { node:'r5', num:'Step 2 / 5', title:'collector.Collect()', body:'4 Prometheus queries: CPU & Memory usage (query_range, step 3600s) + current CPU & Memory limits (instant). Results merged by (namespace, pod, container) key.' },
-  { node:'r5', num:'Step 3 / 5', title:'compute.ComputeP99() + recommender.GenerateAll()', body:'For each container: sort values, index = ceil(0.99 × n) − 1. RecommendedLimit = ceil(p99 × 2). Containers with no data → status = new_service.' },
+  { node:'r5', num:'Step 3 / 5', title:'compute.ComputeP99() + recommender.GenerateAll()', body:'For each container: sort values, index = ceil(0.99 × n) − 1. RecommendedRequest = ceil(p99). RecommendedLimit = ceil(p99 × 2). Containers with no data → status = new_service.' },
   { node:'r4', num:'Step 4 / 5', title:'store.UpsertRecommendation()', body:'INSERT ... ON CONFLICT DO UPDATE for each container. One row per container updated in place. applied flag is NEVER reset — user-owned.' },
   { node:'r6', num:'Step 5 / 5', title:'UpdateClusterHealth + InvalidateCache', body:'Stamps last_synced_at = NOW(), status = connected. Deletes Redis key cluster:{id}:recommendations so next GET fetches fresh data.' },
 ];

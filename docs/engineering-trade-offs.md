@@ -17,7 +17,7 @@ Every decision here was made intentionally. This doc records what we chose, what
 | Auth | JWT + API tokens | Simple · stateless |
 | ID Strategy | UUID v4 (string) | Globally unique · secure · no collision risk |
 | Recommendation storage | UPSERT | One row per container — clean dashboard |
-| Resource percentile | p99 × 2 | Real usage + smart buffer — not freak spikes |
+| Resource percentile | request = ceil(p99) · limit = ceil(p99 × 2) | Real usage + smart buffer — both levers set correctly |
 | Savings units | Cores + GiB (no $) | `$/core-hour` varies wildly per cloud/region/contract |
 
 ---
@@ -265,6 +265,36 @@ These should not define your permanent resource limits.
 | Based on | Worst freak spike ever | Real sustained usage + smart buffer |
 | Result | Massive overprovisioning | Right-sized with safe headroom |
 | Optimizes for | Paranoia | Reality |
+
+### Both `request` AND `limit` — not just a limit number
+
+PodOptix recommends BOTH values per resource — not one. This is a deliberate correction over tools that emit "a limit" and call it a day.
+
+```
+request = ceil(p99)       ← what the K8s scheduler reserves on the node (= what you pay for)
+limit   = ceil(p99 × 2)   ← hard ceiling the kernel enforces (CPU throttle / OOMKill)
+```
+
+Kubernetes has **two levers**, and they do different things:
+
+| Field | Role in Kubernetes | What goes wrong if you ignore it |
+|-------|-------------------|----------------------------------|
+| `requests` | Scheduler reservation + QoS class + autoscaling signal + pays-the-bill number on your node | No request → pod lands on any node → noisy-neighbor evictions · wildly off request → nodes look full/empty when they aren't · HPA/VPA/cluster-autoscaler all misbehave |
+| `limits`   | Kernel-enforced ceiling — CPU gets throttled, memory gets OOMKilled | No limit → one runaway pod can starve the node · limit = request → zero headroom for bursts |
+
+**Why half the advice (limit only) is misleading:**
+
+If a tool only recommends a limit, you have no principled answer for what to put under `requests:` — users typically either (a) copy the limit (over-reserves, destroys bin-packing), (b) leave requests unset (BestEffort QoS, first to evict), or (c) keep the stale pre-existing value (which is exactly the "set by guesswork" problem PodOptix exists to fix). All three outcomes defeat the point.
+
+**Why `request = p99` and `limit = p99 × 2`:**
+
+- `request = ceil(p99)` reserves what the container actually uses 99% of the time — tight bin-packing without starving the workload at steady state. Node capacity planning becomes accurate.
+- `limit = ceil(p99 × 2)` keeps the same 2× burst buffer argued above as the ceiling, so one bad minute doesn't OOMKill a healthy service.
+- The two together produce a **Burstable QoS class** (requests < limits, both set) — the correct class for 99% of application workloads. Guaranteed (request = limit) sacrifices bin-packing; BestEffort (neither set) is first to evict.
+
+**Why savings math uses requests, not limits:**
+
+Node cost is driven by reserved capacity, not ceilings. If a pod has `requests.cpu: 1000m` and `limits.cpu: 2000m`, the scheduler blocks 1 full core on that node — you pay for 1 core whether the pod uses it or not. The 2000m ceiling costs nothing until the pod actually bursts. Therefore PodOptix's Savings page computes reclaim as `Σ (current_cpu_request − recommended_cpu_request)` — that is the number that moves your cloud bill.
 
 ---
 
@@ -800,7 +830,7 @@ Accurate cost attribution is [Kubecost](https://www.kubecost.com/) / [OpenCost](
 
 **What we show instead:**
 
-- Potential reclaim: `Σ (current_cpu_limit − recommended_cpu_limit)` for `applied = false` rows → cores
+- Potential reclaim: `Σ (current_cpu_request − recommended_cpu_request)` for `applied = false` rows → cores (requests, because that's what the scheduler reserves on nodes = what you pay for)
 - Realized reclaim: same math for `applied = true` rows → cores (proof the tool paid off)
 - Same for memory in GiB
 - Adoption %: applied rows / total ready rows

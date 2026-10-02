@@ -8,7 +8,7 @@ Everything an end user needs to install PodOptix, register their first cluster, 
 
 ## What is PodOptix
 
-A single Hub that connects to your workload clusters' Prometheus, computes p99 CPU/memory usage over a rolling window (7d, 10d, or 30d), and recommends resource limits at `ceil(p99 × 2)`. No agents, no sidecars — one Hub queries every cluster's Prometheus remotely.
+A single Hub that connects to your workload clusters' Prometheus, computes p99 CPU/memory usage over a rolling window (7d, 10d, or 30d), and recommends BOTH `request` and `limit` per container — `request = ceil(p99)` (what the scheduler reserves on nodes) and `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill). No agents, no sidecars — one Hub queries every cluster's Prometheus remotely.
 
 ---
 
@@ -19,7 +19,7 @@ A single Hub that connects to your workload clusters' Prometheus, computes p99 C
 | Kubernetes (for Helm install) | 1.24+ |
 | Helm | 3.8+ (OCI support required) |
 | A Prometheus endpoint per cluster you want to analyze | Reachable from the Hub with a bearer token |
-| `kube-state-metrics` scraped by Prometheus | Optional — needed to see current limits alongside recommendations |
+| `kube-state-metrics` scraped by Prometheus | Optional — needed to see current requests + limits alongside recommendations |
 
 > **Air-gapped clusters:** the image + chart live at `ghcr.io/rishabh1270/podoptix` and `ghcr.io/rishabh1270/charts/podoptix` — both public, no auth. Mirror them to your internal registry and override `image.repository` in Helm values.
 
@@ -126,22 +126,29 @@ The cluster detail page shows a table with:
 |--------|---------------|
 | Namespace / Pod / Container | The workload |
 | Status | `ready` = has data · `new_service` = not enough history yet |
-| Current CPU / Mem | What's set today, from `kube_pod_container_resource_limits` |
-| Recommended CPU / Mem | `ceil(p99 × 2)` — the engineering sweet spot |
-| ↓% / ↑% | How much smaller/bigger the recommendation is vs current |
+| Current CPU req + limit | What's set today, from `kube_pod_container_resource_requests` and `kube_pod_container_resource_limits` |
+| Current Mem req + limit | Same, for memory |
+| Recommended CPU req + limit | `request = ceil(p99)` · `limit = ceil(p99 × 2)` |
+| Recommended Mem req + limit | Same, for memory |
+| ↓% / ↑% | How much smaller/bigger the recommendation is vs current (savings math uses requests — that's what the scheduler reserves) |
 | Applied | Toggle when you apply the change to your cluster |
+
+> **Why both?** Kubernetes has two levers. `requests` drive scheduling and define the resources the node reserves for your pod (= what you pay for). `limits` are the hard ceiling the kernel enforces (CPU throttle, memory OOMKill). Recommending only one is misleading — PodOptix sets both from the same p99 so you get right-sized scheduling AND a safe runtime ceiling.
 
 ### 5. Applying a recommendation
 
 PodOptix does NOT apply changes automatically — you decide. To apply:
 
-1. Note the recommended values
+1. Note the recommended values — both `request` and `limit` for CPU and memory
 2. Update your Deployment/StatefulSet manifest, e.g.:
    ```yaml
    resources:
+     requests:
+       cpu:    "250m"    # was 1000m — what the scheduler reserves on the node
+       memory: "256Mi"   # was 1Gi
      limits:
-       cpu:    "500m"    # was 2000m
-       memory: "512Mi"   # was 2Gi
+       cpu:    "500m"    # was 2000m — hard ceiling (CPU throttle)
+       memory: "512Mi"   # was 2Gi   — hard ceiling (OOMKill)
    ```
 3. `kubectl apply` the change
 4. In PodOptix, toggle the **Applied** checkbox on that row — used later for savings reports
@@ -256,7 +263,7 @@ The cluster is `disconnected`. Click **Edit**, verify URL + token, save. PodOpti
 ### No recommendations appear after sync
 
 - Prometheus must have `container_cpu_usage_seconds_total` and `container_memory_working_set_bytes` (from cAdvisor). Most K8s Prometheus installs do.
-- For "current limit" columns to populate, `kube-state-metrics` must be scraped by Prometheus and expose `kube_pod_container_resource_limits`.
+- For "current request" and "current limit" columns to populate, `kube-state-metrics` must be scraped by Prometheus and expose both `kube_pod_container_resource_requests` and `kube_pod_container_resource_limits`.
 - `new_service` status = the pod exists but has no metric history yet. Wait for one full lookback window (7d default).
 
 ### Login fails after upgrade
@@ -288,8 +295,8 @@ No. PodOptix runs as a single Hub in your management cluster and queries each wo
 **Q: How often do recommendations refresh?**
 Automatically every 24 hours per cluster. Also once on startup, once when a cluster is registered, and on-demand via **Recalculate**.
 
-**Q: Why p99 × 2?**
-The p99 covers 99% of real traffic and ignores freak spikes. Doubling gives headroom for growth and unforeseen bursts without the overhead of provisioning for the peak of the peak. It's the engineering sweet spot between reliability (OOMKill avoidance) and cost.
+**Q: Why `request = p99` and `limit = p99 × 2`?**
+The p99 covers 99% of real traffic and ignores freak spikes — that's the right number to reserve on the node (`request`), so the scheduler packs nodes tightly without starving your workload at steady state. Doubling to set the hard ceiling (`limit`) gives headroom for growth and unforeseen bursts without the overhead of provisioning for the peak of the peak. It's the engineering sweet spot between reliability (OOMKill avoidance) and cost.
 
 **Q: Where are Prometheus tokens stored?**
 Encrypted at rest with AES-256-GCM before being written to Postgres. The `ENCRYPTION_KEY` env var is the master key — losing it means all stored tokens become undecryptable. Never rotate mid-deployment.

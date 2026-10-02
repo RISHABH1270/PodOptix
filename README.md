@@ -39,12 +39,12 @@ This is what happens when 150 containers across 50 microservices all have limits
 
 ## The Solution
 
-PodOptix connects to your Prometheus, analyzes **real usage patterns**, and recommends limits at **2× the p99 percentile** — the engineering sweet spot between reliability and cost.
+PodOptix connects to your Prometheus, analyzes **real usage patterns**, and recommends BOTH `request` and `limit` for CPU and memory — `request = ceil(p99)` (what the scheduler reserves) and `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill). The engineering sweet spot between reliability and cost.
 
 ```
-Actual Usage (p99)  →  × 2  →  Recommended Limit
-      120m CPU                      240m CPU
-      180Mi RAM                     360Mi RAM
+Actual Usage (p99)  →  Request = p99 · Limit = p99 × 2
+     120m CPU                  request: 120m · limit: 240m
+     180Mi RAM                 request: 180Mi · limit: 360Mi
 ```
 
 No more guessing. No more waste.

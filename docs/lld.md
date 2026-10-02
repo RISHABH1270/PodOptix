@@ -55,8 +55,8 @@
 │  │                            │                                  │  │
 │  │   ┌────────────────────────▼──────────────────────────────┐   │  │
 │  │   │  Recommendation Engine                                │   │  │
-│  │   │  CPU = p99_cpu × 2   ·   Mem = p99_mem × 2            │   │  │
-│  │   │  Output → YAML patch                                  │   │  │
+│  │   │  request = ceil(p99)  ·  limit = ceil(p99 × 2)        │   │  │
+│  │   │  (per resource: CPU + memory)  Output → YAML patch    │   │  │
 │  │   └───────────────────────────────────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                                                                     │
@@ -154,7 +154,9 @@ Scheduler (cron: daily)
                │
                ├── 5. p99 Engine: quantile(0.99, values) per container
                │
-               ├── 6. Recommendation Engine: ceil(p99 × 2) per container
+               ├── 6. Recommendation Engine per container:
+               │         · request = ceil(p99)       (scheduler reservation)
+               │         · limit   = ceil(p99 × 2)   (hard ceiling: CPU throttle / OOMKill)
                │
                ├── 7. UpsertRecommendation per container
                │         ON CONFLICT (cluster_id, namespace, pod_name, container_name)
@@ -222,12 +224,16 @@ CREATE TABLE IF NOT EXISTS recommendations (
     pod_name            VARCHAR(255) NOT NULL,
     container_name      VARCHAR(255) NOT NULL,
     status              VARCHAR(20)  NOT NULL DEFAULT 'new_service',
+    current_cpu_request INTEGER      NOT NULL DEFAULT 0,
     current_cpu_limit   INTEGER      NOT NULL DEFAULT 0,
+    current_mem_request INTEGER      NOT NULL DEFAULT 0,
     current_mem_limit   INTEGER      NOT NULL DEFAULT 0,
     p99_cpu             FLOAT        NOT NULL DEFAULT 0,
     p99_mem             FLOAT        NOT NULL DEFAULT 0,
-    recommended_cpu_limit INTEGER    NOT NULL DEFAULT 0,
-    recommended_mem_limit INTEGER    NOT NULL DEFAULT 0,
+    recommended_cpu_request INTEGER  NOT NULL DEFAULT 0,
+    recommended_cpu_limit   INTEGER  NOT NULL DEFAULT 0,
+    recommended_mem_request INTEGER  NOT NULL DEFAULT 0,
+    recommended_mem_limit   INTEGER  NOT NULL DEFAULT 0,
     applied             BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -246,12 +252,16 @@ CREATE INDEX idx_recommendations_cluster_id ON recommendations(cluster_id);
 | `pod_name` | VARCHAR(255) | Pod name (may include hash suffix) |
 | `container_name` | VARCHAR(255) | Container within the pod |
 | `status` | VARCHAR(20) | `new_service` or `ready` |
-| `current_cpu_limit` | INTEGER | Millicores — 0 if unset |
-| `current_mem_limit` | INTEGER | MiB — 0 if unset |
+| `current_cpu_request` | INTEGER | Millicores — 0 if unset. From `kube_pod_container_resource_requests` |
+| `current_cpu_limit` | INTEGER | Millicores — 0 if unset. From `kube_pod_container_resource_limits` |
+| `current_mem_request` | INTEGER | MiB — 0 if unset. From `kube_pod_container_resource_requests` |
+| `current_mem_limit` | INTEGER | MiB — 0 if unset. From `kube_pod_container_resource_limits` |
 | `p99_cpu` | FLOAT | Raw p99 value in millicores |
 | `p99_mem` | FLOAT | Raw p99 value in MiB |
-| `recommended_cpu_limit` | INTEGER | `ceil(p99_cpu × 2)` millicores |
-| `recommended_mem_limit` | INTEGER | `ceil(p99_mem × 2)` MiB |
+| `recommended_cpu_request` | INTEGER | `ceil(p99_cpu)` millicores — what the K8s scheduler should reserve |
+| `recommended_cpu_limit` | INTEGER | `ceil(p99_cpu × 2)` millicores — hard ceiling before CPU throttle |
+| `recommended_mem_request` | INTEGER | `ceil(p99_mem)` MiB — what the K8s scheduler should reserve |
+| `recommended_mem_limit` | INTEGER | `ceil(p99_mem × 2)` MiB — hard ceiling before OOMKill |
 | `applied` | BOOLEAN | TRUE if recommendation was applied to cluster — tracks cost savings |
 | `created_at` | TIMESTAMPTZ | First generated |
 | `updated_at` | TIMESTAMPTZ | Last recalculated |
@@ -527,26 +537,30 @@ Get all recommendations for a cluster.
 ```json
 [
   {
-    "recommendation_id":    "x7f3c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-    "cluster_id":           "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-    "namespace":            "payments",
-    "pod_name":             "payment-api-7d9f",
-    "container_name":       "payment-api",
-    "status":               "ready",
-    "current_cpu_limit":    1000,
-    "current_mem_limit":    1024,
-    "p99_cpu":              120.5,
-    "p99_mem":              180.2,
-    "recommended_cpu_limit": 241,
-    "recommended_mem_limit": 361,
-    "applied":              false,
-    "created_at":           "2026-06-24T00:00:00Z",
-    "updated_at":           "2026-06-24T00:00:00Z"
+    "recommendation_id":        "x7f3c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
+    "cluster_id":               "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
+    "namespace":                "payments",
+    "pod_name":                 "payment-api-7d9f",
+    "container_name":           "payment-api",
+    "status":                   "ready",
+    "current_cpu_request":      500,
+    "current_cpu_limit":        1000,
+    "current_mem_request":      512,
+    "current_mem_limit":        1024,
+    "p99_cpu":                  120.5,
+    "p99_mem":                  180.2,
+    "recommended_cpu_request":  121,
+    "recommended_cpu_limit":    241,
+    "recommended_mem_request":  181,
+    "recommended_mem_limit":    361,
+    "applied":                  false,
+    "created_at":               "2026-06-24T00:00:00Z",
+    "updated_at":               "2026-06-24T00:00:00Z"
   }
 ]
 ```
 
-CPU values in millicores. Memory values in MiB. Ordered by `created_at DESC`.
+CPU values in millicores. Memory values in MiB. Ordered by `created_at DESC`. `request = ceil(p99)` (what the scheduler reserves on the node = what you pay for) · `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill).
 
 **Errors:**
 - `404` — "Cluster not found"
@@ -569,7 +583,7 @@ Trigger a manual recommendation recalculation for a cluster.
 
 #### `GET /api/v1/recommendations`
 
-Cross-cluster recommendations view — every recommendation from every registered cluster, joined with the owning cluster's name. Ordered by biggest CPU delta (`current_cpu_limit - recommended_cpu_limit`) descending, so the biggest waste appears first. Powers the `/recommendations` dashboard page.
+Cross-cluster recommendations view — every recommendation from every registered cluster, joined with the owning cluster's name. Ordered by biggest CPU request delta (`current_cpu_request - recommended_cpu_request`) descending, so the biggest waste appears first — savings math uses requests because requests are what the scheduler reserves on nodes. Powers the `/recommendations` dashboard page.
 
 **Auth:** JWT required
 
@@ -577,22 +591,26 @@ Cross-cluster recommendations view — every recommendation from every registere
 ```json
 [
   {
-    "recommendation_id":     "x7f3c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-    "cluster_id":            "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
-    "cluster_name":          "production-us-east",
-    "namespace":             "payments",
-    "pod_name":              "payment-api-7d9f",
-    "container_name":        "payment-api",
-    "status":                "ready",
-    "current_cpu_limit":     2000,
-    "current_mem_limit":     2048,
-    "p99_cpu":               120.5,
-    "p99_mem":               180.2,
-    "recommended_cpu_limit": 241,
-    "recommended_mem_limit": 361,
-    "applied":               false,
-    "created_at":            "2026-06-24T00:00:00Z",
-    "updated_at":            "2026-06-24T00:00:00Z"
+    "recommendation_id":        "x7f3c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
+    "cluster_id":               "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
+    "cluster_name":             "production-us-east",
+    "namespace":                "payments",
+    "pod_name":                 "payment-api-7d9f",
+    "container_name":           "payment-api",
+    "status":                   "ready",
+    "current_cpu_request":      1000,
+    "current_cpu_limit":        2000,
+    "current_mem_request":      1024,
+    "current_mem_limit":        2048,
+    "p99_cpu":                  120.5,
+    "p99_mem":                  180.2,
+    "recommended_cpu_request":  121,
+    "recommended_cpu_limit":    241,
+    "recommended_mem_request":  181,
+    "recommended_mem_limit":    361,
+    "applied":                  false,
+    "created_at":               "2026-06-24T00:00:00Z",
+    "updated_at":               "2026-06-24T00:00:00Z"
   }
 ]
 ```
@@ -770,8 +788,10 @@ internal/compute/p99.go
 internal/recommender/recommender.go
         │
         └── Recommend(containerMetrics, p99Results)
-              · RecommendedCPULimit = ceil(p99_cpu × 2)
-              · RecommendedMemLimit = ceil(p99_mem × 2)
+              · RecommendedCPURequest = ceil(p99_cpu)       (scheduler reservation)
+              · RecommendedCPULimit   = ceil(p99_cpu × 2)   (hard ceiling — CPU throttle)
+              · RecommendedMemRequest = ceil(p99_mem)       (scheduler reservation)
+              · RecommendedMemLimit   = ceil(p99_mem × 2)   (hard ceiling — OOMKill)
               · status = "ready" if data > 7d, else "new_service"
               → []*models.Recommendation
 
@@ -779,7 +799,9 @@ internal/store/recommendation.go
         │
         └── UpsertRecommendation(ctx, rec)
               · ON CONFLICT (cluster_id, namespace, pod_name, container_name)
-              · DO UPDATE SET p99_cpu=..., recommended_cpu_limit=..., updated_at=NOW()
+              · DO UPDATE SET p99_cpu=..., recommended_cpu_request=...,
+                recommended_cpu_limit=..., recommended_mem_request=...,
+                recommended_mem_limit=..., updated_at=NOW()
 ```
 
 **ContainerMetrics struct (intermediate):**

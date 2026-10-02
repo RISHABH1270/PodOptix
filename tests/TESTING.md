@@ -162,11 +162,11 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 - Typical 7d workload — 168 values + 1 spike → spike ignored
 
 ### `recommender_test.go` (7 tests — unit)
-- p99 × 2 = recommended limit (main formula)
+- request = ceil(p99), limit = ceil(p99 × 2) — main formula, both CPU + memory
 - Nil metrics → error
 - Empty CPU values → error
 - Empty memory values → error
-- Single value → recommended is double
+- Single value → recommended request = value, limit = 2 × value
 - GenerateAll with mixed containers → some ready, some new_service
 - GenerateAll with no containers → empty slice
 
