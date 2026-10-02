@@ -223,11 +223,17 @@ export function ClusterDetailPage() {
                   <th className="px-4 py-3">Namespace</th>
                   <th className="px-4 py-3">Pod / Container</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Current CPU</th>
-                  <th className="px-4 py-3 text-right">Recommended CPU</th>
-                  <th className="px-4 py-3 text-right">Current Mem</th>
-                  <th className="px-4 py-3 text-right">Recommended Mem</th>
+                  <th className="px-3 py-3 text-right" colSpan={2}>CPU · req / limit (m)</th>
+                  <th className="px-3 py-3 text-right" colSpan={2}>Mem · req / limit (Mi)</th>
                   <th className="px-4 py-3 text-center">Applied</th>
+                </tr>
+                <tr className="text-left text-[9px] uppercase tracking-widest text-dim font-semibold bg-elevated/20 border-b border-border">
+                  <th colSpan={3}></th>
+                  <th className="px-3 py-2 text-right">current</th>
+                  <th className="px-3 py-2 text-right">recommended</th>
+                  <th className="px-3 py-2 text-right">current</th>
+                  <th className="px-3 py-2 text-right">recommended</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -243,17 +249,27 @@ export function ClusterDetailPage() {
                         ? <StatusPill kind="ok" label="ready" />
                         : <StatusPill kind="warn" label="new service" />}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-muted">
-                      {r.current_cpu_limit || '—'}<span className="text-dim ml-0.5">m</span>
+                    {/* CPU current */}
+                    <td className="px-3 py-3 text-right font-mono text-xs text-muted whitespace-nowrap">
+                      <ReqLimit req={r.current_cpu_request} lim={r.current_cpu_limit} />
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">
-                      <RecommendedValue current={r.current_cpu_limit} recommended={r.recommended_cpu_limit} unit="m" />
+                    {/* CPU recommended */}
+                    <td className="px-3 py-3 text-right font-mono text-xs whitespace-nowrap">
+                      <ReqLimitDelta
+                        currentReq={r.current_cpu_request} currentLim={r.current_cpu_limit}
+                        recReq={r.recommended_cpu_request} recLim={r.recommended_cpu_limit}
+                      />
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-muted">
-                      {r.current_mem_limit || '—'}<span className="text-dim ml-0.5">Mi</span>
+                    {/* Mem current */}
+                    <td className="px-3 py-3 text-right font-mono text-xs text-muted whitespace-nowrap">
+                      <ReqLimit req={r.current_mem_request} lim={r.current_mem_limit} />
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs">
-                      <RecommendedValue current={r.current_mem_limit} recommended={r.recommended_mem_limit} unit="Mi" />
+                    {/* Mem recommended */}
+                    <td className="px-3 py-3 text-right font-mono text-xs whitespace-nowrap">
+                      <ReqLimitDelta
+                        currentReq={r.current_mem_request} currentLim={r.current_mem_limit}
+                        recReq={r.recommended_mem_request} recLim={r.recommended_mem_limit}
+                      />
                     </td>
                     <td className="px-4 py-3 text-center">
                       {r.applied
@@ -280,17 +296,34 @@ function InfoCard({ label, value, mono }: { label: string; value: React.ReactNod
   )
 }
 
-function RecommendedValue({ current, recommended, unit }: { current: number; recommended: number; unit: string }) {
-  if (!recommended) return <span className="text-dim">—</span>
-  if (!current)     return <span className="text-ink">{recommended}<span className="text-dim ml-0.5">{unit}</span></span>
-  const diff = recommended - current
-  const pct  = current > 0 ? Math.round((diff / current) * 100) : 0
-  const color = diff < 0 ? 'text-ok' : diff > 0 ? 'text-warn' : 'text-ink'
-  const arrow = diff < 0 ? '↓' : diff > 0 ? '↑' : '='
+// ReqLimit — shows the current state as "req / lim" (or "—" if both missing)
+function ReqLimit({ req, lim }: { req: number; lim: number }) {
+  if (!req && !lim) return <span className="text-dim">—</span>
   return (
     <span>
-      <span className="text-ink">{recommended}<span className="text-dim ml-0.5">{unit}</span></span>
-      <span className={`ml-2 text-[10px] ${color}`}>{arrow}{Math.abs(pct)}%</span>
+      <span>{req || '—'}</span>
+      <span className="text-dim mx-1">/</span>
+      <span>{lim || '—'}</span>
+    </span>
+  )
+}
+
+// ReqLimitDelta — shows the recommended "req / lim" plus a delta% vs current limit
+function ReqLimitDelta({ currentReq, currentLim, recReq, recLim }: {
+  currentReq: number; currentLim: number; recReq: number; recLim: number
+}) {
+  if (!recReq && !recLim) return <span className="text-dim">—</span>
+  // Compare recommended limit to current limit for the delta%
+  const baseline = currentLim || currentReq
+  const pct   = baseline > 0 ? Math.round(((recLim - baseline) / baseline) * 100) : 0
+  const color = pct < 0 ? 'text-ok' : pct > 0 ? 'text-warn' : 'text-ink'
+  const arrow = pct < 0 ? '↓' : pct > 0 ? '↑' : '='
+  return (
+    <span>
+      <span className="text-ink">{recReq}</span>
+      <span className="text-dim mx-1">/</span>
+      <span className="text-ink">{recLim}</span>
+      {baseline > 0 && <span className={`ml-2 text-[10px] ${color}`}>{arrow}{Math.abs(pct)}%</span>}
     </span>
   )
 }

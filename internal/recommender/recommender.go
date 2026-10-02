@@ -12,8 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// generate computes p99 CPU/memory from usage history and pairs it with the container's
-// current resource limits (from kube-state-metrics via ContainerMetrics).
+// Generate computes p99 CPU/memory from usage history and pairs it with the container's
+// current resource requests + limits (from kube-state-metrics via ContainerMetrics).
+//
+// Formula (same for CPU and memory):
+//   request = ceil(p99)
+//   limit   = ceil(p99 × 2)
 func Generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Recommendation, error) {
 	if metrics == nil {
 		return nil, fmt.Errorf("metrics cannot be nil")
@@ -32,20 +36,24 @@ func Generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Re
 	now := time.Now()
 
 	return &models.Recommendation{
-		RecommendationID:    uuid.New().String(),
-		ClusterID:           clusterID,
-		Namespace:           metrics.Namespace,
-		PodName:             metrics.PodName,
-		ContainerName:       metrics.ContainerName,
-		Status:              models.RecommendationStatusReady,
-		CurrentCPULimit:     metrics.CPULimit,
-		CurrentMemLimit:     metrics.MemLimit,
-		P99CPU:              p99CPU,
-		P99Mem:              p99Mem,
-		RecommendedCPULimit: int(math.Ceil(p99CPU * 2)),
-		RecommendedMemLimit: int(math.Ceil(p99Mem * 2)),
-		CreatedAt:           now,
-		UpdatedAt:           now,
+		RecommendationID:      uuid.New().String(),
+		ClusterID:             clusterID,
+		Namespace:             metrics.Namespace,
+		PodName:               metrics.PodName,
+		ContainerName:         metrics.ContainerName,
+		Status:                models.RecommendationStatusReady,
+		CurrentCPURequest:     metrics.CPURequest,
+		CurrentCPULimit:       metrics.CPULimit,
+		CurrentMemRequest:     metrics.MemRequest,
+		CurrentMemLimit:       metrics.MemLimit,
+		P99CPU:                p99CPU,
+		P99Mem:                p99Mem,
+		RecommendedCPURequest: int(math.Ceil(p99CPU)),
+		RecommendedCPULimit:   int(math.Ceil(p99CPU * 2)),
+		RecommendedMemRequest: int(math.Ceil(p99Mem)),
+		RecommendedMemLimit:   int(math.Ceil(p99Mem * 2)),
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}, nil
 }
 

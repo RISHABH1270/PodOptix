@@ -13,14 +13,16 @@ import (
 	"time"
 )
 
-// ContainerMetrics holds raw CPU/memory usage time series and current resource limits for a single container.
+// ContainerMetrics holds raw CPU/memory usage time series and current resource requests + limits for a single container.
 type ContainerMetrics struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
 	CPUValues     []float64 // millicores — usage over lookback window
 	MemValues     []float64 // MiB       — usage over lookback window
+	CPURequest    int       // millicores — current request from kube_pod_container_resource_requests (0 if unset)
 	CPULimit      int       // millicores — current limit from kube_pod_container_resource_limits (0 if unset)
+	MemRequest    int       // MiB       — current request from kube_pod_container_resource_requests (0 if unset)
 	MemLimit      int       // MiB       — current limit from kube_pod_container_resource_limits (0 if unset)
 }
 
@@ -99,15 +101,21 @@ func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*Cont
 		return nil, fmt.Errorf("query memory usage: %w", err)
 	}
 
-	// query current resource limits from kube-state-metrics — gracefully returns empty if not installed
+	// query current resource requests + limits from kube-state-metrics — gracefully returns empty if not installed
+	cpuRequests, _ := c.queryInstant(ctx,
+		`kube_pod_container_resource_requests{resource="cpu",container!="",container!="POD"} * 1000`,
+	)
 	cpuLimits, _ := c.queryInstant(ctx,
 		`kube_pod_container_resource_limits{resource="cpu",container!="",container!="POD"} * 1000`,
+	)
+	memRequests, _ := c.queryInstant(ctx,
+		`kube_pod_container_resource_requests{resource="memory",container!="",container!="POD"} / 1048576`,
 	)
 	memLimits, _ := c.queryInstant(ctx,
 		`kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"} / 1048576`,
 	)
 
-	metrics := mergeMetrics(cpuData, memData, cpuLimits, memLimits)
+	metrics := mergeMetrics(cpuData, memData, cpuRequests, cpuLimits, memRequests, memLimits)
 	log.Printf("INFO  collector done containers=%d took=%s", len(metrics), time.Since(startedAt).Truncate(time.Millisecond))
 	return metrics, nil
 }
@@ -226,10 +234,10 @@ type containerKey struct {
 	namespace, pod, container string
 }
 
-// mergeMetrics combines CPU/memory usage time series and current resource limits into ContainerMetrics per container.
+// mergeMetrics combines CPU/memory usage time series and current resource requests + limits into ContainerMetrics per container.
 func mergeMetrics(
 	cpuResults, memResults []prometheusResult,
-	cpuLimitResults, memLimitResults []prometheusInstantResult,
+	cpuRequestResults, cpuLimitResults, memRequestResults, memLimitResults []prometheusInstantResult,
 ) []*ContainerMetrics {
 	cpuMap := make(map[containerKey][]float64)
 	for _, r := range cpuResults {
@@ -237,29 +245,25 @@ func mergeMetrics(
 		cpuMap[key] = ExtractValues(r.Values)
 	}
 
-	cpuLimitMap := make(map[containerKey]int)
-	for _, r := range cpuLimitResults {
-		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
-		if len(r.Value) == 2 {
-			if s, ok := r.Value[1].(string); ok {
-				if f, err := strconv.ParseFloat(s, 64); err == nil {
-					cpuLimitMap[key] = int(math.Ceil(f))
+	toIntMap := func(results []prometheusInstantResult) map[containerKey]int {
+		out := make(map[containerKey]int)
+		for _, r := range results {
+			key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
+			if len(r.Value) == 2 {
+				if s, ok := r.Value[1].(string); ok {
+					if f, err := strconv.ParseFloat(s, 64); err == nil {
+						out[key] = int(math.Ceil(f))
+					}
 				}
 			}
 		}
+		return out
 	}
 
-	memLimitMap := make(map[containerKey]int)
-	for _, r := range memLimitResults {
-		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
-		if len(r.Value) == 2 {
-			if s, ok := r.Value[1].(string); ok {
-				if f, err := strconv.ParseFloat(s, 64); err == nil {
-					memLimitMap[key] = int(math.Ceil(f))
-				}
-			}
-		}
-	}
+	cpuRequestMap := toIntMap(cpuRequestResults)
+	cpuLimitMap   := toIntMap(cpuLimitResults)
+	memRequestMap := toIntMap(memRequestResults)
+	memLimitMap   := toIntMap(memLimitResults)
 
 	var metrics []*ContainerMetrics
 	for _, r := range memResults {
@@ -270,7 +274,9 @@ func mergeMetrics(
 			ContainerName: key.container,
 			CPUValues:     cpuMap[key],
 			MemValues:     ExtractValues(r.Values),
+			CPURequest:    cpuRequestMap[key],
 			CPULimit:      cpuLimitMap[key],
+			MemRequest:    memRequestMap[key],
 			MemLimit:      memLimitMap[key],
 		})
 	}

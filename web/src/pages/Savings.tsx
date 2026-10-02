@@ -158,8 +158,10 @@ function calcInsights(rows: RecommendationWithCluster[]) {
   for (const r of rows) {
     if (r.status !== 'ready') continue
     ready++
-    const cpuDelta = Math.max(0, r.current_cpu_limit - r.recommended_cpu_limit)
-    const memDelta = Math.max(0, r.current_mem_limit - r.recommended_mem_limit)
+    // Use REQUESTS for savings — requests are what the scheduler reserves on nodes,
+    // which is what you actually pay for. Limits are just ceilings.
+    const cpuDelta = Math.max(0, r.current_cpu_request - r.recommended_cpu_request)
+    const memDelta = Math.max(0, r.current_mem_request - r.recommended_mem_request)
     potentialCPU += cpuDelta
     potentialMem += memDelta
     if (r.applied) {
@@ -191,13 +193,13 @@ function calcInsights(rows: RecommendationWithCluster[]) {
   const byNamespace = Array.from(perNamespace.values()).sort((a, b) => b.cpuWaste - a.cpuWaste)
 
   const topCPU = [...rows]
-    .filter(r => r.status === 'ready' && r.current_cpu_limit > r.recommended_cpu_limit)
-    .sort((a, b) => (b.current_cpu_limit - b.recommended_cpu_limit) - (a.current_cpu_limit - a.recommended_cpu_limit))
+    .filter(r => r.status === 'ready' && r.current_cpu_request > r.recommended_cpu_request)
+    .sort((a, b) => (b.current_cpu_request - b.recommended_cpu_request) - (a.current_cpu_request - a.recommended_cpu_request))
     .slice(0, 10)
 
   const topMem = [...rows]
-    .filter(r => r.status === 'ready' && r.current_mem_limit > r.recommended_mem_limit)
-    .sort((a, b) => (b.current_mem_limit - b.recommended_mem_limit) - (a.current_mem_limit - a.recommended_mem_limit))
+    .filter(r => r.status === 'ready' && r.current_mem_request > r.recommended_mem_request)
+    .sort((a, b) => (b.current_mem_request - b.recommended_mem_request) - (a.current_mem_request - a.recommended_mem_request))
     .slice(0, 10)
 
   return {
@@ -259,10 +261,10 @@ function TopWasteCard({ title, icon, items, unit }: { title: string; icon: React
         <ol className="divide-y divide-border">
           {items.map((r, i) => {
             const delta = unit === 'm'
-              ? r.current_cpu_limit - r.recommended_cpu_limit
-              : r.current_mem_limit - r.recommended_mem_limit
-            const current = unit === 'm' ? r.current_cpu_limit : r.current_mem_limit
-            const recommended = unit === 'm' ? r.recommended_cpu_limit : r.recommended_mem_limit
+              ? r.current_cpu_request - r.recommended_cpu_request
+              : r.current_mem_request - r.recommended_mem_request
+            const current = unit === 'm' ? r.current_cpu_request : r.current_mem_request
+            const recommended = unit === 'm' ? r.recommended_cpu_request : r.recommended_mem_request
             return (
               <li key={r.recommendation_id} className="px-5 py-3 flex items-center gap-4 hover:bg-elevated/40 transition">
                 <span className="text-dim font-mono text-xs w-4 text-right">{i + 1}</span>

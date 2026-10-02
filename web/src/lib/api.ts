@@ -14,21 +14,28 @@ export interface Cluster {
 }
 
 export interface Recommendation {
-  recommendation_id:     string
-  cluster_id:            string
-  namespace:             string
-  pod_name:              string
-  container_name:        string
-  status:                'ready' | 'new_service'
-  current_cpu_limit:     number
-  current_mem_limit:     number
-  p99_cpu:               number
-  p99_mem:               number
-  recommended_cpu_limit: number
-  recommended_mem_limit: number
-  applied:               boolean
-  created_at:            string
-  updated_at:            string
+  recommendation_id:       string
+  cluster_id:              string
+  namespace:               string
+  pod_name:                string
+  container_name:          string
+  status:                  'ready' | 'new_service'
+  // Current state in the cluster
+  current_cpu_request:     number
+  current_cpu_limit:       number
+  current_mem_request:     number
+  current_mem_limit:       number
+  // Raw p99
+  p99_cpu:                 number
+  p99_mem:                 number
+  // Recommendations: request = ceil(p99), limit = ceil(p99 × 2)
+  recommended_cpu_request: number
+  recommended_cpu_limit:   number
+  recommended_mem_request: number
+  recommended_mem_limit:   number
+  applied:                 boolean
+  created_at:              string
+  updated_at:              string
 }
 
 export interface RecommendationWithCluster extends Recommendation {
