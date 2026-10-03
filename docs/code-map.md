@@ -86,6 +86,25 @@ classDiagram
         +Close()
     }
 
+    class storeCluster {
+        <<package methods>>
+        internal/store/cluster.go
+        hangs off *Store
+        +SaveCluster(ctx, c)         INSERT
+        +GetCluster(ctx, id)         SELECT one · QueryRow+Scan
+        +ListClusters(ctx)           SELECT many · Query+rows.Next
+        +UpdateCluster(ctx, c)       UPDATE 4 user-tweakable fields
+        +UpdateClusterHealth(ctx,id,status,ts)  UPDATE status + last_synced_at
+        +DeleteCluster(ctx, id)      DELETE · fails on FK if recs exist
+        patterns
+        Exec → check err or RowsAffected==0
+        QueryRow+Scan → one row
+        Query+rows.Next+Scan → many rows
+    }
+
+    storeCluster --> Store : methods on
+    storeCluster --> pgxpool : via s.pool
+
     class pgxpool {
         <<3rd-party>>
         jackc/pgx/v5/pgxpool
@@ -335,4 +354,4 @@ classDiagram
 
 Each session adds boxes + arrows. By the end we'll have the complete call graph: HTTP handlers → store methods → SQL, scheduler → collector → PromQL, etc.
 
-**Next add:** `internal/store/cluster.go` + `user.go` — the remaining CRUD methods that hang off `*Store` and actually run SQL.
+**Next add:** `internal/store/user.go` — the auth-side CRUD on `*Store`.
