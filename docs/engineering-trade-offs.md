@@ -837,3 +837,65 @@ Accurate cost attribution is [Kubecost](https://www.kubecost.com/) / [OpenCost](
 - Top-10 CPU + memory waste, per-cluster breakdown, per-namespace breakdown
 
 These are all verifiable from the raw recommendations table — an operator can spot-check any number by running SQL. No opaque cost model, no wrong-by-default numbers.
+
+---
+
+## Workload-level recommendations (not pod-level)
+
+**Decision:** Store one recommendation per `(cluster, namespace, workload_kind, workload_name, container)` — not per pod.
+
+**Why:**
+
+A Kubernetes Deployment with 3 replicas creates 3 pods with ephemeral random suffixes: `auth-service-7f9c-abc12`, `auth-service-7f9c-def34`, `auth-service-7f9c-ghi56`. A rolling update rotates them. A HorizontalPodAutoscaler churns them further. Pod names are **ephemeral**; workload names are **stable**.
+
+Storing per-pod recommendations means:
+
+1. **Table explodes with stale rows.** Every rollout leaves N dead pod rows forever. After 100 rollouts of a 3-replica Deployment, you have 300 dead rows and 3 live ones — same workload.
+2. **Divergent recommendations for replicas that must be sized identically.** Three pods of the same Deployment got slightly different p99s this week — now the dashboard shows three different numbers and the operator has to average by eye. The three pods *must* get the same resources (K8s applies the spec to all of them), so divergent recommendations are false precision.
+3. **The dashboard is impossible to read.** 300 rows for `auth-service` instead of 1.
+
+**How we resolve the workload:** Query `kube_pod_owner` (pod → direct owner — ReplicaSet/StatefulSet/DaemonSet/Job) and `kube_replicaset_owner{owner_kind="Deployment"}` (ReplicaSet → Deployment). Walk the chain: pod → ReplicaSet → Deployment. Bare pods and unknown owners fall back to `("Pod", pod-name)` so we degrade gracefully if kube-state-metrics is missing.
+
+**Why PromQL, not Kubernetes API string parsing:** `auth-service-7f9c-abc12` *looks* like it belongs to Deployment `auth-service`, but string-stripping breaks for every workload with hyphens in its name (`my-app-worker-7f9c-abc12` could be `my-app-worker` or `my-app`). `kube_pod_owner` is the authoritative source — kube-state-metrics already walks the owner refs for us.
+
+---
+
+## MAX across replicas, then p99 across time
+
+**Decision:** Aggregation formula is `usage(t) = MAX over all replicas of container_usage(replica, t)`, then `p99` of `usage(t)` across the lookback window.
+
+**Why MAX:**
+
+- `request` and `limit` are **per-pod** values in Kubernetes. The scheduler reserves `request` on a node for *each* replica; the kernel enforces `limit` on *each* pod individually. If replica A hit 500m while replica B hit 100m at the same instant, we need to size for 500m — otherwise A gets throttled.
+- **AVG would under-provision.** Averaging the loud replica with 2 quiet ones hides the real demand. First real traffic spike → throttle or OOMKill.
+- **SUM would make no sense.** Pods don't share CPU limits. You can't give one pod 1500m because three others summed to 1500m.
+
+**Why p99, not p95 or max:**
+
+- `max` of a 7-day window captures every noisy spike (GC pause, debugger attach, cold-start) and over-provisions. Operators would reject it as wasteful.
+- `p95` leaves a visible margin of outages. 5% of a week = 8 hours of throttling or OOMKills.
+- `p99` is the sweet spot: ignore ~1 hour of spikes per week (acceptable brief tail), accommodate everything else.
+
+**Timestamp alignment:** We fetch range queries with `step=3600` (one point per hour). All replica series land on the same hourly grid, so `MAX(replica, t)` is a straightforward map merge keyed on the Unix timestamp. If a replica didn't exist at some `t`, its series just doesn't contribute to that bucket.
+
+---
+
+## Tombstone with manual review, not auto-delete
+
+**Decision:** When a workload disappears from a scheduler run, stamp `orphaned_at=NOW()`. **Never auto-delete** — the operator reviews orphans in the dashboard and deletes explicitly (per-row trash or "Delete all orphaned" bulk).
+
+**The alternative we rejected:** Auto-delete after N consecutive misses. Rejected because:
+
+1. **Deleted-by-mistake wipes history.** If someone accidentally scales a Deployment to 0 or does a `kubectl delete` during a mis-aimed cleanup, their historical recommendation is also gone. The next time the workload returns, the row is a fresh insert — the `applied=true` flag is lost, savings-realised silently drops. There's no audit trail of what the right-sized state used to be.
+2. **No safe N.** 1 miss is too eager (one Prometheus hiccup wipes real data). 7 misses is too lazy (operators asked us to clean up quickly). Any N we pick is wrong for some workload cadence.
+3. **The user, not us, knows if the workload is really gone.** PodOptix sees a snapshot every 24h; the operator knows the deployment calendar.
+
+**Why tombstone (not just a hidden flag):**
+
+- Operators can see *when* the workload went missing — orphaned since 2 days ago vs 60 days ago drives totally different triage.
+- The partial index `idx_recommendations_orphaned ON (cluster_id) WHERE orphaned_at IS NOT NULL` keeps the "orphaned workloads" count query O(orphans), not O(all recommendations).
+- Un-tombstone is just `orphaned_at = NULL` in `UpsertRecommendation`'s ON CONFLICT clause — zero extra code for the come-back case.
+
+**Safety gate.** `MarkOrphaned` is a no-op if `seenKeys` is empty. If the collector returned 0 workloads (Prometheus down, kube-state-metrics broken), we refuse to mark *every* workload orphaned. Only an actually-smaller set triggers tombstones.
+
+**Why `?orphaned=true` is required on bulk delete.** `DELETE /api/v1/clusters/:id/recommendations` without the query parameter returns 400 instead of wiping everything. A typo'd curl or a buggy client cannot accidentally delete every recommendation for a cluster — the opt-in is explicit, in the URL, impossible to send by mistake.

@@ -182,6 +182,8 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 | `PUT` | `/api/v1/clusters/:id` | JWT | Update cluster details |
 | `DELETE` | `/api/v1/clusters/:id` | JWT | Remove a cluster |
 | `GET` | `/api/v1/clusters/:id/recommendations` | JWT | Get recommendations for one cluster (cached) |
+| `DELETE` | `/api/v1/clusters/:id/recommendations/:recId` | JWT | Delete a single recommendation (operator cleanup of orphans) |
+| `DELETE` | `/api/v1/clusters/:id/recommendations?orphaned=true` | JWT | Bulk-delete orphaned recommendations for a cluster — `?orphaned=true` is required (footgun guard) |
 | `POST` | `/api/v1/clusters/:id/recalculate` | JWT | Trigger manual recalculation |
 | `GET` | `/api/v1/recommendations` | JWT | Cross-cluster recommendations — every cluster, joined with `cluster_name`, sorted by biggest CPU delta |
 
@@ -234,6 +236,8 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 - [x] Cross-cluster recommendations view — sortable by biggest waste
 - [x] Prometheus `/metrics` endpoint — self-observability (HTTP, scheduler, cache)
 - [x] Resource savings dashboard — potential + realized CPU/memory saved, top waste, per-cluster & per-namespace breakdown
+- [x] Workload-level recommendations — collapse replicas via `kube_pod_owner` + `kube_replicaset_owner`, MAX across replicas per timestamp
+- [x] Orphan tombstone — workloads not seen in last scan get `orphaned_at`; operator reviews + deletes in dashboard (per-row or bulk)
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
 

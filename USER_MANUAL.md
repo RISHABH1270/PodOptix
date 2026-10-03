@@ -124,7 +124,7 @@ The cluster detail page shows a table with:
 
 | Column | What it means |
 |--------|---------------|
-| Namespace / Pod / Container | The workload |
+| Namespace / Workload / Container | The workload — e.g. Deployment `auth-service`, container `api`. All replicas aggregate into one row. |
 | Status | `ready` = has data · `new_service` = not enough history yet |
 | Current CPU req + limit | What's set today, from `kube_pod_container_resource_requests` and `kube_pod_container_resource_limits` |
 | Current Mem req + limit | Same, for memory |
@@ -161,6 +161,27 @@ Click **▶ Recalculate** at the top of the cluster detail page. Behind the scen
 - Status updates in real time via polling
 
 If **Recalculate** is disabled → cluster is currently `disconnected`. Fix connectivity first.
+
+### 7. Orphaned workloads
+
+Every scheduler run (and every manual Recalculate) builds a list of the workloads it just observed. Any recommendation row for the cluster that wasn't observed is **tombstoned** — stamped with an `orphaned_at` timestamp. These rows appear in a collapsed **Orphaned workloads** section at the top of the cluster detail page, with a count badge.
+
+Why a workload goes orphan:
+- The Deployment/StatefulSet/DaemonSet was deleted
+- The namespace was deleted
+- The workload was renamed (old name goes orphan, new name appears alive)
+- kube-state-metrics stopped exposing it
+
+**Nothing is deleted automatically.** PodOptix will not touch orphaned rows on its own because a deleted-by-mistake workload would also wipe its historical recommendation — your savings-realised totals would silently drop. You review and clean up:
+
+- **Per row** — the trash icon on an orphan deletes just that row
+- **Bulk** — "Delete all orphaned" wipes every orphan for the cluster in one shot (confirm dialog)
+
+**If the workload comes back**, the next scheduler run clears `orphaned_at` back to NULL and the row returns to the alive table. No action needed on your part.
+
+**Safety gate.** If a scheduler run observes zero workloads (Prometheus hiccupped, kube-state-metrics went missing), PodOptix refuses to mark anything orphaned. Only an actual missing-from-the-set signal creates a tombstone — not an empty scan.
+
+The cross-cluster **Recommendations** page hides orphans by default. Flip the orphan filter to "Only orphaned" to audit across all clusters, or "Include orphaned" to see everything.
 
 ---
 
