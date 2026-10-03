@@ -49,7 +49,9 @@ classDiagram
     class config {
         <<package>>
         internal/config
-        +Load() Config
+        +Load() Config, error
+        -mustGetEnv(key) string, error
+        -getEnv(key, fallback) string
     }
 
     class Config {
@@ -60,6 +62,14 @@ classDiagram
         +JWTSecret string
         +EncryptionKey string
     }
+
+    class osStdlib {
+        <<stdlib>>
+        os
+        +Getenv(key) string
+    }
+
+    config --> osStdlib : reads env
 
     class store {
         <<package>>
@@ -168,4 +178,4 @@ The `o--` (aggregation) arrows show that the Scheduler and Server don't own thei
 
 Each session adds boxes + arrows. By the end we'll have the complete call graph: HTTP handlers → store methods → SQL, scheduler → collector → PromQL, etc.
 
-**Next add:** `internal/config/config.go` (expands the `config` + `Config` boxes with the actual `mustGetEnv` / `getEnv` helpers).
+**Next add:** `internal/store/store.go` (adds the `EnsureDatabase` chicken-and-egg dance, `SyncSchema` migrations, and the `pgxpool` connection pool).
