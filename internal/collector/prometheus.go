@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -16,10 +17,9 @@ import (
 // ContainerMetrics holds raw CPU/memory usage + current resource requests/limits for a single
 // container within a WORKLOAD (a PodController — Deployment, StatefulSet, DaemonSet, or bare Pod).
 //
-// Phase 1 placeholder: WorkloadKind defaults to "Pod" and WorkloadName to the pod name so the
-// schema works. Phase 2 wires in kube_pod_owner + kube_replicaset_owner resolution so these
-// fields reflect the actual owner Deployment / StatefulSet / etc., and CPUValues/MemValues
-// are the max-across-replicas aggregate per timestamp.
+// CPUValues/MemValues are the MAX-across-replicas aggregate per timestamp — if a Deployment has
+// 3 replicas, each timestamp holds the loudest replica's usage. Request/Limit are MAX across
+// replicas too (if any replica has a stale higher limit, that's what the current state is).
 type ContainerMetrics struct {
 	Namespace     string
 	WorkloadKind  string    // Deployment | StatefulSet | DaemonSet | Pod
@@ -123,8 +123,21 @@ func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*Cont
 		`kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"} / 1048576`,
 	)
 
-	metrics := mergeMetrics(cpuData, memData, cpuRequests, cpuLimits, memRequests, memLimits)
-	log.Printf("INFO  collector done containers=%d took=%s", len(metrics), time.Since(startedAt).Truncate(time.Millisecond))
+	// Resolve the pod → workload mapping (ReplicaSet → Deployment collapse).
+	// Degrades gracefully: if kube_pod_owner isn't available (kube-state-metrics missing),
+	// every pod resolves to ("Pod", pod-name) and we behave like Phase 1.
+	podOwnerResults, err := c.queryInstant(ctx, `kube_pod_owner`)
+	if err != nil {
+		log.Printf("WARN  collector kube_pod_owner unavailable, falling back to per-pod: %v", err)
+	}
+	rsOwnerResults, err := c.queryInstant(ctx, `kube_replicaset_owner{owner_kind="Deployment"}`)
+	if err != nil {
+		log.Printf("WARN  collector kube_replicaset_owner unavailable, ReplicaSet names will not be collapsed: %v", err)
+	}
+	podOwners := buildOwnerMap(podOwnerResults, rsOwnerResults)
+
+	metrics := mergeMetrics(cpuData, memData, cpuRequests, cpuLimits, memRequests, memLimits, podOwners)
+	log.Printf("INFO  collector done workloads=%d took=%s", len(metrics), time.Since(startedAt).Truncate(time.Millisecond))
 	return metrics, nil
 }
 
@@ -238,59 +251,213 @@ func (c *Collector) queryInstant(ctx context.Context, query string) ([]prometheu
 	return promResp.Data.Result, nil
 }
 
-type containerKey struct {
-	namespace, pod, container string
+// podKey identifies a pod within a cluster snapshot: (namespace, pod-name).
+type podKey struct {
+	namespace, pod string
 }
 
-// mergeMetrics combines CPU/memory usage time series and current resource requests + limits into ContainerMetrics per container.
+// workloadKey identifies a container within a workload: (namespace, kind, name, container).
+// One ContainerMetrics is produced per workloadKey after aggregating across replicas.
+type workloadKey struct {
+	namespace, kind, name, container string
+}
+
+// ownerRef is the resolved owner of a pod — the K8s object that should receive the recommendation.
+type ownerRef struct {
+	kind, name string
+}
+
+// buildOwnerMap resolves every pod to its owning WORKLOAD using kube-state-metrics data.
+//
+// Chain: pod → kube_pod_owner (ReplicaSet | StatefulSet | DaemonSet | Job | <none>)
+//        ReplicaSet → kube_replicaset_owner (Deployment) — so pods owned by a ReplicaSet
+//        bubble up to their Deployment and all replicas across RS revisions collapse together.
+//
+// Pods missing from the map (fallback) are treated as bare Pods by resolve().
+func buildOwnerMap(podOwnerResults, rsOwnerResults []prometheusInstantResult) map[podKey]ownerRef {
+	podOwners := make(map[podKey]ownerRef, len(podOwnerResults))
+	for _, r := range podOwnerResults {
+		ns := r.Metric["namespace"]
+		pod := r.Metric["pod"]
+		kind := r.Metric["owner_kind"]
+		name := r.Metric["owner_name"]
+		if ns == "" || pod == "" || kind == "" || name == "" {
+			continue
+		}
+		podOwners[podKey{ns, pod}] = ownerRef{kind, name}
+	}
+
+	// ReplicaSet → Deployment collapse (same keyspace as pods — namespace + rs name).
+	rsToDeployment := make(map[podKey]string, len(rsOwnerResults))
+	for _, r := range rsOwnerResults {
+		ns := r.Metric["namespace"]
+		rs := r.Metric["replicaset"]
+		dep := r.Metric["owner_name"]
+		if ns == "" || rs == "" || dep == "" {
+			continue
+		}
+		rsToDeployment[podKey{ns, rs}] = dep
+	}
+	for pk, own := range podOwners {
+		if own.kind == "ReplicaSet" {
+			if dep, ok := rsToDeployment[podKey{pk.namespace, own.name}]; ok {
+				podOwners[pk] = ownerRef{"Deployment", dep}
+			}
+			// else: orphan RS (no Deployment parent) — keep RS as the workload
+		}
+	}
+	return podOwners
+}
+
+// resolveWorkload maps (ns, pod) → (workloadKind, workloadName).
+// Falls back to ("Pod", pod) when the owner isn't known.
+func resolveWorkload(owners map[podKey]ownerRef, ns, pod string) (string, string) {
+	if o, ok := owners[podKey{ns, pod}]; ok {
+		return o.kind, o.name
+	}
+	return "Pod", pod
+}
+
+// timeSeries maps unix timestamp → value. Enables MAX-across-replicas aggregation
+// by merging multiple pods' series on shared timestamps (step=3600 keeps them aligned).
+type timeSeries map[int64]float64
+
+// mergeMax merges other into ts, taking max per timestamp.
+func (ts timeSeries) mergeMax(other timeSeries) {
+	for t, v := range other {
+		if ex, ok := ts[t]; !ok || v > ex {
+			ts[t] = v
+		}
+	}
+}
+
+// flatten returns the values ordered by timestamp ascending.
+func (ts timeSeries) flatten() []float64 {
+	keys := make([]int64, 0, len(ts))
+	for k := range ts {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	out := make([]float64, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, ts[k])
+	}
+	return out
+}
+
+// extractTimeSeries parses Prometheus [[ts, "val"]] pairs into a timeSeries map.
+func extractTimeSeries(values [][]interface{}) timeSeries {
+	out := make(timeSeries, len(values))
+	for _, v := range values {
+		if len(v) != 2 {
+			continue
+		}
+		tsF, ok := v[0].(float64)
+		if !ok {
+			continue
+		}
+		valStr, ok := v[1].(string)
+		if !ok {
+			continue
+		}
+		val, err := strconv.ParseFloat(valStr, 64)
+		if err != nil {
+			continue
+		}
+		out[int64(tsF)] = val
+	}
+	return out
+}
+
+// mergeMetrics combines CPU/memory usage + current requests/limits across REPLICAS
+// into one ContainerMetrics per workload-container.
+//
+//   usage(t) → MAX of each replica's value at timestamp t
+//   request/limit → MAX across replicas (recommend against the loudest current config)
+//   ReplicaCount → number of distinct pods observed for the workload-container
 func mergeMetrics(
 	cpuResults, memResults []prometheusResult,
 	cpuRequestResults, cpuLimitResults, memRequestResults, memLimitResults []prometheusInstantResult,
+	podOwners map[podKey]ownerRef,
 ) []*ContainerMetrics {
-	cpuMap := make(map[containerKey][]float64)
-	for _, r := range cpuResults {
-		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
-		cpuMap[key] = ExtractValues(r.Values)
+	cpuSeries := make(map[workloadKey]timeSeries)
+	memSeries := make(map[workloadKey]timeSeries)
+	replicas := make(map[workloadKey]map[string]struct{})
+
+	track := func(wk workloadKey, pod string) {
+		if replicas[wk] == nil {
+			replicas[wk] = make(map[string]struct{})
+		}
+		replicas[wk][pod] = struct{}{}
 	}
 
-	toIntMap := func(results []prometheusInstantResult) map[containerKey]int {
-		out := make(map[containerKey]int)
+	aggRange := func(results []prometheusResult, dst map[workloadKey]timeSeries) {
 		for _, r := range results {
-			key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
-			if len(r.Value) == 2 {
-				if s, ok := r.Value[1].(string); ok {
-					if f, err := strconv.ParseFloat(s, 64); err == nil {
-						out[key] = int(math.Ceil(f))
-					}
-				}
+			ns := r.Metric["namespace"]
+			pod := r.Metric["pod"]
+			ctr := r.Metric["container"]
+			if ns == "" || pod == "" || ctr == "" {
+				continue
+			}
+			kind, name := resolveWorkload(podOwners, ns, pod)
+			wk := workloadKey{ns, kind, name, ctr}
+			if dst[wk] == nil {
+				dst[wk] = make(timeSeries)
+			}
+			dst[wk].mergeMax(extractTimeSeries(r.Values))
+			track(wk, pod)
+		}
+	}
+	aggRange(cpuResults, cpuSeries)
+	aggRange(memResults, memSeries)
+
+	// MAX across replicas for scalar request/limit values.
+	toMaxIntMap := func(results []prometheusInstantResult) map[workloadKey]int {
+		out := make(map[workloadKey]int)
+		for _, r := range results {
+			ns := r.Metric["namespace"]
+			pod := r.Metric["pod"]
+			ctr := r.Metric["container"]
+			if ns == "" || pod == "" || ctr == "" || len(r.Value) != 2 {
+				continue
+			}
+			s, ok := r.Value[1].(string)
+			if !ok {
+				continue
+			}
+			f, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				continue
+			}
+			v := int(math.Ceil(f))
+			kind, name := resolveWorkload(podOwners, ns, pod)
+			wk := workloadKey{ns, kind, name, ctr}
+			if ex, ok := out[wk]; !ok || v > ex {
+				out[wk] = v
 			}
 		}
 		return out
 	}
+	cpuReq := toMaxIntMap(cpuRequestResults)
+	cpuLim := toMaxIntMap(cpuLimitResults)
+	memReq := toMaxIntMap(memRequestResults)
+	memLim := toMaxIntMap(memLimitResults)
 
-	cpuRequestMap := toIntMap(cpuRequestResults)
-	cpuLimitMap   := toIntMap(cpuLimitResults)
-	memRequestMap := toIntMap(memRequestResults)
-	memLimitMap   := toIntMap(memLimitResults)
-
+	// Driven by memSeries (as before — same semantics for the "has memory data" filter).
 	var metrics []*ContainerMetrics
-	for _, r := range memResults {
-		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
-		// Phase 1 placeholder: WorkloadKind=Pod, WorkloadName=pod name so the schema works.
-		// Phase 2 replaces this with real owner-chain resolution (kube_pod_owner → kube_replicaset_owner),
-		// at which point multiple pod rows will collapse into one workload row.
+	for wk, ms := range memSeries {
 		metrics = append(metrics, &ContainerMetrics{
-			Namespace:     key.namespace,
-			WorkloadKind:  "Pod",
-			WorkloadName:  key.pod,
-			ContainerName: key.container,
-			ReplicaCount:  1,
-			CPUValues:     cpuMap[key],
-			MemValues:     ExtractValues(r.Values),
-			CPURequest:    cpuRequestMap[key],
-			CPULimit:      cpuLimitMap[key],
-			MemRequest:    memRequestMap[key],
-			MemLimit:      memLimitMap[key],
+			Namespace:     wk.namespace,
+			WorkloadKind:  wk.kind,
+			WorkloadName:  wk.name,
+			ContainerName: wk.container,
+			ReplicaCount:  len(replicas[wk]),
+			CPUValues:     cpuSeries[wk].flatten(),
+			MemValues:     ms.flatten(),
+			CPURequest:    cpuReq[wk],
+			CPULimit:      cpuLim[wk],
+			MemRequest:    memReq[wk],
+			MemLimit:      memLim[wk],
 		})
 	}
 	return metrics
