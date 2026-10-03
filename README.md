@@ -41,13 +41,13 @@ This is what happens when 150 containers across 50 microservices all have limits
 
 ## The Solution
 
-PodOptix connects to your Prometheus, analyzes **real usage patterns**, and recommends both `requests` and `limits` — the engineering sweet spot between reliability and cost.
+PodOptix connects to your Prometheus, computes **p99** from real usage, and recommends both `requests` and `limits` — the engineering sweet spot between reliability and cost.
 
 **The formula** (same for CPU and memory):
 
 ```
 request = ceil(p99)         ← scheduler reserves this · pod is guaranteed this much
-limit   = ceil(p99 × 2)     ← hard ceiling · CPU gets throttled, memory gets OOMKilled above
+limit   = ceil(p99 × 2)     ← hard ceiling · CPU gets throttled, pod gets OOMKilled on memory overrun
 ```
 
 **Example** — a container averaging 120m CPU and 180Mi RAM at the 99th percentile:
@@ -80,7 +80,7 @@ The Hub connects directly to each cluster's Prometheus HTTP API, queries p99 met
     └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-Register a cluster with its Prometheus URL + auth token. Recommendations are generated on startup and refreshed every 24 hours.
+Register a cluster with its Prometheus URL + auth token. The first sync fires immediately on registration; subsequent syncs run on a 24-hour interval (or on-demand via the **Recalculate** button).
 
 ---
 
@@ -91,10 +91,10 @@ PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tail
 **Pages:**
 - **Login / Register** — email + password, JWT in localStorage
 - **Clusters** — list all registered clusters with status pills + stat cards
-- **Register Cluster / Edit Cluster** — form with lookback picker (7d / 10d / 30d)
+- **Register Cluster / Edit Cluster** — form with lookback picker (7d | 10d | 30d)
 - **Cluster Detail** — per-container recommendations table + one-click recalculate
-- **Recommendations** — cross-cluster view, sortable by biggest waste
-- **Savings** — potential + realized CPU/memory reclaim, adoption %, top-10 waste, per-cluster + per-namespace breakdown
+- **Recommendations** — every recommendation across every cluster, with applied vs pending status, sortable by cluster, namespace, or biggest potential saving
+- **Savings** — CPU and memory already **reclaimed** (applied) + still **on the table** (pending), adoption %, top opportunities, per-cluster + per-namespace breakdown
 
 Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
 
@@ -163,7 +163,7 @@ Then wait for the LoadBalancer's external IP:
 kubectl get svc podoptix -n podoptix --watch
 ```
 
-See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all options.
+See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for all options.
 
 ---
 
@@ -199,7 +199,7 @@ See [deploy/helm/podoptix/README.md](deploy/helm/podoptix/README.md) for all opt
 | [API Testing Guide](tests/TESTING.md) | Backend Go test suite — structure, isolation, helpers |
 | [Dashboard Guide](web/DASHBOARD.md) | React dashboard — dev server, structure, build |
 | [UI Testing Guide](web/tests-e2e/UI_TESTING.md) | Playwright end-to-end tests — isolation, commands, debugging |
-| [Helm Chart](deploy/helm/podoptix/README.md) | Kubernetes install — Deployment + StatefulSet + Services |
+| [Helm Chart](deploy/helm/podoptix/HELM_CHART.md) | Kubernetes install — Deployment + StatefulSet + Services |
 
 ---
 
