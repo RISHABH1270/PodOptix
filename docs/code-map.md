@@ -73,10 +73,10 @@ classDiagram
 
     class store {
         <<package>>
-        internal/store
+        internal/store/store.go
         +EnsureDatabase(url) error
         +SyncSchema(url) error
-        +New(url) Store
+        +New(url) Store, error
     }
 
     class Store {
@@ -85,6 +85,39 @@ classDiagram
         +Ping(ctx) error
         +Close()
     }
+
+    class pgxpool {
+        <<3rd-party>>
+        jackc/pgx/v5/pgxpool
+        +ParseConfig(url) Config
+        +NewWithConfig(ctx, cfg) Pool
+        pool tuning
+        MaxConns 10
+        MinConns 2
+        MaxConnLifetime 1h
+        MaxConnIdleTime 30m
+    }
+
+    class pgx {
+        <<3rd-party>>
+        jackc/pgx/v5
+        +Connect(ctx, url) Conn
+        used for admin tasks
+    }
+
+    class migrateLib {
+        <<3rd-party>>
+        golang-migrate/migrate/v4
+        +New(src, dst) Migrate
+        +Version() ver, dirty, err
+        +Up() error
+        file:// source + postgres driver
+        both registered via blank import
+    }
+
+    store --> pgxpool : opens pool
+    store --> pgx : admin lobby connect
+    store --> migrateLib : apply migrations
 
     class cache {
         <<package>>
@@ -178,4 +211,4 @@ The `o--` (aggregation) arrows show that the Scheduler and Server don't own thei
 
 Each session adds boxes + arrows. By the end we'll have the complete call graph: HTTP handlers → store methods → SQL, scheduler → collector → PromQL, etc.
 
-**Next add:** `internal/store/store.go` (adds the `EnsureDatabase` chicken-and-egg dance, `SyncSchema` migrations, and the `pgxpool` connection pool).
+**Next add:** `internal/store/cluster.go` + `user.go` + `recommendation.go` — the CRUD methods that hang off `*Store` and actually run SQL.
