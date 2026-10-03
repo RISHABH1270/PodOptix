@@ -342,7 +342,7 @@ Owns the connection pool, migrations, and every SQL query.
 **[internal/store/store.go](../internal/store/store.go)** — the two most important functions:
 
 - `EnsureDatabase(url)` — parses the URL, connects to the default `postgres` DB, `CREATE DATABASE podoptix` if it doesn't exist. Handles the chicken-and-egg (pool can't open a DB that doesn't exist yet).
-- `SyncSchema(url)` — uses `golang-migrate` to apply every SQL file in `migrations/`. Idempotent, handles crashed-mid-migration ("dirty") state automatically.
+- `SyncSchema(url)` — uses `golang-migrate` to apply every SQL file in `migrations/`. Idempotent for clean state. **If a previous run crashed mid-migration (dirty state), SyncSchema fails loud** and tells the operator to use the migrate CLI to roll back manually. Auto-force is unsafe — see troubleshooting below.
 - `New(url)` — opens the pgxpool: max 10, min 2, lifetime 1h, idle 30m.
 
 **[internal/store/cluster.go](../internal/store/cluster.go)** — CRUD for the `clusters` table. `SaveCluster`, `GetCluster`, `ListClusters`, `UpdateCluster`, `DeleteCluster`, `UpdateClusterHealth` (the ONLY function that touches `status` + `last_synced_at` — a discipline that prevents race conditions).
@@ -965,7 +965,28 @@ docker compose down -v && docker compose up -d
 ```
 
 **Schema migration stuck in "dirty" state:**
-`SyncSchema` auto-fixes this on the next start. Just restart the backend.
+
+PodOptix will REFUSE to start and print an error pointing you here. A dirty state means a previous migration crashed partway through — the actual schema may be inconsistent with what the migration metadata believes. Auto-force is unsafe because `Force()` only updates metadata, it doesn't inspect the schema.
+
+Install the migrate CLI, inspect the schema, then force to the last known-good version:
+
+```bash
+# Install (one-time)
+brew install golang-migrate
+# or: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+# See current state (returns something like "3 (dirty)")
+migrate -database "$DATABASE_URL" -path migrations version
+
+# Compare the broken migration file to the actual schema
+docker exec -it podoptix-db psql -U postgres -d podoptix -c "\d <table>"
+
+# Once you've either undone the partial change OR confirmed the schema matches
+# the LAST-GOOD version, force clean to that version:
+migrate -database "$DATABASE_URL" -path migrations force <N-1>
+
+# Restart — SyncSchema will apply pending migrations normally
+```
 
 **Vite dev server won't start:**
 ```bash

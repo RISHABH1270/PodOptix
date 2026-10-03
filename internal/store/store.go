@@ -60,31 +60,47 @@ func EnsureDatabase(databaseURL string) error {
 
 // ── Step 2: SyncSchema ────────────────────────────────────────────────────────
 
-// SyncSchema runs all SQL migration files from migrations/ in sequence.
-// Skips already applied migrations. Auto-fixes dirty state from a previous crash.
+// SyncSchema applies pending migration files from migrations/ in sequence.
+//
+// If a previous run crashed mid-migration, the schema_migrations table will be
+// in a "dirty" state. We DO NOT auto-fix dirty state — Force() only updates
+// metadata, it doesn't inspect the actual schema. Auto-forcing to the current
+// (failed) version would silently mark an unfinished migration as applied,
+// leaving the schema partially migrated with no warning. That's worse than a
+// loud failure.
+//
+// On dirty state: SyncSchema returns an error pointing the operator at the
+// migrate CLI so they can inspect, roll back manually, and force to the last
+// known-good version before restarting the service.
 func SyncSchema(databaseURL string) error {
 	m, err := migrate.New("file://migrations", databaseURL)
 	if err != nil {
 		return fmt.Errorf("create schema syncer: %w", err)
 	}
 
+	// Pre-flight: is the migrations table in a dirty state from a previous crash?
+	version, dirty, vErr := m.Version()
+	if vErr != nil && vErr != migrate.ErrNilVersion {
+		return fmt.Errorf("read current migration version: %w", vErr)
+	}
+	if dirty {
+		return fmt.Errorf(
+			"migrations are in a DIRTY state at version %d (a previous migration crashed).\n"+
+				"  Inspect the schema manually, then force to the last known-good version:\n"+
+				"    migrate -database $DATABASE_URL -path migrations force %d\n"+
+				"  Then restart the service",
+			version, version-1,
+		)
+	}
+
+	// Clean state — apply any pending migrations.
 	err = m.Up()
 	if err == migrate.ErrNoChange {
 		return nil
 	}
 	if err != nil {
-		version, _, vErr := m.Version()
-		if vErr == nil && version > 0 {
-			if fErr := m.Force(int(version)); fErr == nil {
-				if rErr := m.Up(); rErr != nil && rErr != migrate.ErrNoChange {
-					return fmt.Errorf("sync schema after force: %w", rErr)
-				}
-				return nil
-			}
-		}
-		return fmt.Errorf("sync schema: %w", err)
+		return fmt.Errorf("apply migrations: %w", err)
 	}
-
 	return nil
 }
 

@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RISHABH1270/PodOptix/internal/api"
-	"github.com/RISHABH1270/PodOptix/internal/cache"
-	"github.com/RISHABH1270/PodOptix/internal/config"
-	"github.com/RISHABH1270/PodOptix/internal/scheduler"
-	"github.com/RISHABH1270/PodOptix/internal/store"
+	"github.com/RISHABH1270/PodOptix/internal/api"       // Gin HTTP server
+    "github.com/RISHABH1270/PodOptix/internal/cache"     // Redis wrapper
+    "github.com/RISHABH1270/PodOptix/internal/config"    // env var loader
+    "github.com/RISHABH1270/PodOptix/internal/scheduler" // 24h ticker
+    "github.com/RISHABH1270/PodOptix/internal/store"     // PostgreSQL
 )
 
 const (
@@ -25,6 +25,7 @@ const (
 	reset  = "\033[0m"
 )
 
+// The entry point and wires every other package together and controls startup + shutdown.
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -67,8 +68,8 @@ func main() {
 // must prints a green success line or a red failure and exits.
 func must(label string, err error) {
 	if err != nil {
-		fmt.Printf("%s  %s: failed — %s%s\n", red, label, err.Error(), reset)
-		log.Fatalf("%s: %v", label, err)
+		fmt.Printf("%s  %s: failed — %s%s\n", red, label, err.Error(), reset) // writes to stdout
+		log.Fatalf("%s: %v", label, err) // writes to stderr and then terminates the application
 	}
 	fmt.Printf("%s  %s:%s OK\n", green, label, reset)
 }

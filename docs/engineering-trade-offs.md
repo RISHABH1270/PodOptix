@@ -520,7 +520,7 @@ ALTER TABLE clusters RENAME COLUMN id TO cluster_id;
 
 **Dirty database recovery:**
 
-golang-migrate marks a migration dirty the moment it starts. If the app crashes halfway — the flag stays dirty. On next startup, PodOptix detects this, forces the version clean, and retries. Safe because migrations use `IF NOT EXISTS`.
+golang-migrate marks a migration dirty the moment it starts. If the app crashes halfway, the flag stays dirty. On next startup, PodOptix **refuses to start** and prints an error directing the operator to the migrate CLI to roll back manually. Auto-forcing the dirty version to "clean" is unsafe — `Force()` only updates the `schema_migrations` metadata row, it does not inspect or repair the actual schema. Loud failure beats silent drift.
 
 ---
 
