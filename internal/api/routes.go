@@ -36,6 +36,8 @@ func (s *Server) registerRoutes() {
 		// recommendations
 		v1.GET("/recommendations", s.listAllRecommendations)   // cross-cluster overview
 		v1.GET("/clusters/:id/recommendations", s.listRecommendations)
+		v1.DELETE("/clusters/:id/recommendations", s.deleteOrphanedRecommendations) // ?orphaned=true required
+		v1.DELETE("/clusters/:id/recommendations/:recId", s.deleteRecommendation)
 		v1.POST("/clusters/:id/recalculate", s.recalculate)
 	}
 

@@ -13,6 +13,7 @@ export function RecommendationsPage() {
   const [search, setSearch]     = useState('')
   const [clusterFilter, setClusterFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter]   = useState<string>('all')
+  const [orphanFilter, setOrphanFilter]   = useState<'alive' | 'orphaned' | 'all'>('alive')
   const [sortKey, setSortKey]   = useState<SortKey>('cpu_delta')
 
   const load = async () => {
@@ -33,8 +34,10 @@ export function RecommendationsPage() {
   // filter + sort
   const filtered = useMemo(() => {
     let out = rows
-    if (clusterFilter !== 'all') out = out.filter(r => r.cluster_name === clusterFilter)
-    if (statusFilter !== 'all')  out = out.filter(r => r.status === statusFilter)
+    if (orphanFilter === 'alive')    out = out.filter(r => !r.orphaned_at)
+    if (orphanFilter === 'orphaned') out = out.filter(r =>  r.orphaned_at)
+    if (clusterFilter !== 'all')     out = out.filter(r => r.cluster_name === clusterFilter)
+    if (statusFilter !== 'all')      out = out.filter(r => r.status === statusFilter)
     if (search) {
       const q = search.toLowerCase()
       out = out.filter(r =>
@@ -59,7 +62,7 @@ export function RecommendationsPage() {
         break
     }
     return sorted
-  }, [rows, clusterFilter, statusFilter, search, sortKey])
+  }, [rows, clusterFilter, statusFilter, orphanFilter, search, sortKey])
 
   const stats = useMemo(() => {
     const ready       = rows.filter(r => r.status === 'ready').length
@@ -107,7 +110,7 @@ export function RecommendationsPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Filter namespace, pod, container…"
+                placeholder="Filter namespace, workload, container…"
                 className="w-72 bg-elevated border border-border focus:border-accent rounded-md pl-9 pr-3 py-1.5 text-sm text-ink placeholder:text-dim outline-none transition"
               />
             </div>
@@ -127,6 +130,16 @@ export function RecommendationsPage() {
               <option value="all">All statuses</option>
               <option value="ready">ready</option>
               <option value="new_service">new_service</option>
+            </select>
+            <select
+              value={orphanFilter}
+              onChange={(e) => setOrphanFilter(e.target.value as 'alive' | 'orphaned' | 'all')}
+              className="bg-elevated border border-border rounded-md px-2 py-1.5 text-sm text-ink outline-none"
+              title="Orphans are workloads that disappeared from the last scheduler scan"
+            >
+              <option value="alive">Hide orphaned</option>
+              <option value="orphaned">Only orphaned</option>
+              <option value="all">Include orphaned</option>
             </select>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted">
@@ -158,7 +171,7 @@ export function RecommendationsPage() {
                 <tr className="text-left text-[10px] uppercase tracking-widest text-dim font-semibold bg-elevated/40 border-b border-border">
                   <th className="px-4 py-3">Cluster</th>
                   <th className="px-4 py-3">Namespace</th>
-                  <th className="px-4 py-3">Pod / Container</th>
+                  <th className="px-4 py-3">Workload / Container</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-3 py-3 text-right" colSpan={2}>CPU · req / limit (m)</th>
                   <th className="px-3 py-3 text-right" colSpan={2}>Mem · req / limit (Mi)</th>

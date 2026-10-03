@@ -128,4 +128,14 @@ export const api = {
       'POST', `/api/v1/clusters/${clusterId}/recalculate`,
     )
   },
+  deleteRecommendation(clusterId: string, recId: string) {
+    return request<{ deleted: number; recommendation_id: string }>(
+      'DELETE', `/api/v1/clusters/${clusterId}/recommendations/${recId}`,
+    )
+  },
+  deleteOrphanedRecommendations(clusterId: string) {
+    return request<{ deleted: number }>(
+      'DELETE', `/api/v1/clusters/${clusterId}/recommendations?orphaned=true`,
+    )
+  },
 }
