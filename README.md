@@ -195,6 +195,7 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 | [HLD](docs/hld.md) | High Level Design — system overview, architecture, data flow |
 | [LLD](docs/lld.md) | Low Level Design — DB schema, API contract, Redis design, security model |
 | [Engineering Trade-offs](docs/engineering-trade-offs.md) | Every technical decision with full reasoning |
+| [Code Map](docs/code-map.md) | Living class diagram — grows as the walkthrough progresses |
 | [Dev Setup](docs/dev-setup.md) | How to run locally in 5 minutes |
 | [API Testing Guide](tests/TESTING.md) | Backend Go test suite — structure, isolation, helpers |
 | [Dashboard Guide](web/DASHBOARD.md) | React dashboard — dev server, structure, build |

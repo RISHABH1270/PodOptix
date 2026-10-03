@@ -1031,4 +1031,5 @@ You're in Option B (single binary) but the dashboard wasn't built. Run `make das
 - **Testing?** → [tests/TESTING.md](../tests/TESTING.md) + [web/tests-e2e/UI_TESTING.md](../web/tests-e2e/UI_TESTING.md)
 - **Design decisions?** → [engineering-trade-offs.md](engineering-trade-offs.md)
 - **System overview?** → [hld.md](hld.md), [lld.md](lld.md), [architecture.html](architecture.html)
+- **Code map (growing class diagram)?** → [code-map.md](code-map.md)
 - **Just want to install PodOptix?** → [../USER_MANUAL.md](../USER_MANUAL.md)

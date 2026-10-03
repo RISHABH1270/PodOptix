@@ -61,7 +61,6 @@ func EnsureDatabase(databaseURL string) error {
 // ── Step 2: SyncSchema ────────────────────────────────────────────────────────
 
 // SyncSchema applies pending migration files from migrations/ in sequence.
-//
 // If a previous run crashed mid-migration, the schema_migrations table will be
 // in a "dirty" state. We DO NOT auto-fix dirty state — Force() only updates
 // metadata, it doesn't inspect the actual schema. Auto-forcing to the current
