@@ -102,7 +102,10 @@ classDiagram
         <<3rd-party>>
         jackc/pgx/v5
         +Connect(ctx, url) Conn
-        used for admin tasks
+        one-shot admin connection
+        used by EnsureDatabase to connect
+        to the 'postgres' admin DB and
+        run CREATE DATABASE podoptix
     }
 
     class migrateLib {
