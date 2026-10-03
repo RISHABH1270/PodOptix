@@ -207,3 +207,89 @@ func (s *Store) ListAllWithClusterName(ctx context.Context) ([]*RecommendationWi
 	}
 	return out, nil
 }
+
+// ── Tombstone / Delete ────────────────────────────────────────────────────────
+
+// MarkOrphaned stamps orphaned_at=NOW() on every row in the cluster whose
+// (namespace, workload_kind, workload_name, container_name) is NOT in seenKeys —
+// i.e. the scheduler just ran and these workloads weren't observed in Prometheus.
+//
+// SAFETY GATE: if seenKeys is empty, this is a no-op (returns 0, nil). An empty
+// scheduler run usually means Prometheus hiccupped or kube-state-metrics went
+// missing — NOT that every workload in the cluster disappeared. We refuse to
+// stamp everything orphaned in that case.
+//
+// Rows already stamped (orphaned_at IS NOT NULL) are left alone — their timestamp
+// records WHEN they first went missing, not the latest run.
+//
+// Returns the number of rows newly stamped.
+func (s *Store) MarkOrphaned(ctx context.Context, clusterID string, seenKeys []models.WorkloadKey) (int, error) {
+	if len(seenKeys) == 0 {
+		return 0, nil
+	}
+
+	// UNNEST four parallel arrays into a seen(ns, kind, name, ctr) table,
+	// then NOT EXISTS to mark everything else orphaned.
+	namespaces := make([]string, len(seenKeys))
+	kinds := make([]string, len(seenKeys))
+	names := make([]string, len(seenKeys))
+	containers := make([]string, len(seenKeys))
+	for i, k := range seenKeys {
+		namespaces[i] = k.Namespace
+		kinds[i] = k.WorkloadKind
+		names[i] = k.WorkloadName
+		containers[i] = k.ContainerName
+	}
+
+	query := `
+		UPDATE recommendations r
+		SET orphaned_at = NOW()
+		WHERE r.cluster_id = $1
+		  AND r.orphaned_at IS NULL
+		  AND NOT EXISTS (
+		    SELECT 1
+		    FROM UNNEST($2::text[], $3::text[], $4::text[], $5::text[])
+		         AS seen(ns, kind, name, ctr)
+		    WHERE seen.ns   = r.namespace
+		      AND seen.kind = r.workload_kind
+		      AND seen.name = r.workload_name
+		      AND seen.ctr  = r.container_name
+		  )
+	`
+	tag, err := s.pool.Exec(ctx, query, clusterID, namespaces, kinds, names, containers)
+	if err != nil {
+		return 0, fmt.Errorf("mark orphaned: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+// DeleteOrphaned hard-deletes every orphaned row for a cluster.
+// Called from the dashboard "delete all orphans" bulk action.
+// Returns the number of rows deleted.
+func (s *Store) DeleteOrphaned(ctx context.Context, clusterID string) (int, error) {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM recommendations WHERE cluster_id = $1 AND orphaned_at IS NOT NULL`,
+		clusterID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("delete orphaned: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+// DeleteRecommendation hard-deletes a single recommendation by id.
+// Called from the dashboard per-row delete action. The caller is expected
+// to have scoped the request to the cluster_id already.
+func (s *Store) DeleteRecommendation(ctx context.Context, recommendationID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM recommendations WHERE recommendation_id = $1`,
+		recommendationID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete recommendation: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("recommendation not found: %s", recommendationID)
+	}
+	return nil
+}

@@ -109,6 +109,7 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 	}
 
 	var saved int
+	seenKeys := make([]models.WorkloadKey, 0, len(recommendations))
 	for _, rec := range recommendations {
 		if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
 			log.Printf("ERROR scheduler upsert cluster=%s workload=%s/%s container=%s: %v",
@@ -116,9 +117,25 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 			continue
 		}
 		saved++
+		seenKeys = append(seenKeys, models.WorkloadKey{
+			Namespace:     rec.Namespace,
+			WorkloadKind:  rec.WorkloadKind,
+			WorkloadName:  rec.WorkloadName,
+			ContainerName: rec.ContainerName,
+		})
 	}
 
 	log.Printf("INFO  scheduler saved %d/%d recommendations for cluster=%s", saved, len(recommendations), clusterID)
+
+	// Mark anything we didn't see this run as orphaned (safety-gated: no-op if seenKeys empty).
+	// Rows aren't deleted — the operator reviews orphans in the dashboard and deletes explicitly.
+	// If the workload comes back next run, UpsertRecommendation clears orphaned_at back to NULL.
+	orphaned, err := s.store.MarkOrphaned(ctx, clusterID, seenKeys)
+	if err != nil {
+		log.Printf("WARN  scheduler mark orphaned cluster=%s: %v", clusterID, err)
+	} else if orphaned > 0 {
+		log.Printf("INFO  scheduler marked %d workloads as orphaned for cluster=%s", orphaned, clusterID)
+	}
 
 	if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now()); err != nil {
 		log.Printf("WARN  scheduler health update cluster=%s: %v", clusterID, err)
