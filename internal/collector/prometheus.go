@@ -13,13 +13,21 @@ import (
 	"time"
 )
 
-// ContainerMetrics holds raw CPU/memory usage time series and current resource requests + limits for a single container.
+// ContainerMetrics holds raw CPU/memory usage + current resource requests/limits for a single
+// container within a WORKLOAD (a PodController — Deployment, StatefulSet, DaemonSet, or bare Pod).
+//
+// Phase 1 placeholder: WorkloadKind defaults to "Pod" and WorkloadName to the pod name so the
+// schema works. Phase 2 wires in kube_pod_owner + kube_replicaset_owner resolution so these
+// fields reflect the actual owner Deployment / StatefulSet / etc., and CPUValues/MemValues
+// are the max-across-replicas aggregate per timestamp.
 type ContainerMetrics struct {
 	Namespace     string
-	PodName       string
+	WorkloadKind  string    // Deployment | StatefulSet | DaemonSet | Pod
+	WorkloadName  string    // e.g. "auth-service" — resolved from pod owner chain
 	ContainerName string
-	CPUValues     []float64 // millicores — usage over lookback window
-	MemValues     []float64 // MiB       — usage over lookback window
+	ReplicaCount  int       // how many replicas aggregated — 1 for bare pods, N for scaled workloads
+	CPUValues     []float64 // millicores — usage over lookback window (max across replicas per timestamp)
+	MemValues     []float64 // MiB       — usage over lookback window (max across replicas per timestamp)
 	CPURequest    int       // millicores — current request from kube_pod_container_resource_requests (0 if unset)
 	CPULimit      int       // millicores — current limit from kube_pod_container_resource_limits (0 if unset)
 	MemRequest    int       // MiB       — current request from kube_pod_container_resource_requests (0 if unset)
@@ -268,10 +276,15 @@ func mergeMetrics(
 	var metrics []*ContainerMetrics
 	for _, r := range memResults {
 		key := containerKey{r.Metric["namespace"], r.Metric["pod"], r.Metric["container"]}
+		// Phase 1 placeholder: WorkloadKind=Pod, WorkloadName=pod name so the schema works.
+		// Phase 2 replaces this with real owner-chain resolution (kube_pod_owner → kube_replicaset_owner),
+		// at which point multiple pod rows will collapse into one workload row.
 		metrics = append(metrics, &ContainerMetrics{
 			Namespace:     key.namespace,
-			PodName:       key.pod,
+			WorkloadKind:  "Pod",
+			WorkloadName:  key.pod,
 			ContainerName: key.container,
+			ReplicaCount:  1,
 			CPUValues:     cpuMap[key],
 			MemValues:     ExtractValues(r.Values),
 			CPURequest:    cpuRequestMap[key],

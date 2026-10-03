@@ -274,7 +274,7 @@ function TopWasteCard({ title, icon, items, unit }: { title: string; icon: React
                     <span className="text-dim mx-1">·</span>
                     <span className="text-muted font-mono">{r.namespace}</span>
                     <span className="text-dim mx-1">·</span>
-                    <span className="font-mono">{r.pod_name}/{r.container_name}</span>
+                    <span className="font-mono">{r.workload_name}/{r.container_name}</span>
                   </div>
                   <div className="text-[11px] text-dim font-mono mt-0.5">
                     {current}{unit} → {recommended}{unit}

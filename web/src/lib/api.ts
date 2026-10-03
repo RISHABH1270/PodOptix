@@ -17,15 +17,17 @@ export interface Recommendation {
   recommendation_id:       string
   cluster_id:              string
   namespace:               string
-  pod_name:                string
+  workload_kind:           string   // Deployment | StatefulSet | DaemonSet | Pod
+  workload_name:           string   // e.g. "auth-service" (NOT the pod name)
   container_name:          string
+  replica_count:           number   // how many replicas aggregated this run
   status:                  'ready' | 'new_service'
   // Current state in the cluster
   current_cpu_request:     number
   current_cpu_limit:       number
   current_mem_request:     number
   current_mem_limit:       number
-  // Raw p99
+  // Raw p99 (max across replicas → p99 across time)
   p99_cpu:                 number
   p99_mem:                 number
   // Recommendations: request = ceil(p99), limit = ceil(p99 × 2)
@@ -34,6 +36,8 @@ export interface Recommendation {
   recommended_mem_request: number
   recommended_mem_limit:   number
   applied:                 boolean
+  // Tombstone — null when workload is alive, timestamp when not seen in last scheduler run
+  orphaned_at:             string | null
   created_at:              string
   updated_at:              string
 }

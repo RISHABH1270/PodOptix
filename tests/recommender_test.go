@@ -13,7 +13,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("success — recommended is ceil(p99 × 2)", func(t *testing.T) {
 		track(t)
 		metrics := &collector.ContainerMetrics{
-			Namespace: "payments", PodName: "payment-api", ContainerName: "api",
+			Namespace: "payments", WorkloadKind: models.WorkloadKindDeployment, WorkloadName: "payment-api", ContainerName: "api", ReplicaCount: 3,
 			CPUValues:  []float64{100, 110, 120, 105, 115},
 			MemValues:  []float64{200, 210, 220, 205, 215},
 			CPURequest: 500,  CPULimit: 1000,
@@ -61,7 +61,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("single value — request is p99, limit is p99 × 2", func(t *testing.T) {
 		track(t)
 		rec, err := recommender.Generate("cluster-1", &collector.ContainerMetrics{
-			Namespace: "ns", PodName: "pod", ContainerName: "c",
+			Namespace: "ns", WorkloadKind: models.WorkloadKindDeployment, WorkloadName: "pod", ContainerName: "c", ReplicaCount: 1,
 			CPUValues: []float64{50}, MemValues: []float64{100},
 		})
 		assert.NoError(t, err)
@@ -76,8 +76,8 @@ func TestGenerateAll(t *testing.T) {
 	t.Run("mixed data — ready and new_service", func(t *testing.T) {
 		track(t)
 		recs, err := recommender.GenerateAll("cluster-1", []*collector.ContainerMetrics{
-			{Namespace: "ns", PodName: "pod-1", ContainerName: "c1", CPUValues: []float64{100, 110, 120}, MemValues: []float64{200, 210, 220}},
-			{Namespace: "ns", PodName: "pod-2", ContainerName: "c2", CPUValues: []float64{}, MemValues: []float64{}},
+			{Namespace: "ns", WorkloadKind: models.WorkloadKindDeployment, WorkloadName: "pod-1", ContainerName: "c1", ReplicaCount: 1, CPUValues: []float64{100, 110, 120}, MemValues: []float64{200, 210, 220}},
+			{Namespace: "ns", WorkloadKind: models.WorkloadKindDeployment, WorkloadName: "pod-2", ContainerName: "c2", ReplicaCount: 1, CPUValues: []float64{}, MemValues: []float64{}},
 		})
 		assert.NoError(t, err)
 		assert.Len(t, recs, 2)

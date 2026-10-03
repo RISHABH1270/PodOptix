@@ -25,12 +25,12 @@ func Generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Re
 
 	p99CPU, err := compute.ComputeP99(metrics.CPUValues)
 	if err != nil {
-		return nil, fmt.Errorf("compute p99 cpu for %s/%s: %w", metrics.PodName, metrics.ContainerName, err)
+		return nil, fmt.Errorf("compute p99 cpu for %s/%s: %w", metrics.WorkloadName, metrics.ContainerName, err)
 	}
 
 	p99Mem, err := compute.ComputeP99(metrics.MemValues)
 	if err != nil {
-		return nil, fmt.Errorf("compute p99 mem for %s/%s: %w", metrics.PodName, metrics.ContainerName, err)
+		return nil, fmt.Errorf("compute p99 mem for %s/%s: %w", metrics.WorkloadName, metrics.ContainerName, err)
 	}
 
 	now := time.Now()
@@ -39,8 +39,10 @@ func Generate(clusterID string, metrics *collector.ContainerMetrics) (*models.Re
 		RecommendationID:      uuid.New().String(),
 		ClusterID:             clusterID,
 		Namespace:             metrics.Namespace,
-		PodName:               metrics.PodName,
+		WorkloadKind:          metrics.WorkloadKind,
+		WorkloadName:          metrics.WorkloadName,
 		ContainerName:         metrics.ContainerName,
+		ReplicaCount:          metrics.ReplicaCount,
 		Status:                models.RecommendationStatusReady,
 		CurrentCPURequest:     metrics.CPURequest,
 		CurrentCPULimit:       metrics.CPULimit,
@@ -72,8 +74,10 @@ func GenerateAll(clusterID string, allMetrics []*collector.ContainerMetrics) ([]
 				RecommendationID: uuid.New().String(),
 				ClusterID:        clusterID,
 				Namespace:        m.Namespace,
-				PodName:          m.PodName,
+				WorkloadKind:     m.WorkloadKind,
+				WorkloadName:     m.WorkloadName,
 				ContainerName:    m.ContainerName,
+				ReplicaCount:     m.ReplicaCount,
 				Status:           models.RecommendationStatusNewService,
 				CreatedAt:        now,
 				UpdatedAt:        now,

@@ -111,8 +111,8 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 	var saved int
 	for _, rec := range recommendations {
 		if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
-			log.Printf("ERROR scheduler upsert cluster=%s pod=%s container=%s: %v",
-				clusterID, rec.PodName, rec.ContainerName, err)
+			log.Printf("ERROR scheduler upsert cluster=%s workload=%s/%s container=%s: %v",
+				clusterID, rec.WorkloadKind, rec.WorkloadName, rec.ContainerName, err)
 			continue
 		}
 		saved++

@@ -39,7 +39,7 @@ export function RecommendationsPage() {
       const q = search.toLowerCase()
       out = out.filter(r =>
         r.namespace.toLowerCase().includes(q) ||
-        r.pod_name.toLowerCase().includes(q) ||
+        r.workload_name.toLowerCase().includes(q) ||
         r.container_name.toLowerCase().includes(q),
       )
     }
@@ -184,7 +184,7 @@ export function RecommendationsPage() {
                     </td>
                     <td className="px-4 py-3 text-muted font-mono text-xs">{r.namespace}</td>
                     <td className="px-4 py-3">
-                      <div className="text-ink text-xs font-medium">{r.pod_name}</div>
+                      <div className="text-ink text-xs font-medium">{r.workload_name}</div>
                       <div className="text-dim text-[11px] font-mono">{r.container_name}</div>
                     </td>
                     <td className="px-4 py-3">
