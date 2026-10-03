@@ -137,9 +137,9 @@ classDiagram
         both registered via blank import
     }
 
-    store --> pgxpool : opens pool
-    store --> pgx : admin lobby connect
-    store --> migrateLib : apply migrations
+    store --> pgx : 1. admin lobby connect (EnsureDatabase)
+    store --> migrateLib : 2. apply migrations (SyncSchema)
+    store --> pgxpool : 3. opens pool (New)
 
     class cache {
         <<package>>
