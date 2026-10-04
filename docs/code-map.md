@@ -87,23 +87,20 @@ classDiagram
     }
 
     class storeCluster {
-        <<package methods>>
+        <<methods on *Store>>
         internal/store/cluster.go
-        hangs off *Store
         +SaveCluster(ctx, c)         INSERT
         +GetCluster(ctx, id)         SELECT one · QueryRow+Scan
         +ListClusters(ctx)           SELECT many · Query+rows.Next
         +UpdateCluster(ctx, c)       UPDATE 4 user-tweakable fields
-        +UpdateClusterHealth(ctx,id,status,ts)  UPDATE status + last_synced_at
+        +UpdateClusterHealth(ctx,id,status,ts)
         +DeleteCluster(ctx, id)      DELETE · fails on FK if recs exist
         patterns
         Exec → check err or RowsAffected==0
-        QueryRow+Scan → one row
-        Query+rows.Next+Scan → many rows
+        QueryRow+Scan → one row · Query+rows.Next+Scan → many rows
     }
 
-    storeCluster --> Store : methods on
-    storeCluster --> pgxpool : via s.pool
+    Store *-- storeCluster : extends
 
     class pgxpool {
         <<3rd-party>>
