@@ -1,75 +1,28 @@
 # PodOptix — Code Map
 
 ```mermaid
-classDiagram
-    direction TB
+flowchart TB
+    main["<b>main</b><br/>cmd/hub/main.go<br/>wires everything · handles SIGTERM"]
 
-    class main {
-        <<entry point>>
-        cmd/hub/main.go
-        wires everything
-        handles SIGTERM
-    }
+    config["<b>config</b><br/>internal/config<br/>env var loader"]
+    store["<b>store</b><br/>internal/store<br/>pgxpool + migrations<br/>CRUD on clusters / users / recs"]
+    cache["<b>cache</b><br/>internal/cache<br/>Redis · cache-aside · locks"]
+    collector["<b>collector</b><br/>internal/collector<br/>Prometheus · owner resolution<br/>MAX across replicas"]
+    recommender["<b>recommender</b><br/>internal/recommender<br/>p99 → req=ceil(p99)<br/>limit=ceil(p99 × 2)"]
+    scheduler["<b>scheduler</b><br/>internal/scheduler<br/>24h ticker"]
+    api["<b>api</b><br/>internal/api<br/>Gin HTTP server"]
 
-    class config {
-        <<package>>
-        internal/config
-        env var loader
-    }
+    main -->|"1 · Load env"| config
+    main -->|"2 · bootstrap DB"| store
+    main -->|"3 · Redis"| cache
+    main -->|"4 · go Start"| scheduler
+    main -->|"5 · Serve"| api
 
-    class store {
-        <<package>>
-        internal/store
-        pgxpool + migrations
-        CRUD on clusters / users / recommendations
-    }
+    scheduler -->|"6 · ListClusters"| store
+    scheduler -->|"7 · Collect"| collector
+    scheduler -->|"8 · GenerateAll"| recommender
 
-    class cache {
-        <<package>>
-        internal/cache
-        Redis · cache-aside · distributed locks
-    }
-
-    class collector {
-        <<package>>
-        internal/collector
-        Prometheus queries
-        pod → workload owner resolution
-        MAX across replicas
-    }
-
-    class recommender {
-        <<package>>
-        internal/recommender
-        p99 → request = ceil(p99)
-        limit = ceil(p99 × 2)
-    }
-
-    class scheduler {
-        <<package>>
-        internal/scheduler
-        24h ticker
-        collect → recommend → upsert → mark orphan
-    }
-
-    class api {
-        <<package>>
-        internal/api
-        Gin HTTP server
-        auth · clusters · recommendations · savings
-    }
-
-    main --> config : 1 · Load env
-    main --> store : 2 · EnsureDB → SyncSchema → open pool
-    main --> cache : 3 · Connect Redis
-    main --> scheduler : 4 · New + go Start
-    main --> api : 5 · NewServer + Serve
-
-    scheduler --> store : 6 · ListClusters + Upsert + MarkOrphaned
-    scheduler --> collector : 7 · Collect(lookback)
-    scheduler --> recommender : 8 · GenerateAll (p99)
-
-    api --> cache : 9 · cache-aside
-    api --> store : 10 · DB on miss / writes
-    api --> scheduler : 11 · recalculate → RunForCluster
+    api -->|"9 · cache-aside"| cache
+    api -->|"10 · DB"| store
+    api -->|"11 · recalculate"| scheduler
 ```
