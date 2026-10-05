@@ -109,19 +109,26 @@ func (c *Collector) Collect(ctx context.Context, lookbackWindow string) ([]*Cont
 		return nil, fmt.Errorf("query memory usage: %w", err)
 	}
 
-	// query current resource requests + limits from kube-state-metrics — gracefully returns empty if not installed
-	cpuRequests, _ := c.queryInstant(ctx,
-		`kube_pod_container_resource_requests{resource="cpu",container!="",container!="POD"} * 1000`,
-	)
-	cpuLimits, _ := c.queryInstant(ctx,
-		`kube_pod_container_resource_limits{resource="cpu",container!="",container!="POD"} * 1000`,
-	)
-	memRequests, _ := c.queryInstant(ctx,
-		`kube_pod_container_resource_requests{resource="memory",container!="",container!="POD"} / 1048576`,
-	)
-	memLimits, _ := c.queryInstant(ctx,
-		`kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"} / 1048576`,
-	)
+	// Query current resource requests + limits from kube-state-metrics. Failures are
+	// logged but NOT fatal — if kube-state-metrics isn't installed the queries return
+	// empty (not error) so this logging mostly catches transient Prometheus hiccups.
+	// Empty results mean current_* fields default to 0 → Savings page shows the full
+	// recommended value as "waste" (visible operator hint that something's off).
+	queryWithLog := func(label, query string) []prometheusInstantResult {
+		res, err := c.queryInstant(ctx, query)
+		if err != nil {
+			log.Printf("WARN  collector %s query failed: %v", label, err)
+		}
+		return res
+	}
+	cpuRequests := queryWithLog("cpu_requests",
+		`kube_pod_container_resource_requests{resource="cpu",container!="",container!="POD"} * 1000`)
+	cpuLimits := queryWithLog("cpu_limits",
+		`kube_pod_container_resource_limits{resource="cpu",container!="",container!="POD"} * 1000`)
+	memRequests := queryWithLog("mem_requests",
+		`kube_pod_container_resource_requests{resource="memory",container!="",container!="POD"} / 1048576`)
+	memLimits := queryWithLog("mem_limits",
+		`kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"} / 1048576`)
 
 	// Resolve the pod → workload mapping (ReplicaSet → Deployment collapse).
 	// Degrades gracefully: if kube_pod_owner isn't available (kube-state-metrics missing),
@@ -443,17 +450,28 @@ func mergeMetrics(
 	memReq := toMaxIntMap(memRequestResults)
 	memLim := toMaxIntMap(memLimitResults)
 
-	// Driven by memSeries (as before — same semantics for the "has memory data" filter).
-	var metrics []*ContainerMetrics
-	for wk, ms := range memSeries {
+	// Build the union of workload keys seen in EITHER CPU or Mem — if a container
+	// temporarily reports only one dimension (brief kube-state-metrics restart,
+	// metric relabel, etc.), the recommender will mark it new_service rather than
+	// us silently dropping the row.
+	allKeys := make(map[workloadKey]struct{}, len(cpuSeries)+len(memSeries))
+	for wk := range cpuSeries {
+		allKeys[wk] = struct{}{}
+	}
+	for wk := range memSeries {
+		allKeys[wk] = struct{}{}
+	}
+
+	metrics := make([]*ContainerMetrics, 0, len(allKeys))
+	for wk := range allKeys {
 		metrics = append(metrics, &ContainerMetrics{
 			Namespace:     wk.namespace,
 			WorkloadKind:  wk.kind,
 			WorkloadName:  wk.name,
 			ContainerName: wk.container,
 			ReplicaCount:  len(replicas[wk]),
-			CPUValues:     cpuSeries[wk].flatten(),
-			MemValues:     ms.flatten(),
+			CPUValues:     cpuSeries[wk].flatten(), // nil-safe: zero value of timeSeries is nil map → flatten returns []
+			MemValues:     memSeries[wk].flatten(),
 			CPURequest:    cpuReq[wk],
 			CPULimit:      cpuLim[wk],
 			MemRequest:    memReq[wk],
@@ -461,27 +479,6 @@ func mergeMetrics(
 		})
 	}
 	return metrics
-}
-
-// extractValues converts Prometheus [[timestamp, "value"]] pairs to []float64.
-func ExtractValues(values [][]interface{}) []float64 {
-	var result []float64
-	for _, v := range values {
-		if len(v) != 2 {
-			continue
-		}
-		// value is a string like "0.120" — parse to float64
-		str, ok := v[1].(string)
-		if !ok {
-			continue
-		}
-		f, err := strconv.ParseFloat(str, 64)
-		if err != nil {
-			continue
-		}
-		result = append(result, f)
-	}
-	return result
 }
 
 // parseDuration converts "7d", "24h" etc. to time.Duration.

@@ -62,30 +62,6 @@ func TestParseDuration(t *testing.T) {
 	})
 }
 
-func TestExtractValues(t *testing.T) {
-	t.Run("valid values parsed correctly", func(t *testing.T) {
-		track(t)
-		result := collector.ExtractValues([][]interface{}{
-			{1719100800, "120.5"},
-			{1719104400, "115.2"},
-			{1719108000, "132.8"},
-		})
-		assert.Equal(t, []float64{120.5, 115.2, 132.8}, result)
-	})
-	t.Run("empty input returns nil", func(t *testing.T) {
-		track(t)
-		assert.Empty(t, collector.ExtractValues([][]interface{}{}))
-	})
-	t.Run("invalid value skipped, valid one kept", func(t *testing.T) {
-		track(t)
-		result := collector.ExtractValues([][]interface{}{
-			{1719100800, "notanumber"},
-			{1719104400, "120.5"},
-		})
-		assert.Equal(t, []float64{120.5}, result)
-	})
-}
-
 func TestCollect(t *testing.T) {
 	t.Run("success returns merged cpu and memory per container", func(t *testing.T) {
 		track(t)

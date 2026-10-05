@@ -170,12 +170,12 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 - GenerateAll with mixed containers → some ready, some new_service
 - GenerateAll with no containers → empty slice
 
-### `collector_test.go` (13 tests — unit)
+### `collector_test.go` — unit
 - ParseDuration handles days/hours/minutes
 - ParseDuration with invalid input → error
-- ExtractValues parses Prometheus JSON format
-- ExtractValues skips invalid values
 - Collect (with mock Prometheus via `httptest.NewServer`) — HTTP calls, merging, auth header attachment
+- Multi-replica collapse — two pods owned by same Deployment produce one row with MAX aggregation
+- Owner lookup unavailable → falls back to bare Pod naming
 
 ---
 
