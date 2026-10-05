@@ -2,14 +2,22 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/pkg/models"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// ErrClusterNameTaken is returned by SaveCluster when another cluster already
+// has the same cluster_name. Handler uses errors.Is() to map to 409 Conflict.
+var ErrClusterNameTaken = errors.New("cluster name already in use")
 
 // ── Create ────────────────────────────────────────────────────────────────────
 
+// SaveCluster inserts a cluster. Returns ErrClusterNameTaken if a cluster with
+// the same cluster_name already exists (UNIQUE constraint violation).
 func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 	query := `
 		INSERT INTO clusters (cluster_id, cluster_name, prometheus_url, prometheus_token, lookback_window, status, created_by, last_synced_at, created_at, updated_at)
@@ -28,6 +36,12 @@ func (s *Store) SaveCluster(ctx context.Context, c *models.Cluster) error {
 		c.UpdatedAt,
 	)
 	if err != nil {
+		// SQLSTATE 23505 = unique_violation. Only one UNIQUE constraint exists
+		// on clusters (cluster_name), so a hit means the name is taken.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrClusterNameTaken
+		}
 		return fmt.Errorf("save cluster: %w", err)
 	}
 	return nil
@@ -72,7 +86,7 @@ func (s *Store) ListClusters(ctx context.Context) ([]*models.Cluster, error) {
 	}
 	defer rows.Close()
 
-	var clusters []*models.Cluster
+	clusters := []*models.Cluster{} // never nil — handlers serialise to [] not null
 	for rows.Next() {
 		c := &models.Cluster{}
 		if err := rows.Scan(

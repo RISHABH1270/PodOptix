@@ -21,7 +21,7 @@
 
 CREATE TABLE IF NOT EXISTS recommendations (
     recommendation_id       VARCHAR(36)   PRIMARY KEY,
-    cluster_id              VARCHAR(36)   NOT NULL REFERENCES clusters(cluster_id),
+    cluster_id              VARCHAR(36)   NOT NULL REFERENCES clusters(cluster_id) ON DELETE CASCADE,
     status                  VARCHAR(20)   NOT NULL DEFAULT 'new_service',   -- new_service | ready
 
     -- Workload identity (resolved from pod → ReplicaSet → Deployment chain)
