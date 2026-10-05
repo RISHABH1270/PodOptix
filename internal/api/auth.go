@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // RegisterRequest defines the expected JSON body for registration.
@@ -57,9 +57,7 @@ func (s *Server) register(c *gin.Context) {
 	}
 
 	if err = s.store.CreateUser(c.Request.Context(), user); err != nil {
-		// 23505 = PostgreSQL unique_violation — the only error that means "email already registered"
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.Is(err, store.ErrEmailAlreadyRegistered) {
 			c.JSON(http.StatusConflict, gin.H{
 				"error":      "An account with this email already exists",
 				"request_id": requestID,
