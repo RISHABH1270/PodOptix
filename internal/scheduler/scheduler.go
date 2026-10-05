@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
@@ -13,6 +14,13 @@ import (
 	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
+
+// maxConcurrentClusterRuns caps how many clusters the scheduler processes in
+// parallel per tick. Picked to balance speed against Prometheus / DB load:
+// too low wastes the ticker window; too high can hammer every cluster's
+// Prometheus simultaneously (we query 8 PromQL endpoints per run × N clusters).
+// Hardcoded for now — expose as env var if someone deploys with 50+ clusters.
+const maxConcurrentClusterRuns = 5
 
 // Scheduler runs the collection pipeline once per day for every registered cluster.
 // Shares the per-cluster recalculate lock with the API's /recalculate handler
@@ -56,7 +64,9 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}
 }
 
-// runAll fetches all clusters and runs the full pipeline for each one sequentially.
+// runAll fetches all clusters and runs the full pipeline for each one in parallel,
+// capped at maxConcurrentClusterRuns. Returns only after every cluster is done
+// (or ctx is cancelled) so the next ticker tick never overlaps the current one.
 func (s *Scheduler) runAll(ctx context.Context) {
 	log.Printf("INFO  scheduler running collection for all clusters")
 
@@ -71,14 +81,28 @@ func (s *Scheduler) runAll(ctx context.Context) {
 		return
 	}
 
+	log.Printf("INFO  scheduler processing %d clusters (max %d in parallel)", len(clusters), maxConcurrentClusterRuns)
+
+	// Buffered channel acts as a counting semaphore — send to acquire a slot,
+	// receive to release. WaitGroup blocks runAll until every goroutine finishes.
+	sem := make(chan struct{}, maxConcurrentClusterRuns)
+	var wg sync.WaitGroup
 	for _, cluster := range clusters {
-		plainToken, err := auth.Decrypt(cluster.PrometheusToken, s.encryptionKey)
-		if err != nil {
-			log.Printf("ERROR scheduler decrypt token cluster=%s: %v", cluster.ClusterID, err)
-			continue
-		}
-		s.RunForCluster(ctx, cluster.ClusterID, cluster.PrometheusURL, plainToken, cluster.LookbackWindow)
+		wg.Add(1)
+		sem <- struct{}{} // acquire — blocks here once maxConcurrent are in flight
+		go func(cluster *models.Cluster) {
+			defer wg.Done()
+			defer func() { <-sem }() // release
+
+			plainToken, err := auth.Decrypt(cluster.PrometheusToken, s.encryptionKey)
+			if err != nil {
+				log.Printf("ERROR scheduler decrypt token cluster=%s: %v", cluster.ClusterID, err)
+				return
+			}
+			s.RunForCluster(ctx, cluster.ClusterID, cluster.PrometheusURL, plainToken, cluster.LookbackWindow)
+		}(cluster)
 	}
+	wg.Wait()
 }
 
 // RunForCluster runs the full collect → recommend → upsert pipeline for one cluster.
