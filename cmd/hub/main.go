@@ -47,7 +47,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	sched := scheduler.New(db, 24*time.Hour, cfg.EncryptionKey)
+	sched := scheduler.New(db, redisCache, 24*time.Hour, cfg.EncryptionKey)
 	go sched.Start(ctx)
 	info("Scheduler", "Started — 24h interval")
 

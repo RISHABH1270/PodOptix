@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
+	"github.com/RISHABH1270/PodOptix/internal/cache"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
 	"github.com/RISHABH1270/PodOptix/internal/metrics"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
@@ -14,16 +15,20 @@ import (
 )
 
 // Scheduler runs the collection pipeline once per day for every registered cluster.
+// Shares the per-cluster recalculate lock with the API's /recalculate handler
+// so a scheduled tick + a manual click can never run concurrently on the same cluster.
 type Scheduler struct {
 	store         *store.Store
+	cache         *cache.Cache // nil in tests — lock acquisition is skipped when nil
 	interval      time.Duration
 	encryptionKey string
 }
 
-// New creates a new Scheduler.
-func New(st *store.Store, interval time.Duration, encryptionKey string) *Scheduler {
+// New creates a new Scheduler. cache may be nil (lock skipped — fine for tests).
+func New(st *store.Store, ca *cache.Cache, interval time.Duration, encryptionKey string) *Scheduler {
 	return &Scheduler{
 		store:         st,
+		cache:         ca,
 		interval:      interval,
 		encryptionKey: encryptionKey,
 	}
@@ -79,9 +84,30 @@ func (s *Scheduler) runAll(ctx context.Context) {
 // RunForCluster runs the full collect → recommend → upsert pipeline for one cluster.
 // Called by the scheduler loop and directly after cluster registration for immediate first sync.
 // Uses a 10 minute timeout so a hanging Prometheus never blocks the full run.
+//
+// Acquires the shared per-cluster recalculate lock. If another run (scheduler tick
+// or manual recalculate) is already in progress, logs and returns silently — no
+// double Prometheus load, no racing on MarkOrphaned.
 func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL, token, lookbackWindow string) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
+
+	// Lock acquisition — skipped when cache is nil (test setup).
+	if s.cache != nil {
+		locked, err := s.cache.AcquireRecalculateLock(ctx, clusterID)
+		if err != nil {
+			log.Printf("WARN  scheduler lock error cluster=%s: %v", clusterID, err)
+		}
+		if !locked {
+			log.Printf("INFO  scheduler skipped cluster=%s — another run in progress", clusterID)
+			return
+		}
+		defer func() {
+			if err := s.cache.ReleaseRecalculateLock(ctx, clusterID); err != nil {
+				log.Printf("WARN  scheduler release lock cluster=%s: %v", clusterID, err)
+			}
+		}()
+	}
 
 	start := time.Now()
 	log.Printf("INFO  scheduler collecting cluster=%s", clusterID)
@@ -108,21 +134,26 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 		return
 	}
 
+	// IMPORTANT: build seenKeys from EVERY observed workload, regardless of whether
+	// the DB write succeeded. If an upsert transiently fails and we skip the seenKey,
+	// MarkOrphaned would stamp the workload as missing even though Prometheus just
+	// confirmed it exists → false orphan on dashboard. Prometheus observation is
+	// the authoritative signal; DB blips are a separate concern (self-heals on next tick).
 	var saved int
 	seenKeys := make([]models.WorkloadKey, 0, len(recommendations))
 	for _, rec := range recommendations {
-		if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
-			log.Printf("ERROR scheduler upsert cluster=%s workload=%s/%s container=%s: %v",
-				clusterID, rec.WorkloadKind, rec.WorkloadName, rec.ContainerName, err)
-			continue
-		}
-		saved++
 		seenKeys = append(seenKeys, models.WorkloadKey{
 			Namespace:     rec.Namespace,
 			WorkloadKind:  rec.WorkloadKind,
 			WorkloadName:  rec.WorkloadName,
 			ContainerName: rec.ContainerName,
 		})
+		if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
+			log.Printf("ERROR scheduler upsert cluster=%s workload=%s/%s container=%s: %v",
+				clusterID, rec.WorkloadKind, rec.WorkloadName, rec.ContainerName, err)
+			continue
+		}
+		saved++
 	}
 
 	log.Printf("INFO  scheduler saved %d/%d recommendations for cluster=%s", saved, len(recommendations), clusterID)

@@ -251,18 +251,21 @@ func (s *Server) recalculate(c *gin.Context) {
 			return
 		}
 
+		// seenKeys populated BEFORE upsert — Prometheus observation is authoritative.
+		// If an upsert fails transiently, we still don't want MarkOrphaned to stamp
+		// the workload as missing. See scheduler.RunForCluster for the same pattern.
 		seenKeys := make([]models.WorkloadKey, 0, len(recs))
 		for _, rec := range recs {
-			if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
-				log.Printf("ERROR recalculate upsert cluster=%s: %v", clusterID, err)
-				continue
-			}
 			seenKeys = append(seenKeys, models.WorkloadKey{
 				Namespace:     rec.Namespace,
 				WorkloadKind:  rec.WorkloadKind,
 				WorkloadName:  rec.WorkloadName,
 				ContainerName: rec.ContainerName,
 			})
+			if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
+				log.Printf("ERROR recalculate upsert cluster=%s: %v", clusterID, err)
+				continue
+			}
 		}
 
 		if orphaned, err := s.store.MarkOrphaned(ctx, clusterID, seenKeys); err != nil {
