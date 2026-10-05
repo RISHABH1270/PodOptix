@@ -5,12 +5,12 @@ flowchart TB
     main["<b>main</b><br/>cmd/hub/main.go<br/>wires everything<br/>graceful shutdown (10s drain)"]
 
     config["<b>config</b><br/>internal/config<br/>env var loader<br/>validates URL + key lengths at startup"]
-    store["<b>store</b><br/>internal/store<br/>pgxpool + migrations<br/>CRUD on clusters / users / recommendations"]
-    cache["<b>cache</b><br/>internal/cache<br/>Redis · cache-aside · distributed locks"]
-    collector["<b>collector</b><br/>internal/collector<br/>Prometheus queries<br/>pod → workload owner resolution<br/>MAX across replicas"]
+    store["<b>store</b><br/>internal/store<br/>pgxpool + migrations<br/>CRUD on clusters / users / recommendations<br/>cluster delete cascades to recs"]
+    cache["<b>cache</b><br/>internal/cache<br/>Redis · 3h cache-aside for rec list<br/>fencing-token lock for recalculate"]
+    collector["<b>collector</b><br/>internal/collector<br/>Prometheus queries<br/>pod → workload owner resolution<br/>MAX across replicas per timestamp"]
     recommender["<b>recommender</b><br/>internal/recommender<br/>p99 → req=ceil(p99)<br/>limit=ceil(p99 × 2)"]
-    scheduler["<b>scheduler</b><br/>internal/scheduler<br/>24h ticker<br/>writes every rec field EXCEPT applied"]
-    api["<b>api</b><br/>internal/api<br/>Gin HTTP server<br/>sole writer of applied flag (PATCH)"]
+    scheduler["<b>scheduler</b><br/>internal/scheduler<br/>24h ticker · max 5 clusters parallel<br/>writes every rec field EXCEPT applied"]
+    api["<b>api</b><br/>internal/api<br/>Gin HTTP server · 10s graceful drain<br/>sole writer of applied flag (PATCH)"]
 
     pg[("PostgreSQL<br/>external")]
     rd[("Redis<br/>external")]
@@ -23,12 +23,13 @@ flowchart TB
     main -->|"5 · Serve"| api
 
     scheduler -->|"6 · ListClusters"| store
-    scheduler -->|"7 · Collect(lookback)"| collector
-    scheduler -->|"8 · GenerateAll (p99)"| recommender
+    scheduler -->|"7 · acquire lock (shared w/ recalc)"| cache
+    scheduler -->|"8 · Collect(lookback)"| collector
+    scheduler -->|"9 · GenerateAll (p99)"| recommender
 
-    api -->|"9 · cache-aside"| cache
-    api -->|"10 · DB on miss / writes"| store
-    api -->|"11 · recalculate → RunForCluster"| scheduler
+    api -->|"10 · cache-aside"| cache
+    api -->|"11 · DB on miss / writes"| store
+    api -->|"12 · recalculate → RunForCluster"| scheduler
 
     store -.->|SQL| pg
     cache -.->|RESP| rd
