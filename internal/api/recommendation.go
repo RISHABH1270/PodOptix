@@ -2,15 +2,16 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
 	"github.com/RISHABH1270/PodOptix/internal/metrics"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 )
@@ -84,8 +85,7 @@ func (s *Server) deleteRecommendation(c *gin.Context) {
 	recID := c.Param("recId")
 
 	if err := s.store.DeleteRecommendation(c.Request.Context(), recID); err != nil {
-		// The store returns a "not found" error with that literal substring.
-		if containsNotFound(err) {
+		if errors.Is(err, store.ErrRecommendationNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":      "Recommendation not found",
 				"request_id": requestID,
@@ -104,6 +104,49 @@ func (s *Server) deleteRecommendation(c *gin.Context) {
 		s.cache.InvalidateRecommendations(c.Request.Context(), clusterID)
 	}
 	c.JSON(http.StatusOK, gin.H{"deleted": 1, "recommendation_id": recID})
+}
+
+// patchRecommendation toggles the applied flag on one recommendation.
+// This is the ONLY write path for `applied` — scheduler/upsert never touch it.
+// Flipping drives the Savings page math (reclaimed vs still-on-the-table).
+// Request body: {"applied": true | false}
+func (s *Server) patchRecommendation(c *gin.Context) {
+	requestID := c.GetString("request_id")
+	clusterID := c.Param("id")
+	recID := c.Param("recId")
+
+	// *bool so we can distinguish "omitted" from "false"
+	var body struct {
+		Applied *bool `json:"applied"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.Applied == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      `body must include {"applied": true | false}`,
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if err := s.store.SetRecommendationApplied(c.Request.Context(), recID, *body.Applied); err != nil {
+		if errors.Is(err, store.ErrRecommendationNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":      "Recommendation not found",
+				"request_id": requestID,
+			})
+			return
+		}
+		log.Printf("ERROR [%s] patchRecommendation cluster=%s rec=%s: %v", requestID, clusterID, recID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to update recommendation",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if s.cache != nil {
+		s.cache.InvalidateRecommendations(c.Request.Context(), clusterID)
+	}
+	c.JSON(http.StatusOK, gin.H{"recommendation_id": recID, "applied": *body.Applied})
 }
 
 // deleteOrphanedRecommendations bulk-deletes every orphaned row for a cluster.
@@ -136,12 +179,6 @@ func (s *Server) deleteOrphanedRecommendations(c *gin.Context) {
 		s.cache.InvalidateRecommendations(c.Request.Context(), clusterID)
 	}
 	c.JSON(http.StatusOK, gin.H{"deleted": n})
-}
-
-// containsNotFound is a tiny helper so handlers can distinguish the store's
-// "not found" sentinel without pulling in errors.Is boilerplate for every call site.
-func containsNotFound(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "not found")
 }
 
 // recalculate triggers a manual recommendation recalculation for a cluster.

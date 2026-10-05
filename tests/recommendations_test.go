@@ -130,6 +130,88 @@ func TestRecommendations(t *testing.T) {
 		})
 	})
 
+	t.Run("PATCH /clusters/:id/recommendations/:recId", func(t *testing.T) {
+		t.Run("toggles applied true then back to false", func(t *testing.T) {
+			track(t)
+			id := createCluster(t, "patch-apply-cluster", "http://prom.patch.apply.test")
+			rec := newRec(id, "ns", "Deployment", "svc", "api")
+			assert.NoError(t, db.UpsertRecommendation(context.Background(), rec))
+
+			// Flip to applied=true
+			resp := do(t, http.MethodPatch,
+				"/api/v1/clusters/"+id+"/recommendations/"+rec.RecommendationID,
+				`{"applied":true}`, tok)
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Contains(t, body, `"applied":true`)
+			recs, _ := db.ListByCluster(context.Background(), id)
+			assert.True(t, recs[0].Applied)
+
+			// Flip back to false
+			resp = do(t, http.MethodPatch,
+				"/api/v1/clusters/"+id+"/recommendations/"+rec.RecommendationID,
+				`{"applied":false}`, tok)
+			resp.Body.Close()
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			recs, _ = db.ListByCluster(context.Background(), id)
+			assert.False(t, recs[0].Applied)
+		})
+
+		t.Run("applied flag survives next scheduler upsert", func(t *testing.T) {
+			track(t)
+			id := createCluster(t, "patch-persist-cluster", "http://prom.patch.persist.test")
+			rec := newRec(id, "ns", "Deployment", "persistent", "api")
+			assert.NoError(t, db.UpsertRecommendation(context.Background(), rec))
+
+			// Flip to applied=true
+			resp := do(t, http.MethodPatch,
+				"/api/v1/clusters/"+id+"/recommendations/"+rec.RecommendationID,
+				`{"applied":true}`, tok)
+			resp.Body.Close()
+
+			// Simulate scheduler re-upserting the same workload
+			assert.NoError(t, db.UpsertRecommendation(context.Background(), rec))
+
+			recs, _ := db.ListByCluster(context.Background(), id)
+			assert.True(t, recs[0].Applied, "applied flag must survive the next scheduler upsert")
+		})
+
+		t.Run("missing applied field returns 400", func(t *testing.T) {
+			track(t)
+			id := createCluster(t, "patch-badbody-cluster", "http://prom.patch.badbody.test")
+			rec := newRec(id, "ns", "Deployment", "svc", "api")
+			assert.NoError(t, db.UpsertRecommendation(context.Background(), rec))
+
+			resp := do(t, http.MethodPatch,
+				"/api/v1/clusters/"+id+"/recommendations/"+rec.RecommendationID,
+				`{}`, tok)
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Contains(t, body, "applied")
+		})
+
+		t.Run("unknown recId returns 404", func(t *testing.T) {
+			track(t)
+			id := createCluster(t, "patch-missing-cluster", "http://prom.patch.missing.test")
+			resp := do(t, http.MethodPatch,
+				"/api/v1/clusters/"+id+"/recommendations/not-a-real-id",
+				`{"applied":true}`, tok)
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+			assert.Contains(t, body, "not found")
+		})
+
+		t.Run("no auth returns 401", func(t *testing.T) {
+			track(t)
+			id := createCluster(t, "patch-noauth-cluster", "http://prom.patch.noauth.test")
+			resp := do(t, http.MethodPatch,
+				"/api/v1/clusters/"+id+"/recommendations/anything",
+				`{"applied":true}`, "")
+			resp.Body.Close()
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		})
+	})
+
 	t.Run("DELETE /clusters/:id/recommendations?orphaned=true", func(t *testing.T) {
 		t.Run("bulk-deletes orphaned rows only", func(t *testing.T) {
 			track(t)

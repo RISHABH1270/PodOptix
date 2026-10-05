@@ -128,6 +128,16 @@ export function ClusterDetailPage() {
     }
   }
 
+  const toggleApplied = async (recId: string, next: boolean) => {
+    const prev = recs
+    setRecs(recs.map((r) => (r.recommendation_id === recId ? { ...r, applied: next } : r))) // optimistic
+    try {
+      await api.setRecommendationApplied(id, recId, next)
+    } catch (err: any) {
+      setRecs(prev); setError(err.message ?? 'Failed to update applied flag')
+    }
+  }
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <Link to="/clusters" className="inline-flex items-center gap-2 text-sm text-muted hover:text-ink mb-6 transition">
@@ -373,9 +383,17 @@ export function ClusterDetailPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {r.applied
-                        ? <span className="text-ok text-xs">✓</span>
-                        : <span className="text-dim text-xs">—</span>}
+                      <button
+                        onClick={() => toggleApplied(r.recommendation_id, !r.applied)}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded border transition ${
+                          r.applied
+                            ? 'bg-okBg border-ok/40 text-ok hover:bg-ok hover:text-white'
+                            : 'bg-elevated border-border text-dim hover:border-ok hover:text-ok'
+                        }`}
+                        title={r.applied ? 'Mark as not applied' : 'Mark as applied'}
+                      >
+                        {r.applied ? '✓' : '○'}
+                      </button>
                     </td>
                     <td className="px-3 py-3 text-right">
                       <button

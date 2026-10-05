@@ -133,6 +133,12 @@ export const api = {
       'DELETE', `/api/v1/clusters/${clusterId}/recommendations/${recId}`,
     )
   },
+  setRecommendationApplied(clusterId: string, recId: string, applied: boolean) {
+    return request<{ recommendation_id: string; applied: boolean }>(
+      'PATCH', `/api/v1/clusters/${clusterId}/recommendations/${recId}`,
+      { applied },
+    )
+  },
   deleteOrphanedRecommendations(clusterId: string) {
     return request<{ deleted: number }>(
       'DELETE', `/api/v1/clusters/${clusterId}/recommendations?orphaned=true`,

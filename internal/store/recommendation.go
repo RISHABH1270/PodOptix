@@ -2,17 +2,28 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 )
 
+// ErrRecommendationNotFound is returned by DeleteRecommendation and
+// SetRecommendationApplied when the given recommendation_id doesn't exist.
+// Handler maps to 404.
+var ErrRecommendationNotFound = errors.New("recommendation not found")
+
 // ── Create / Update (Upsert) ──────────────────────────────────────────────────
 
 // UpsertRecommendation inserts a new recommendation or updates the existing one.
 // One row per workload-container — updated in place every time the scheduler runs.
-// `applied` is preserved on conflict (scheduler never resets a user's applied flag).
-// `first_missed_at` is cleared on every upsert — a workload we just saw is alive by definition.
+//
+// Fields the scheduler owns and overwrites: replica_count, status, current/p99/recommended.
+// Fields the USER owns (NEVER touched by scheduler):
+//   - applied        — hardcoded FALSE on INSERT, OMITTED from UPDATE SET.
+//                      Only flipped by SetRecommendationApplied (PATCH endpoint).
+//   - first_missed_at — cleared to NULL on both INSERT and UPDATE (a workload
+//                      we just saw is alive by definition — un-tombstones).
 func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendation) error {
 	query := `
 		INSERT INTO recommendations (
@@ -30,7 +41,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 			$13, $14,
 			$15, $16,
 			$17, $18,
-			$19, NULL, $20, NOW()
+			FALSE, NULL, $19, NOW()
 		)
 		ON CONFLICT (cluster_id, namespace, workload_kind, workload_name, container_name)
 		DO UPDATE SET
@@ -68,11 +79,30 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 		r.RecommendedCPULimit,
 		r.RecommendedMemRequest,
 		r.RecommendedMemLimit,
-		r.Applied,
 		r.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert recommendation: %w", err)
+	}
+	return nil
+}
+
+// SetRecommendationApplied flips the applied flag on one row. This is the ONLY
+// write path for `applied` — the scheduler never touches it. Called from the
+// dashboard when an operator toggles the ✓ checkmark after applying (or reverting)
+// the recommendation in the cluster. Drives the Savings page math.
+//
+// Returns ErrRecommendationNotFound if the id doesn't exist.
+func (s *Store) SetRecommendationApplied(ctx context.Context, recID string, applied bool) error {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE recommendations SET applied = $1, updated_at = NOW() WHERE recommendation_id = $2`,
+		applied, recID,
+	)
+	if err != nil {
+		return fmt.Errorf("set applied: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrRecommendationNotFound
 	}
 	return nil
 }
@@ -280,6 +310,7 @@ func (s *Store) DeleteOrphaned(ctx context.Context, clusterID string) (int, erro
 // DeleteRecommendation hard-deletes a single recommendation by id.
 // Called from the dashboard per-row delete action. The caller is expected
 // to have scoped the request to the cluster_id already.
+// Returns ErrRecommendationNotFound if the id doesn't exist.
 func (s *Store) DeleteRecommendation(ctx context.Context, recommendationID string) error {
 	tag, err := s.pool.Exec(ctx,
 		`DELETE FROM recommendations WHERE recommendation_id = $1`,
@@ -289,7 +320,7 @@ func (s *Store) DeleteRecommendation(ctx context.Context, recommendationID strin
 		return fmt.Errorf("delete recommendation: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("recommendation not found: %s", recommendationID)
+		return ErrRecommendationNotFound
 	}
 	return nil
 }

@@ -25,6 +25,16 @@ export function RecommendationsPage() {
 
   useEffect(() => { load() }, [])
 
+  const toggleApplied = async (clusterId: string, recId: string, next: boolean) => {
+    const prev = rows
+    setRows(rows.map((r) => (r.recommendation_id === recId ? { ...r, applied: next } : r))) // optimistic
+    try {
+      await api.setRecommendationApplied(clusterId, recId, next)
+    } catch (err: any) {
+      setRows(prev); setError(err.message ?? 'Failed to update applied flag')
+    }
+  }
+
   // unique cluster names for the filter dropdown
   const clusterOptions = useMemo(() => {
     const set = new Set(rows.map(r => r.cluster_name))
@@ -228,7 +238,17 @@ export function RecommendationsPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {r.applied ? <span className="text-ok text-xs">✓</span> : <span className="text-dim text-xs">—</span>}
+                      <button
+                        onClick={() => toggleApplied(r.cluster_id, r.recommendation_id, !r.applied)}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded border transition ${
+                          r.applied
+                            ? 'bg-okBg border-ok/40 text-ok hover:bg-ok hover:text-white'
+                            : 'bg-elevated border-border text-dim hover:border-ok hover:text-ok'
+                        }`}
+                        title={r.applied ? 'Mark as not applied' : 'Mark as applied'}
+                      >
+                        {r.applied ? '✓' : '○'}
+                      </button>
                     </td>
                   </tr>
                 ))}
