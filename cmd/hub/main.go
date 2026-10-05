@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/api"       // Gin HTTP server
-    "github.com/RISHABH1270/PodOptix/internal/cache"     // Redis wrapper
-    "github.com/RISHABH1270/PodOptix/internal/config"    // env var loader
-    "github.com/RISHABH1270/PodOptix/internal/scheduler" // 24h ticker
-    "github.com/RISHABH1270/PodOptix/internal/store"     // PostgreSQL
+	"github.com/RISHABH1270/PodOptix/internal/cache"     // Redis wrapper
+	"github.com/RISHABH1270/PodOptix/internal/config"    // env var loader
+	"github.com/RISHABH1270/PodOptix/internal/scheduler" // 24h ticker
+	"github.com/RISHABH1270/PodOptix/internal/store"     // PostgreSQL
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 	reset  = "\033[0m"
 )
 
-// The entry point and wires every other package together and controls startup + shutdown.
+// main is the entry point — wires every package together and controls startup + shutdown.
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -61,15 +61,24 @@ func main() {
 	go server.Serve(listener) //nolint
 
 	<-ctx.Done()
-	listener.Close() // unblocks Serve — triggers graceful drain
+	log.Println("INFO  received shutdown signal — draining in-flight requests (10s deadline)")
+
+	// Stop accepting new connections and wait for in-flight handlers to finish.
+	// http.Server.Shutdown closes the listener too — no listener.Close() needed.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("WARN  shutdown deadline hit before drain completed: %v", err)
+	}
 	log.Println("INFO  shutdown complete")
 }
 
 // must prints a green success line or a red failure and exits.
+// Writes the failure line once to stderr (where ops tooling expects errors) and exits non-zero.
 func must(label string, err error) {
 	if err != nil {
-		fmt.Printf("%s  %s: failed — %s%s\n", red, label, err.Error(), reset) // writes to stdout
-		log.Fatalf("%s: %v", label, err) // writes to stderr and then terminates the application
+		fmt.Fprintf(os.Stderr, "%s  %s: failed - %s%s\n", red, label, err.Error(), reset)
+		os.Exit(1)
 	}
 	fmt.Printf("%s  %s:%s OK\n", green, label, reset)
 }
