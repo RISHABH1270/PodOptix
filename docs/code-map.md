@@ -59,17 +59,17 @@ classDiagram
         auth · clusters · recommendations · savings
     }
 
-    main --> config
-    main --> store
-    main --> cache
-    main --> scheduler
-    main --> api
+    main --> config : 1 · Load()
+    main --> store : 2 · EnsureDatabase + SyncSchema + New
+    main --> cache : 3 · New
+    main --> scheduler : 4 · New + go Start
+    main --> api : 5 · NewServer + Serve
 
-    scheduler --> store
-    scheduler --> collector
-    scheduler --> recommender
+    scheduler --> store : 1 · ListClusters
+    scheduler --> collector : 2 · Collect(lookback)
+    scheduler --> recommender : 3 · GenerateAll
 
-    api --> store
-    api --> cache
-    api --> scheduler
+    api --> cache : 1 · GET cached first
+    api --> store : 2 · DB read / write on miss
+    api --> scheduler : 3 · recalculate → RunForCluster
 ```
