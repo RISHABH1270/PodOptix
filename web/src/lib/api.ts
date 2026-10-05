@@ -37,7 +37,7 @@ export interface Recommendation {
   recommended_mem_limit:   number
   applied:                 boolean
   // Tombstone — null when workload is alive, timestamp when not seen in last scheduler run
-  orphaned_at:             string | null
+  first_missed_at:             string | null
   created_at:              string
   updated_at:              string
 }

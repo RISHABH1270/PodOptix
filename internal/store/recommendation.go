@@ -12,7 +12,7 @@ import (
 // UpsertRecommendation inserts a new recommendation or updates the existing one.
 // One row per workload-container — updated in place every time the scheduler runs.
 // `applied` is preserved on conflict (scheduler never resets a user's applied flag).
-// `orphaned_at` is cleared on every upsert — a workload we just saw is alive by definition.
+// `first_missed_at` is cleared on every upsert — a workload we just saw is alive by definition.
 func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendation) error {
 	query := `
 		INSERT INTO recommendations (
@@ -22,7 +22,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 			p99_cpu, p99_mem,
 			recommended_cpu_request, recommended_cpu_limit,
 			recommended_mem_request, recommended_mem_limit,
-			applied, orphaned_at, created_at, updated_at
+			applied, first_missed_at, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7,
 			$8,
@@ -46,7 +46,7 @@ func (s *Store) UpsertRecommendation(ctx context.Context, r *models.Recommendati
 			recommended_cpu_limit   = EXCLUDED.recommended_cpu_limit,
 			recommended_mem_request = EXCLUDED.recommended_mem_request,
 			recommended_mem_limit   = EXCLUDED.recommended_mem_limit,
-			orphaned_at             = NULL,
+			first_missed_at         = NULL,
 			updated_at              = NOW()
 	`
 	_, err := s.pool.Exec(ctx, query,
@@ -86,7 +86,7 @@ const recommendationColumns = `
 	p99_cpu, p99_mem,
 	recommended_cpu_request, recommended_cpu_limit,
 	recommended_mem_request, recommended_mem_limit,
-	applied, orphaned_at, created_at, updated_at
+	applied, first_missed_at, created_at, updated_at
 `
 
 func scanRecommendation(scanner interface{ Scan(...any) error }, r *models.Recommendation) error {
@@ -110,7 +110,7 @@ func scanRecommendation(scanner interface{ Scan(...any) error }, r *models.Recom
 		&r.RecommendedMemRequest,
 		&r.RecommendedMemLimit,
 		&r.Applied,
-		&r.OrphanedAt,
+		&r.FirstMissedAt,
 		&r.CreatedAt,
 		&r.UpdatedAt,
 	)
@@ -160,7 +160,7 @@ func (s *Store) ListAllWithClusterName(ctx context.Context) ([]*RecommendationWi
 			r.p99_cpu, r.p99_mem,
 			r.recommended_cpu_request, r.recommended_cpu_limit,
 			r.recommended_mem_request, r.recommended_mem_limit,
-			r.applied, r.orphaned_at, r.created_at, r.updated_at,
+			r.applied, r.first_missed_at, r.created_at, r.updated_at,
 			c.cluster_name
 		FROM recommendations r
 		JOIN clusters c ON r.cluster_id = c.cluster_id
@@ -196,7 +196,7 @@ func (s *Store) ListAllWithClusterName(ctx context.Context) ([]*RecommendationWi
 			&item.RecommendedMemRequest,
 			&item.RecommendedMemLimit,
 			&item.Applied,
-			&item.OrphanedAt,
+			&item.FirstMissedAt,
 			&item.CreatedAt,
 			&item.UpdatedAt,
 			&item.ClusterName,
@@ -210,7 +210,7 @@ func (s *Store) ListAllWithClusterName(ctx context.Context) ([]*RecommendationWi
 
 // ── Tombstone / Delete ────────────────────────────────────────────────────────
 
-// MarkOrphaned stamps orphaned_at=NOW() on every row in the cluster whose
+// MarkOrphaned stamps first_missed_at=NOW() on every row in the cluster whose
 // (namespace, workload_kind, workload_name, container_name) is NOT in seenKeys —
 // i.e. the scheduler just ran and these workloads weren't observed in Prometheus.
 //
@@ -219,7 +219,7 @@ func (s *Store) ListAllWithClusterName(ctx context.Context) ([]*RecommendationWi
 // missing — NOT that every workload in the cluster disappeared. We refuse to
 // stamp everything orphaned in that case.
 //
-// Rows already stamped (orphaned_at IS NOT NULL) are left alone — their timestamp
+// Rows already stamped (first_missed_at IS NOT NULL) are left alone — their timestamp
 // records WHEN they first went missing, not the latest run.
 //
 // Returns the number of rows newly stamped.
@@ -243,9 +243,9 @@ func (s *Store) MarkOrphaned(ctx context.Context, clusterID string, seenKeys []m
 
 	query := `
 		UPDATE recommendations r
-		SET orphaned_at = NOW()
+		SET first_missed_at = NOW()
 		WHERE r.cluster_id = $1
-		  AND r.orphaned_at IS NULL
+		  AND r.first_missed_at IS NULL
 		  AND NOT EXISTS (
 		    SELECT 1
 		    FROM UNNEST($2::text[], $3::text[], $4::text[], $5::text[])
@@ -268,7 +268,7 @@ func (s *Store) MarkOrphaned(ctx context.Context, clusterID string, seenKeys []m
 // Returns the number of rows deleted.
 func (s *Store) DeleteOrphaned(ctx context.Context, clusterID string) (int, error) {
 	tag, err := s.pool.Exec(ctx,
-		`DELETE FROM recommendations WHERE cluster_id = $1 AND orphaned_at IS NOT NULL`,
+		`DELETE FROM recommendations WHERE cluster_id = $1 AND first_missed_at IS NOT NULL`,
 		clusterID,
 	)
 	if err != nil {

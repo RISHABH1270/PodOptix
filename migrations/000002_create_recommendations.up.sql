@@ -49,11 +49,15 @@ CREATE TABLE IF NOT EXISTS recommendations (
 
     applied                 BOOLEAN       NOT NULL DEFAULT FALSE,  -- user toggles true after applying — drives savings math
 
-    -- Tombstone: NULL = workload is alive, timestamp = not seen in most recent scheduler run.
+    -- Tombstone: NULL = workload is alive, timestamp = when the scheduler FIRST noticed
+    -- the workload was missing from Prometheus. This is NOT the time the workload was
+    -- actually deleted — we have no way to know that. The real deletion could have
+    -- happened anywhere between the previous scheduler run and this one.
     -- Rows are NEVER auto-deleted — operator reviews orphans in the dashboard and
     -- deletes them explicitly. If the workload comes back later (deleted + recreated),
-    -- the next upsert clears orphaned_at back to NULL.
-    orphaned_at             TIMESTAMPTZ,
+    -- the next upsert clears first_missed_at back to NULL. Already-set timestamps are
+    -- NOT updated on subsequent misses — we keep the FIRST detection.
+    first_missed_at         TIMESTAMPTZ,
 
     created_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -68,4 +72,4 @@ CREATE INDEX IF NOT EXISTS idx_recommendations_cluster_id ON recommendations(clu
 -- Fast lookup of orphaned rows for the "orphaned" dashboard section
 CREATE INDEX IF NOT EXISTS idx_recommendations_orphaned
     ON recommendations(cluster_id)
-    WHERE orphaned_at IS NOT NULL;
+    WHERE first_missed_at IS NOT NULL;

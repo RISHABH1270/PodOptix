@@ -882,7 +882,7 @@ Storing per-pod recommendations means:
 
 ## Tombstone with manual review, not auto-delete
 
-**Decision:** When a workload disappears from a scheduler run, stamp `orphaned_at=NOW()`. **Never auto-delete** — the operator reviews orphans in the dashboard and deletes explicitly (per-row trash or "Delete all orphaned" bulk).
+**Decision:** When a workload disappears from a scheduler run, stamp `first_missed_at=NOW()`. **Never auto-delete** — the operator reviews orphans in the dashboard and deletes explicitly (per-row trash or "Delete all orphaned" bulk).
 
 **The alternative we rejected:** Auto-delete after N consecutive misses. Rejected because:
 
@@ -893,8 +893,8 @@ Storing per-pod recommendations means:
 **Why tombstone (not just a hidden flag):**
 
 - Operators can see *when* the workload went missing — orphaned since 2 days ago vs 60 days ago drives totally different triage.
-- The partial index `idx_recommendations_orphaned ON (cluster_id) WHERE orphaned_at IS NOT NULL` keeps the "orphaned workloads" count query O(orphans), not O(all recommendations).
-- Un-tombstone is just `orphaned_at = NULL` in `UpsertRecommendation`'s ON CONFLICT clause — zero extra code for the come-back case.
+- The partial index `idx_recommendations_orphaned ON (cluster_id) WHERE first_missed_at IS NOT NULL` keeps the "orphaned workloads" count query O(orphans), not O(all recommendations).
+- Un-tombstone is just `first_missed_at = NULL` in `UpsertRecommendation`'s ON CONFLICT clause — zero extra code for the come-back case.
 
 **Safety gate.** `MarkOrphaned` is a no-op if `seenKeys` is empty. If the collector returned 0 workloads (Prometheus down, kube-state-metrics broken), we refuse to mark *every* workload orphaned. Only an actually-smaller set triggers tombstones.
 

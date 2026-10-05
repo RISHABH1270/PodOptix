@@ -129,7 +129,7 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 
 	// Mark anything we didn't see this run as orphaned (safety-gated: no-op if seenKeys empty).
 	// Rows aren't deleted — the operator reviews orphans in the dashboard and deletes explicitly.
-	// If the workload comes back next run, UpsertRecommendation clears orphaned_at back to NULL.
+	// If the workload comes back next run, UpsertRecommendation clears first_missed_at back to NULL.
 	orphaned, err := s.store.MarkOrphaned(ctx, clusterID, seenKeys)
 	if err != nil {
 		log.Printf("WARN  scheduler mark orphaned cluster=%s: %v", clusterID, err)

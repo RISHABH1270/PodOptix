@@ -85,9 +85,9 @@ export function ClusterDetailPage() {
   }
 
   // Orphaned workloads live in their own section so operators can review/delete explicitly.
-  // Main table shows only alive rows (orphaned_at === null).
-  const aliveRecs   = useMemo(() => recs.filter((r) => !r.orphaned_at), [recs])
-  const orphanedRecs = useMemo(() => recs.filter((r) =>  r.orphaned_at), [recs])
+  // Main table shows only alive rows (first_missed_at === null).
+  const aliveRecs   = useMemo(() => recs.filter((r) => !r.first_missed_at), [recs])
+  const orphanedRecs = useMemo(() => recs.filter((r) =>  r.first_missed_at), [recs])
 
   const filtered = useMemo(() => {
     if (!search) return aliveRecs
@@ -267,7 +267,7 @@ export function ClusterDetailPage() {
                         <div className="text-dim text-[11px] font-mono">{r.container_name}</div>
                       </td>
                       <td className="px-4 py-3 text-muted text-xs">{r.workload_kind}</td>
-                      <td className="px-4 py-3 text-dim text-xs">{formatSynced(r.orphaned_at ?? '')}</td>
+                      <td className="px-4 py-3 text-dim text-xs">{formatSynced(r.first_missed_at ?? '')}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => deleteOne(r.recommendation_id)}

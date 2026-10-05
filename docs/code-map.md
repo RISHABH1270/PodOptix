@@ -289,7 +289,7 @@ classDiagram
         pkg/models/recommendation.go
         + Namespace, WorkloadKind, WorkloadName, ContainerName
         + current/p99/recommended CPU + Mem
-        + Applied, OrphanedAt *time.Time
+        + Applied, FirstMissedAt *time.Time
     }
 
     class StoreRec {
@@ -306,7 +306,7 @@ classDiagram
         <<db table>>
         migrations/000002
         UNIQUE (cluster, ns, kind, name, container)
-        orphaned_at TIMESTAMPTZ NULL
+        first_missed_at TIMESTAMPTZ NULL
         idx_recommendations_orphaned (partial)
     }
 
@@ -327,9 +327,9 @@ classDiagram
     Scheduler --> Recommender : 4. GenerateAll()
     Recommender ..> Recommendation : one per workload-container
     Scheduler --> StoreRec : 5. UpsertRecommendation()
-    StoreRec --> recommendations_table : INSERT/UPDATE (clears orphaned_at)
+    StoreRec --> recommendations_table : INSERT/UPDATE (clears first_missed_at)
     Scheduler --> StoreRec : 6. MarkOrphaned(seenKeys)
-    StoreRec --> recommendations_table : UPDATE orphaned_at=NOW() WHERE NOT IN seen
+    StoreRec --> recommendations_table : UPDATE first_missed_at=NOW() WHERE NOT IN seen
 
     ApiRec --> StoreRec : list / delete
     ApiRec --> recommendations_table : via StoreRec
@@ -341,9 +341,9 @@ classDiagram
 2. **Collector** fires 6 PromQL queries (CPU usage, mem usage, 4× req/limit) PLUS two owner queries (`kube_pod_owner`, `kube_replicaset_owner`). The owner results feed `buildOwnerMap` → `map[pod] → ownerRef`. ReplicaSets collapse to their Deployment parent.
 3. **mergeMetrics** resolves each pod's time series to a `(ns, workload_kind, workload_name, container)` key and takes **MAX across replicas** at each timestamp. Request/limit scalars also take MAX across replicas. `ReplicaCount` = distinct pods observed.
 4. **Recommender** computes `p99 → request=ceil(p99)`, `limit=ceil(p99×2)` on the aggregated series.
-5. **Store.UpsertRecommendation** writes to `recommendations` with ON CONFLICT on `(cluster, ns, kind, name, container)`. It **clears `orphaned_at = NULL` on every upsert** — a workload we just saw is alive.
-6. **Scheduler.MarkOrphaned(seenKeys)** stamps `orphaned_at=NOW()` on every row for the cluster that is NOT in `seenKeys`. Safety-gated: if `seenKeys` is empty, no-op (a hiccupped Prometheus scrape never orphans a whole cluster).
-7. **Dashboard** reads `ListByCluster` and splits by `orphaned_at`. Operators review the orphaned section and delete via `DELETE /clusters/:id/recommendations/:recId` or `DELETE /clusters/:id/recommendations?orphaned=true`.
+5. **Store.UpsertRecommendation** writes to `recommendations` with ON CONFLICT on `(cluster, ns, kind, name, container)`. It **clears `first_missed_at = NULL` on every upsert** — a workload we just saw is alive.
+6. **Scheduler.MarkOrphaned(seenKeys)** stamps `first_missed_at=NOW()` on every row for the cluster that is NOT in `seenKeys`. Safety-gated: if `seenKeys` is empty, no-op (a hiccupped Prometheus scrape never orphans a whole cluster).
+7. **Dashboard** reads `ListByCluster` and splits by `first_missed_at`. Operators review the orphaned section and delete via `DELETE /clusters/:id/recommendations/:recId` or `DELETE /clusters/:id/recommendations?orphaned=true`.
 
 ---
 

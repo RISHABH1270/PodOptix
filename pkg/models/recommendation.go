@@ -34,10 +34,12 @@ const (
 //   request = ceil(p99)
 //   limit   = ceil(p99 × 2)
 //
-// OrphanedAt is NULL when the workload was seen in the most recent scheduler run.
-// When set, the workload wasn't found — the operator can review in the dashboard
-// and delete explicitly, or leave it (next sync will clear OrphanedAt if the
-// workload comes back).
+// FirstMissedAt is NULL when the workload was seen in the most recent scheduler run.
+// When set, it records when the scheduler FIRST noticed the workload was missing
+// from Prometheus — NOT when the workload was actually deleted (we can't know that).
+// The real deletion could have happened any time between the previous scheduler
+// run and this one. Once set, it's not updated on subsequent misses (we keep the
+// first detection). The next upsert resets it to NULL if the workload reappears.
 type Recommendation struct {
 	RecommendationID string `json:"recommendation_id" db:"recommendation_id"`
 	ClusterID        string `json:"cluster_id"        db:"cluster_id"`
@@ -68,9 +70,10 @@ type Recommendation struct {
 
 	Applied bool `json:"applied" db:"applied"` // toggled true when applied to cluster — drives savings math
 
-	// Tombstone — NULL means alive, timestamp means not seen in last scheduler run.
-	// *time.Time to allow NULL (JSON serialises to null when unset).
-	OrphanedAt *time.Time `json:"orphaned_at,omitempty" db:"orphaned_at"`
+	// Tombstone — NULL means alive, timestamp means the scheduler first noticed
+	// this workload was missing at that time. *time.Time to allow NULL
+	// (JSON serialises to null when unset).
+	FirstMissedAt *time.Time `json:"first_missed_at,omitempty" db:"first_missed_at"`
 
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`

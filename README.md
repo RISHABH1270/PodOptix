@@ -237,7 +237,7 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 - [x] Prometheus `/metrics` endpoint — self-observability (HTTP, scheduler, cache)
 - [x] Resource savings dashboard — potential + realized CPU/memory saved, top waste, per-cluster & per-namespace breakdown
 - [x] Workload-level recommendations — collapse replicas via `kube_pod_owner` + `kube_replicaset_owner`, MAX across replicas per timestamp
-- [x] Orphan tombstone — workloads not seen in last scan get `orphaned_at`; operator reviews + deletes in dashboard (per-row or bulk)
+- [x] Orphan tombstone — workloads not seen in last scan get `first_missed_at`; operator reviews + deletes in dashboard (per-row or bulk)
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
 

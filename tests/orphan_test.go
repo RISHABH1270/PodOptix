@@ -77,9 +77,9 @@ func TestOrphanLifecycle(t *testing.T) {
 		for _, r := range recs {
 			byName[r.WorkloadName] = r
 		}
-		assert.Nil(t, byName["svc-a"].OrphanedAt)
-		assert.Nil(t, byName["svc-b"].OrphanedAt)
-		assert.NotNil(t, byName["svc-c"].OrphanedAt)
+		assert.Nil(t, byName["svc-a"].FirstMissedAt)
+		assert.Nil(t, byName["svc-b"].FirstMissedAt)
+		assert.NotNil(t, byName["svc-c"].FirstMissedAt)
 	})
 
 	t.Run("re-upserting an orphaned workload clears its tombstone", func(t *testing.T) {
@@ -97,12 +97,12 @@ func TestOrphanLifecycle(t *testing.T) {
 		assert.NoError(t, err)
 
 		recs, _ := db.ListByCluster(ctx, cid)
-		assert.NotNil(t, recs[0].OrphanedAt, "pre-condition: workload is tombstoned")
+		assert.NotNil(t, recs[0].FirstMissedAt, "pre-condition: workload is tombstoned")
 
-		// Workload returns on next scheduler run → upsert should clear orphaned_at.
+		// Workload returns on next scheduler run → upsert should clear first_missed_at.
 		assert.NoError(t, db.UpsertRecommendation(ctx, rec))
 		recs, _ = db.ListByCluster(ctx, cid)
-		assert.Nil(t, recs[0].OrphanedAt, "upsert should clear orphaned_at — workload is alive again")
+		assert.Nil(t, recs[0].FirstMissedAt, "upsert should clear first_missed_at — workload is alive again")
 	})
 
 	t.Run("safety gate — empty seenKeys is a no-op", func(t *testing.T) {
@@ -117,7 +117,7 @@ func TestOrphanLifecycle(t *testing.T) {
 		assert.Equal(t, 0, n)
 
 		recs, _ := db.ListByCluster(ctx, cid)
-		assert.Nil(t, recs[0].OrphanedAt, "existing workload must not be stamped on empty run")
+		assert.Nil(t, recs[0].FirstMissedAt, "existing workload must not be stamped on empty run")
 	})
 
 	t.Run("already-orphaned rows keep their original timestamp", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestOrphanLifecycle(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		recs, _ := db.ListByCluster(ctx, cid)
-		firstStamp := *recs[0].OrphanedAt
+		firstStamp := *recs[0].FirstMissedAt
 
 		// Second mark some time later — timestamp must not advance
 		time.Sleep(10 * time.Millisecond)
@@ -142,7 +142,7 @@ func TestOrphanLifecycle(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 0, n, "already-orphaned rows should not be re-stamped")
 		recs, _ = db.ListByCluster(ctx, cid)
-		assert.Equal(t, firstStamp, *recs[0].OrphanedAt, "orphaned_at should preserve the time of first observation")
+		assert.Equal(t, firstStamp, *recs[0].FirstMissedAt, "first_missed_at should preserve the time of first observation")
 	})
 
 	t.Run("DeleteOrphaned removes only orphaned rows", func(t *testing.T) {

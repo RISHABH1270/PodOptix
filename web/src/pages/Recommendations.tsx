@@ -34,8 +34,8 @@ export function RecommendationsPage() {
   // filter + sort
   const filtered = useMemo(() => {
     let out = rows
-    if (orphanFilter === 'alive')    out = out.filter(r => !r.orphaned_at)
-    if (orphanFilter === 'orphaned') out = out.filter(r =>  r.orphaned_at)
+    if (orphanFilter === 'alive')    out = out.filter(r => !r.first_missed_at)
+    if (orphanFilter === 'orphaned') out = out.filter(r =>  r.first_missed_at)
     if (clusterFilter !== 'all')     out = out.filter(r => r.cluster_name === clusterFilter)
     if (statusFilter !== 'all')      out = out.filter(r => r.status === statusFilter)
     if (search) {

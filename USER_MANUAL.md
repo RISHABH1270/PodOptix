@@ -164,7 +164,7 @@ If **Recalculate** is disabled → cluster is currently `disconnected`. Fix conn
 
 ### 7. Orphaned workloads
 
-Every scheduler run (and every manual Recalculate) builds a list of the workloads it just observed. Any recommendation row for the cluster that wasn't observed is **tombstoned** — stamped with an `orphaned_at` timestamp. These rows appear in a collapsed **Orphaned workloads** section at the top of the cluster detail page, with a count badge.
+Every scheduler run (and every manual Recalculate) builds a list of the workloads it just observed. Any recommendation row for the cluster that wasn't observed is **tombstoned** — stamped with an `first_missed_at` timestamp. These rows appear in a collapsed **Orphaned workloads** section at the top of the cluster detail page, with a count badge.
 
 Why a workload goes orphan:
 - The Deployment/StatefulSet/DaemonSet was deleted
@@ -177,7 +177,7 @@ Why a workload goes orphan:
 - **Per row** — the trash icon on an orphan deletes just that row
 - **Bulk** — "Delete all orphaned" wipes every orphan for the cluster in one shot (confirm dialog)
 
-**If the workload comes back**, the next scheduler run clears `orphaned_at` back to NULL and the row returns to the alive table. No action needed on your part.
+**If the workload comes back**, the next scheduler run clears `first_missed_at` back to NULL and the row returns to the alive table. No action needed on your part.
 
 **Safety gate.** If a scheduler run observes zero workloads (Prometheus hiccupped, kube-state-metrics went missing), PodOptix refuses to mark anything orphaned. Only an actual missing-from-the-set signal creates a tombstone — not an empty scan.
 
