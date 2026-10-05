@@ -9,8 +9,8 @@ flowchart TB
     cache["<b>cache</b><br/>internal/cache<br/>Redis · cache-aside · distributed locks"]
     collector["<b>collector</b><br/>internal/collector<br/>Prometheus queries<br/>pod → workload owner resolution<br/>MAX across replicas"]
     recommender["<b>recommender</b><br/>internal/recommender<br/>p99 → req=ceil(p99)<br/>limit=ceil(p99 × 2)"]
-    scheduler["<b>scheduler</b><br/>internal/scheduler<br/>24h ticker"]
-    api["<b>api</b><br/>internal/api<br/>Gin HTTP server"]
+    scheduler["<b>scheduler</b><br/>internal/scheduler<br/>24h ticker<br/>writes every rec field EXCEPT applied"]
+    api["<b>api</b><br/>internal/api<br/>Gin HTTP server<br/>sole writer of applied flag (PATCH)"]
 
     pg[("PostgreSQL<br/>external")]
     rd[("Redis<br/>external")]
