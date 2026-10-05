@@ -198,9 +198,12 @@ func (s *Server) recalculate(c *gin.Context) {
 		return
 	}
 
-	// try to acquire distributed lock — prevents duplicate jobs
+	// Try to acquire the distributed lock — prevents duplicate jobs. Captures the
+	// fencing token so Release can CAS against it (won't delete a lock that's been
+	// reclaimed by someone else after TTL expiry).
+	var lockToken string
 	if s.cache != nil {
-		locked, err := s.cache.AcquireRecalculateLock(c.Request.Context(), clusterID)
+		token, locked, err := s.cache.AcquireRecalculateLock(c.Request.Context(), clusterID)
 		if err != nil {
 			log.Printf("WARN  [%s] recalculate lock error cluster=%s: %v", requestID, clusterID, err)
 		}
@@ -211,6 +214,7 @@ func (s *Server) recalculate(c *gin.Context) {
 			})
 			return
 		}
+		lockToken = token
 	}
 
 	// decrypt token before using for Prometheus
@@ -230,7 +234,7 @@ func (s *Server) recalculate(c *gin.Context) {
 		defer cancel()
 		defer func() {
 			if s.cache != nil {
-				s.cache.ReleaseRecalculateLock(ctx, clusterID)
+				s.cache.ReleaseRecalculateLock(ctx, clusterID, lockToken)
 			}
 		}()
 

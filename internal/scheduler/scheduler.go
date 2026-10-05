@@ -117,8 +117,10 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 	defer cancel()
 
 	// Lock acquisition — skipped when cache is nil (test setup).
+	// Captures the fencing token so Release can CAS against it (prevents us from
+	// deleting someone else's lock if ours expired while the pipeline ran).
 	if s.cache != nil {
-		locked, err := s.cache.AcquireRecalculateLock(ctx, clusterID)
+		token, locked, err := s.cache.AcquireRecalculateLock(ctx, clusterID)
 		if err != nil {
 			log.Printf("WARN  scheduler lock error cluster=%s: %v", clusterID, err)
 		}
@@ -127,7 +129,7 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 			return
 		}
 		defer func() {
-			if err := s.cache.ReleaseRecalculateLock(ctx, clusterID); err != nil {
+			if err := s.cache.ReleaseRecalculateLock(ctx, clusterID, token); err != nil {
 				log.Printf("WARN  scheduler release lock cluster=%s: %v", clusterID, err)
 			}
 		}()
