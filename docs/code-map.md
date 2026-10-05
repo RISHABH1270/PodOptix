@@ -59,17 +59,17 @@ classDiagram
         auth · clusters · recommendations · savings
     }
 
-    main --> config : 1 · Load()
-    main --> store : 2 · EnsureDatabase + SyncSchema + New
-    main --> cache : 3 · New
-    main --> scheduler : 4 · New + go Start
-    main --> api : 5 · NewServer + Serve
+    main --> config : 1 · Load config
+    main --> store : 2 · EnsureDatabase ·· 3 · SyncSchema ·· 4 · Open pool (New)
+    main --> cache : 5 · Connect Redis (New)
+    main --> scheduler : 6 · New + go Start (background 24h loop)
+    main --> api : 7 · NewServer + Listen + Serve (blocks)
 
-    scheduler --> store : 1 · ListClusters
+    scheduler --> store : 1 · ListClusters ·· 5 · UpsertRecommendation ·· 6 · MarkOrphaned
     scheduler --> collector : 2 · Collect(lookback)
-    scheduler --> recommender : 3 · GenerateAll
+    scheduler --> recommender : 3 · GenerateAll (p99 math) ·· 4 · back to store
 
-    api --> cache : 1 · GET cached first
-    api --> store : 2 · DB read / write on miss
-    api --> scheduler : 3 · recalculate → RunForCluster
+    api --> cache : 1 · check cache first
+    api --> store : 2 · DB on miss ·· 3 · writes invalidate cache
+    api --> scheduler : 4 · POST /recalculate → RunForCluster
 ```
