@@ -158,11 +158,10 @@ func (s *Scheduler) RunForCluster(ctx context.Context, clusterID, prometheusURL,
 		return
 	}
 
-	// IMPORTANT: build seenKeys from EVERY observed workload, regardless of whether
-	// the DB write succeeded. If an upsert transiently fails and we skip the seenKey,
-	// MarkOrphaned would stamp the workload as missing even though Prometheus just
-	// confirmed it exists → false orphan on dashboard. Prometheus observation is
-	// the authoritative signal; DB blips are a separate concern (self-heals on next tick).
+	// IMPORTANT: append to seenKeys BEFORE the upsert. If an upsert transiently fails
+	// and we skipped the seenKey, MarkOrphaned would stamp the workload as missing
+	// even though Prometheus just confirmed it exists → false orphan on dashboard.
+	// Prometheus observation is authoritative; DB blips self-heal on next tick.
 	var saved int
 	seenKeys := make([]models.WorkloadKey, 0, len(recommendations))
 	for _, rec := range recommendations {
