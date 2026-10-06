@@ -10,7 +10,7 @@ flowchart TB
     collector["<b>collector</b><br/>internal/collector<br/>Prometheus queries<br/>pod → workload owner resolution<br/>MAX across replicas per timestamp"]
     recommender["<b>recommender</b><br/>internal/recommender<br/>p99 → req=ceil(p99)<br/>limit=ceil(p99 × 2)"]
     scheduler["<b>scheduler</b><br/>internal/scheduler<br/>24h ticker · max 5 clusters parallel<br/>shares cache lock with api recalculate<br/>writes every rec field EXCEPT applied"]
-    api["<b>api</b><br/>internal/api<br/>Gin HTTP server · 10s graceful drain<br/>sole writer of applied flag (PATCH)"]
+    api["<b>api</b><br/>internal/api<br/>Gin HTTP server · 10s graceful drain<br/>input validation at HTTP boundary<br/>sole writer of applied flag (PATCH)"]
 
     pg[("PostgreSQL<br/>external")]
     rd[("Redis<br/>external")]
