@@ -158,11 +158,15 @@ Scheduler (cron: daily)
                │         · request = ceil(p99)       (scheduler reservation)
                │         · limit   = ceil(p99 × 2)   (hard ceiling: CPU throttle / OOMKill)
                │
-               ├── 7. UpsertRecommendation per container
-               │         ON CONFLICT (cluster_id, namespace, pod_name, container_name)
-               │         DO UPDATE SET p99_cpu=..., updated_at=NOW()
+               ├── 7. UpsertRecommendation per workload-container
+               │         ON CONFLICT (cluster_id, namespace, workload_kind, workload_name, container_name)
+               │         DO UPDATE SET p99_cpu=..., first_missed_at=NULL, updated_at=NOW()
+               │         (clears first_missed_at — a workload we just saw is alive by definition)
                │
-               └── 8. Invalidate Redis key: cluster:{id}:recommendations
+               ├── 8. MarkOrphaned(cluster, seenKeys) — stamp first_missed_at=NOW() on rows NOT seen
+               │         (safety-gated: no-op if seenKeys is empty)
+               │
+               └── 9. Invalidate Redis key: cluster:{id}:recommendations
 ```
 
 ### Dashboard Read Flow (recommendations)
@@ -219,10 +223,12 @@ CREATE TABLE IF NOT EXISTS clusters (
 ```sql
 CREATE TABLE IF NOT EXISTS recommendations (
     recommendation_id   VARCHAR(36)  PRIMARY KEY,
-    cluster_id          VARCHAR(36)  NOT NULL REFERENCES clusters(cluster_id),
+    cluster_id          VARCHAR(36)  NOT NULL REFERENCES clusters(cluster_id) ON DELETE CASCADE,
     namespace           VARCHAR(255) NOT NULL,
-    pod_name            VARCHAR(255) NOT NULL,
+    workload_kind       VARCHAR(50)  NOT NULL,  -- Deployment | StatefulSet | DaemonSet | Pod
+    workload_name       VARCHAR(255) NOT NULL,  -- e.g. "auth-service" (NOT the pod name)
     container_name      VARCHAR(255) NOT NULL,
+    replica_count       INTEGER      NOT NULL DEFAULT 1,
     status              VARCHAR(20)  NOT NULL DEFAULT 'new_service',
     current_cpu_request INTEGER      NOT NULL DEFAULT 0,
     current_cpu_limit   INTEGER      NOT NULL DEFAULT 0,
@@ -235,40 +241,51 @@ CREATE TABLE IF NOT EXISTS recommendations (
     recommended_mem_request INTEGER  NOT NULL DEFAULT 0,
     recommended_mem_limit   INTEGER  NOT NULL DEFAULT 0,
     applied             BOOLEAN      NOT NULL DEFAULT FALSE,
+    first_missed_at     TIMESTAMPTZ,                    -- tombstone — NULL = alive
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
-    UNIQUE (cluster_id, namespace, pod_name, container_name)
+    UNIQUE (cluster_id, namespace, workload_kind, workload_name, container_name)
 );
 
 CREATE INDEX idx_recommendations_cluster_id ON recommendations(cluster_id);
+
+-- Partial index — only orphaned rows, keeps the "orphans" dashboard query O(orphans)
+CREATE INDEX idx_recommendations_orphaned
+    ON recommendations(cluster_id)
+    WHERE first_missed_at IS NOT NULL;
 ```
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `recommendation_id` | VARCHAR(36) | UUID v4 primary key |
-| `cluster_id` | VARCHAR(36) | FK → clusters.cluster_id |
+| `cluster_id` | VARCHAR(36) | FK → clusters.cluster_id · **ON DELETE CASCADE** (deleting a cluster wipes its recommendations atomically) |
 | `namespace` | VARCHAR(255) | Kubernetes namespace |
-| `pod_name` | VARCHAR(255) | Pod name (may include hash suffix) |
-| `container_name` | VARCHAR(255) | Container within the pod |
-| `status` | VARCHAR(20) | `new_service` or `ready` |
-| `current_cpu_request` | INTEGER | Millicores — 0 if unset. From `kube_pod_container_resource_requests` |
-| `current_cpu_limit` | INTEGER | Millicores — 0 if unset. From `kube_pod_container_resource_limits` |
-| `current_mem_request` | INTEGER | MiB — 0 if unset. From `kube_pod_container_resource_requests` |
-| `current_mem_limit` | INTEGER | MiB — 0 if unset. From `kube_pod_container_resource_limits` |
-| `p99_cpu` | FLOAT | Raw p99 value in millicores |
-| `p99_mem` | FLOAT | Raw p99 value in MiB |
-| `recommended_cpu_request` | INTEGER | `ceil(p99_cpu)` millicores — what the K8s scheduler should reserve |
+| `workload_kind` | VARCHAR(50) | `Deployment` / `StatefulSet` / `DaemonSet` / `Pod` — resolved from `kube_pod_owner` → `kube_replicaset_owner` |
+| `workload_name` | VARCHAR(255) | Stable workload name (NOT the ephemeral pod name) |
+| `container_name` | VARCHAR(255) | Container within the workload (main + sidecars) |
+| `replica_count` | INTEGER | How many replicas were aggregated into this row this run |
+| `status` | VARCHAR(20) | `new_service` (not enough data) or `ready` |
+| `current_cpu_request` | INTEGER | Millicores — MAX across replicas. From `kube_pod_container_resource_requests` |
+| `current_cpu_limit` | INTEGER | Millicores — MAX across replicas. From `kube_pod_container_resource_limits` |
+| `current_mem_request` | INTEGER | MiB — MAX across replicas |
+| `current_mem_limit` | INTEGER | MiB — MAX across replicas |
+| `p99_cpu` | FLOAT | p99 of (max-across-replicas per timestamp) in millicores |
+| `p99_mem` | FLOAT | Same for memory, MiB |
+| `recommended_cpu_request` | INTEGER | `ceil(p99_cpu)` millicores |
 | `recommended_cpu_limit` | INTEGER | `ceil(p99_cpu × 2)` millicores — hard ceiling before CPU throttle |
-| `recommended_mem_request` | INTEGER | `ceil(p99_mem)` MiB — what the K8s scheduler should reserve |
+| `recommended_mem_request` | INTEGER | `ceil(p99_mem)` MiB |
 | `recommended_mem_limit` | INTEGER | `ceil(p99_mem × 2)` MiB — hard ceiling before OOMKill |
-| `applied` | BOOLEAN | TRUE if recommendation was applied to cluster — tracks cost savings |
+| `applied` | BOOLEAN | Operator-flipped via `PATCH` endpoint — the ONLY write path. Scheduler NEVER touches this field. Drives Savings page math |
+| `first_missed_at` | TIMESTAMPTZ | **Tombstone**: `NULL` = workload is alive; set to NOW() when the scheduler FIRST noticed the workload was missing from Prometheus. NOT the deletion time (we have no way to know that). On re-appearance, next upsert clears back to NULL |
 | `created_at` | TIMESTAMPTZ | First generated |
 | `updated_at` | TIMESTAMPTZ | Last recalculated |
 
-**Composite UNIQUE constraint** on `(cluster_id, namespace, pod_name, container_name)` is what enables UPSERT — same container = UPDATE existing row, not INSERT new row.
+**Composite UNIQUE constraint** on `(cluster_id, namespace, workload_kind, workload_name, container_name)` is what enables UPSERT — same workload-container = UPDATE existing row, not INSERT new row. The addition of `workload_kind + workload_name` (replacing the old per-pod key) means all replicas of a Deployment collapse into one row.
 
 **B-Tree index** on `cluster_id` enables O(log n) lookup for dashboard queries instead of full table scan.
+
+**Partial index** `idx_recommendations_orphaned` only contains rows where `first_missed_at IS NOT NULL` → the "orphans" badge count query stays O(orphans), not O(all recommendations).
 
 ### Table: `users`
 
@@ -540,8 +557,10 @@ Get all recommendations for a cluster.
     "recommendation_id":        "x7f3c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
     "cluster_id":               "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
     "namespace":                "payments",
-    "pod_name":                 "payment-api-7d9f",
+    "workload_kind":            "Deployment",
+    "workload_name":            "payment-api",
     "container_name":           "payment-api",
+    "replica_count":            3,
     "status":                   "ready",
     "current_cpu_request":      500,
     "current_cpu_limit":        1000,
@@ -554,16 +573,74 @@ Get all recommendations for a cluster.
     "recommended_mem_request":  181,
     "recommended_mem_limit":    361,
     "applied":                  false,
+    "first_missed_at":          null,
     "created_at":               "2026-06-24T00:00:00Z",
     "updated_at":               "2026-06-24T00:00:00Z"
   }
 ]
 ```
 
-CPU values in millicores. Memory values in MiB. Ordered by `created_at DESC`. `request = ceil(p99)` (what the scheduler reserves on the node = what you pay for) · `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill).
+CPU values in millicores. Memory values in MiB. Ordered by namespace / workload / container. One row per **workload-container** (not pod) — all replicas of a Deployment aggregate into one row via MAX-across-replicas on each metric. `request = ceil(p99)` (what the scheduler reserves on the node = what you pay for) · `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill). `first_missed_at` is null for alive workloads; set to a timestamp if the scheduler no longer sees the workload (operator reviews + deletes explicitly).
 
 **Errors:**
 - `404` — "Cluster not found"
+
+---
+
+#### `PATCH /api/v1/clusters/:id/recommendations/:recId`
+
+Toggle the `applied` flag on a single recommendation. This is the ONLY write path for `applied` — the scheduler never touches it. Drives the Savings page's realized-vs-pending math.
+
+**Auth:** JWT required
+
+**Request body:**
+```json
+{ "applied": true }
+```
+Or `{ "applied": false }` to un-apply.
+
+**Response 200:**
+```json
+{ "recommendation_id": "...", "applied": true }
+```
+
+Invalidates the cluster's recommendation cache so the dashboard reflects the new state on next load.
+
+**Errors:**
+- `400` — body missing `applied` field
+- `404` — recommendation not found (via `ErrRecommendationNotFound` sentinel)
+
+---
+
+#### `DELETE /api/v1/clusters/:id/recommendations/:recId`
+
+Delete a single recommendation row — operator cleanup, typically for an orphaned workload (`first_missed_at IS NOT NULL`) they're sure is gone for good.
+
+**Auth:** JWT required
+
+**Response 200:**
+```json
+{ "deleted": 1, "recommendation_id": "..." }
+```
+
+**Errors:**
+- `404` — recommendation not found
+
+---
+
+#### `DELETE /api/v1/clusters/:id/recommendations?orphaned=true`
+
+Bulk-delete every orphaned row for a cluster in one shot (dashboard's "Delete all orphaned" button). The `?orphaned=true` query parameter is **REQUIRED** — a bare `DELETE` would be a huge footgun (wiping every recommendation for a cluster), so we force the opt-in to make intent explicit.
+
+**Auth:** JWT required
+
+**Response 200:**
+```json
+{ "deleted": 7 }
+```
+
+**Errors:**
+- `400` — missing or wrong `?orphaned=true` query parameter
 
 ---
 
@@ -577,7 +654,7 @@ Trigger a manual recommendation recalculation for a cluster.
 
 **Errors:**
 - `404` — "Cluster not found"
-- `429` — recalculation already in progress (distributed Redis lock held)
+- `429` — recalculation already in progress (fencing-token Redis lock held, shared with the scheduler)
 
 ---
 
@@ -595,8 +672,10 @@ Cross-cluster recommendations view — every recommendation from every registere
     "cluster_id":               "a3f8c2d1-9b4e-4f1a-8c3d-2e5f7a9b1c4d",
     "cluster_name":             "production-us-east",
     "namespace":                "payments",
-    "pod_name":                 "payment-api-7d9f",
+    "workload_kind":            "Deployment",
+    "workload_name":            "payment-api",
     "container_name":           "payment-api",
+    "replica_count":            3,
     "status":                   "ready",
     "current_cpu_request":      1000,
     "current_cpu_limit":        2000,
@@ -609,6 +688,7 @@ Cross-cluster recommendations view — every recommendation from every registere
     "recommended_mem_request":  181,
     "recommended_mem_limit":    361,
     "applied":                  false,
+    "first_missed_at":          null,
     "created_at":               "2026-06-24T00:00:00Z",
     "updated_at":               "2026-06-24T00:00:00Z"
   }
@@ -798,25 +878,33 @@ internal/recommender/recommender.go
 internal/store/recommendation.go
         │
         └── UpsertRecommendation(ctx, rec)
-              · ON CONFLICT (cluster_id, namespace, pod_name, container_name)
+              · ON CONFLICT (cluster_id, namespace, workload_kind, workload_name, container_name)
               · DO UPDATE SET p99_cpu=..., recommended_cpu_request=...,
                 recommended_cpu_limit=..., recommended_mem_request=...,
-                recommended_mem_limit=..., updated_at=NOW()
+                recommended_mem_limit=..., first_missed_at=NULL, updated_at=NOW()
+              · INSERT hardcodes applied=FALSE — scheduler never writes applied
+              · ON CONFLICT UPDATE SET omits applied — operator's toggle is preserved
 ```
 
-**ContainerMetrics struct (intermediate):**
+**ContainerMetrics struct (intermediate — one per workload-container, aggregated across replicas):**
 
 ```go
 type ContainerMetrics struct {
     Namespace     string    // "payments"
-    PodName       string    // "payment-api"
+    WorkloadKind  string    // "Deployment" | "StatefulSet" | "DaemonSet" | "Pod"
+    WorkloadName  string    // "payment-api" — resolved from kube_pod_owner
     ContainerName string    // "api"
-    CPUValues     []float64 // 168 values over 7d, millicores
-    MemValues     []float64 // 168 values over 7d, MiB
+    ReplicaCount  int       // 3 — distinct pods observed
+    CPUValues     []float64 // 168 values over 7d · MAX across replicas per timestamp
+    MemValues     []float64 // 168 values over 7d · MAX across replicas per timestamp
+    CPURequest    int       // MAX across replicas, millicores
+    CPULimit      int       // MAX across replicas, millicores
+    MemRequest    int       // MAX across replicas, MiB
+    MemLimit      int       // MAX across replicas, MiB
 }
 ```
 
-One `ContainerMetrics` per container. One pod with 3 containers = 3 `ContainerMetrics` objects.
+One `ContainerMetrics` per **workload-container** (not per pod). A Deployment with 3 replicas × 2 containers each = 2 `ContainerMetrics` (one per container, with ReplicaCount=3 and MAX-aggregated series).
 
 **Unit normalization:**
 

@@ -182,9 +182,10 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 | `PUT` | `/api/v1/clusters/:id` | JWT | Update cluster details |
 | `DELETE` | `/api/v1/clusters/:id` | JWT | Remove a cluster |
 | `GET` | `/api/v1/clusters/:id/recommendations` | JWT | Get recommendations for one cluster (cached) |
+| `PATCH` | `/api/v1/clusters/:id/recommendations/:recId` | JWT | Toggle the `applied` flag — body `{"applied": true\|false}`. Drives the Savings page's realized-vs-pending math |
 | `DELETE` | `/api/v1/clusters/:id/recommendations/:recId` | JWT | Delete a single recommendation (operator cleanup of orphans) |
 | `DELETE` | `/api/v1/clusters/:id/recommendations?orphaned=true` | JWT | Bulk-delete orphaned recommendations for a cluster — `?orphaned=true` is required (footgun guard) |
-| `POST` | `/api/v1/clusters/:id/recalculate` | JWT | Trigger manual recalculation |
+| `POST` | `/api/v1/clusters/:id/recalculate` | JWT | Trigger manual recalculation (fencing-token lock prevents concurrent runs) |
 | `GET` | `/api/v1/recommendations` | JWT | Cross-cluster recommendations — every cluster, joined with `cluster_name`, sorted by biggest CPU delta |
 
 ---
@@ -221,7 +222,7 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 - [x] Recommendation engine
 - [x] Scheduler — 24h ticker + immediate on startup
 - [x] Redis — recommendations cache + distributed lock
-- [x] Backend integration tests — 63 tests, real TCP server + PostgreSQL + Redis, isolated DB/port
+- [x] Backend integration tests — 100+ subtests, real TCP server + PostgreSQL + Redis, isolated DB/port
 - [x] Readiness probe (/readyz)
 - [x] Graceful shutdown (SIGTERM/SIGINT)
 - [x] Structured logging (INFO/WARN/ERROR + request_id + duration)
@@ -238,8 +239,16 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 - [x] Resource savings dashboard — potential + realized CPU/memory saved, top waste, per-cluster & per-namespace breakdown
 - [x] Workload-level recommendations — collapse replicas via `kube_pod_owner` + `kube_replicaset_owner`, MAX across replicas per timestamp
 - [x] Orphan tombstone — workloads not seen in last scan get `first_missed_at`; operator reviews + deletes in dashboard (per-row or bulk)
+- [x] Applied-flag toggle — `PATCH` endpoint flips the "applied" flag; scheduler never touches it, powers the Savings page
+- [x] Startup validation — ENCRYPTION_KEY length (32B), JWT_SECRET minimum (32B), DATABASE_URL / REDIS_URL shape all checked before serving traffic
+- [x] Graceful HTTP shutdown — `http.Server.Shutdown` drains in-flight requests on SIGTERM (10s deadline)
+- [x] Fencing-token distributed lock — scheduler + manual recalculate share the same Redis lock, race-safe via atomic Lua CAS
+- [x] Parallel per-cluster scheduler — max 5 clusters concurrently via buffered-channel semaphore + WaitGroup barrier
+- [x] Email normalization + password strength — store trims/lowercases emails, HTTP layer enforces 8-128 char passwords and RFC email format
+- [x] Request-ID propagation — honors incoming `X-Request-ID` header for trace stitching across upstream ingress/LB layers
 - [ ] CI/CD (GitHub Actions)
 - [ ] User password change endpoint
+- [ ] Grafana dashboard + Prometheus alert rules for the `/metrics` endpoint
 
 ---
 

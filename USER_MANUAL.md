@@ -151,20 +151,24 @@ PodOptix does NOT apply changes automatically — you decide. To apply:
        memory: "512Mi"   # was 2Gi   — hard ceiling (OOMKill)
    ```
 3. `kubectl apply` the change
-4. In PodOptix, toggle the **Applied** checkbox on that row — used later for savings reports
+4. In PodOptix, click the **✓** button on that row — it flips the recommendation's `applied` flag. Clicking again toggles it back off. The scheduler NEVER touches this flag — it's your audit trail.
+
+**Why toggling matters:** the Savings page splits reclaimed capacity into "already reclaimed" (applied=true) and "still on the table" (applied=false). Without toggling, your Savings dashboard shows zero realized savings forever.
+
+**Under the hood:** `PATCH /api/v1/clusters/:id/recommendations/:recId` with body `{"applied": true}`. The store has exactly one method that writes this flag (`SetRecommendationApplied`) — the scheduler's upsert path cannot touch it. This guarantees that re-syncing a cluster never resets your applied state.
 
 ### 6. Triggering a fresh scan
 
 Click **▶ Recalculate** at the top of the cluster detail page. Behind the scenes:
-- Distributed Redis lock prevents duplicate runs
+- **Fencing-token Redis lock** prevents duplicate runs — scheduler ticks and manual recalcs share the same lock. If a run is already in progress, you get **429 Too Many Requests** with "Recalculation already in progress"
 - Same collect → compute → recommend → upsert pipeline as the scheduler
-- Status updates in real time via polling
+- Status updates in real time via polling (2-min deadline, then "taking longer than expected")
 
 If **Recalculate** is disabled → cluster is currently `disconnected`. Fix connectivity first.
 
 ### 7. Orphaned workloads
 
-Every scheduler run (and every manual Recalculate) builds a list of the workloads it just observed. Any recommendation row for the cluster that wasn't observed is **tombstoned** — stamped with an `first_missed_at` timestamp. These rows appear in a collapsed **Orphaned workloads** section at the top of the cluster detail page, with a count badge.
+Every scheduler run (and every manual Recalculate) builds a list of the workloads it just observed in Prometheus. Any recommendation row for the cluster that wasn't observed is **tombstoned** — stamped with a `first_missed_at` timestamp (the time the scheduler **first noticed** the workload was missing — NOT when it was deleted, which we have no way to know). These rows appear in a collapsed **Orphaned workloads** section at the top of the cluster detail page, with a count badge.
 
 Why a workload goes orphan:
 - The Deployment/StatefulSet/DaemonSet was deleted

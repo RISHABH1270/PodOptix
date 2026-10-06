@@ -212,12 +212,12 @@ ID          │ Name
 "def-456"   │ staging-cluster
 
 RECOMMENDATION TABLE
-──────────────────────────────────────────────
-ID          │ ClusterID   │ PodName
-────────────┼─────────────┼──────────────────
-"xyz-789"   │ "abc-123"   │ payment-api
-"xyz-790"   │ "abc-123"   │ auth-service
-"xyz-791"   │ "def-456"   │ payment-api
+──────────────────────────────────────────────────────────
+ID          │ ClusterID   │ WorkloadKind │ WorkloadName
+────────────┼─────────────┼──────────────┼────────────────
+"xyz-789"   │ "abc-123"   │ Deployment   │ payment-api
+"xyz-790"   │ "abc-123"   │ Deployment   │ auth-service
+"xyz-791"   │ "def-456"   │ StatefulSet  │ redis
 ```
 
 Cluster info is stored once and referenced many times — not repeated per recommendation.
@@ -470,13 +470,16 @@ A pod running for 360 days with a daily scheduler = 360 recommendation rows per 
 
 ```sql
 INSERT INTO recommendations (...) VALUES (...)
-ON CONFLICT (cluster_id, namespace, pod_name, container_name)
+ON CONFLICT (cluster_id, namespace, workload_kind, workload_name, container_name)
 DO UPDATE SET
     p99_cpu = EXCLUDED.p99_cpu,
     p99_mem = EXCLUDED.p99_mem,
     recommended_cpu_limit = EXCLUDED.recommended_cpu_limit,
     recommended_mem_limit = EXCLUDED.recommended_mem_limit,
-    updated_at = EXCLUDED.updated_at;
+    first_missed_at = NULL,   -- un-tombstone: a workload we just saw is alive
+    updated_at = NOW();
+    -- NOTE: `applied` is deliberately absent from UPDATE SET so the operator's
+    -- choice (set via PATCH) is preserved across scheduler runs.
 ```
 
 One row per container, always showing the latest values. `updated_at` shows when it was last recalculated.
@@ -899,3 +902,56 @@ Storing per-pod recommendations means:
 **Safety gate.** `MarkOrphaned` is a no-op if `seenKeys` is empty. If the collector returned 0 workloads (Prometheus down, kube-state-metrics broken), we refuse to mark *every* workload orphaned. Only an actually-smaller set triggers tombstones.
 
 **Why `?orphaned=true` is required on bulk delete.** `DELETE /api/v1/clusters/:id/recommendations` without the query parameter returns 400 instead of wiping everything. A typo'd curl or a buggy client cannot accidentally delete every recommendation for a cluster — the opt-in is explicit, in the URL, impossible to send by mistake.
+
+---
+
+## Fencing-token distributed lock (not plain SETNX + DEL)
+
+**Decision:** The per-cluster recalculate lock uses a random UUID token stored as the lock VALUE. Release runs atomic Lua CAS on the Redis server: `if GET(key) == our_token then DEL(key) else 0`.
+
+**The classic bug we avoid** — "lost lock" race on a plain SETNX + DEL implementation:
+
+| Time | What happens |
+|---|---|
+| t=0 | Scheduler A acquires lock (TTL 10m) |
+| t>10m | Lock TTL expires on Redis |
+| t>10m | Scheduler B (or a user clicking Recalculate) acquires fresh lock — SETNX succeeds because the key is gone |
+| t=11m | Scheduler A's pipeline finally finishes → defer release → DELs B's lock |
+| t=11m | A third actor acquires the lock → **B and C now run concurrently** on the same cluster → double Prometheus load, MarkOrphaned race, metrics double-counted |
+
+The scheduler + manual-recalculate handler share the same lock key. Without fencing, scaling the Hub to multiple replicas (or a long-running pipeline exceeding the TTL in a single replica) would reliably hit this race.
+
+**Why Lua, not Go-side CAS:** Lua runs atomically on the Redis server. A naive Go implementation (`GET → if match → DEL`) is NOT atomic — a parallel actor could insert between the GET and DEL. Lua guarantees no interleaving.
+
+**TTL vs pipeline-duration margin:** The lock TTL is 10 min; `RunForCluster` has a 10-min context timeout for the pipeline. If a pipeline hits the context deadline, the Lua CAS catches the "we lost the lock" case silently (no-op release). The combination of (a) context timeout + (b) fencing-token release means the system is race-safe even if a Prometheus endpoint hangs just long enough to burn through the TTL.
+
+---
+
+## Parallel per-cluster scheduler (max 5 concurrent)
+
+**Decision:** `runAll` processes clusters via goroutines with a buffered-channel semaphore (size 5) + `sync.WaitGroup` barrier.
+
+**Why not sequential:** 10 clusters × 10-min worst-case timeout = 100-min cycle. Doesn't scale past a handful of clusters.
+
+**Why not unbounded parallelism:** 100 clusters × 8 PromQL queries each = 800 concurrent HTTP calls out at once. Would hammer every cluster's observability stack simultaneously. 5 concurrent gives us ~5× speedup without a thundering herd.
+
+**Why WaitGroup barrier:** `wg.Wait()` holds `runAll` until the entire batch is done. The 24h ticker is `time.NewTicker` (not `time.AfterFunc` loop), so late tickers queue harmlessly — but we never want two batches live at once (would thrash the fencing-token lock + confuse metrics).
+
+**Hardcoded to 5 for now.** Easy to lift to an env var when someone deploys with 50+ clusters. The per-cluster Redis lock still guards against double-execution within a batch (via the fencing-token pattern above), so this cap is only about avoiding thundering-herd load, not about correctness.
+
+---
+
+## HTTP graceful shutdown (http.Server.Shutdown over listener.Close)
+
+**Decision:** On SIGTERM, call `server.Shutdown(10s ctx)` instead of `listener.Close()`.
+
+**Why not just listener.Close():** closing the listener stops accepting NEW connections but YANKS existing in-flight requests mid-handler. Clients see TCP connection resets during rolling updates / `helm upgrade`. We'd ship a few hundred 500-equivalent responses per deploy on a busy cluster.
+
+**What Shutdown does:**
+1. Stop accepting new connections (closes the listener)
+2. Wait for in-flight handlers to return naturally
+3. Return `nil` when drained, or `context.DeadlineExceeded` if a handler is stuck past the 10s deadline
+
+Combined with Kubernetes' `terminationGracePeriodSeconds` (default 30s), we get a clean handoff: pod gets SIGTERM → Shutdown drains → pod exits cleanly before the 30s SIGKILL.
+
+**10s deadline:** matches the recalculate pipeline's "return 202 immediately" pattern — no handler should block longer than that. Longer-running work (the collect pipeline) uses `context.Background()` + its own internal 10-min timeout, surviving the HTTP handler lifecycle on purpose.
