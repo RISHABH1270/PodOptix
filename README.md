@@ -259,7 +259,6 @@ Delivered in the order a well-run engineering cycle would ship them — foundati
 - [x] Helm chart — stateless Hub Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
 - [x] Helm security hardening — PodSecurityContext (non-root, read-only FS, drop caps), optional NetworkPolicy
 - [x] Helm autoscaling — optional HorizontalPodAutoscaler (CPU + memory targets)
-- [ ] Grafana dashboard + Prometheus alert rules for the `/metrics` endpoint
 
 ---
 
