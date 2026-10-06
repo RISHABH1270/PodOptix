@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -132,6 +134,13 @@ func (s *Server) createCluster(c *gin.Context) {
 	}
 
 	if err := s.store.SaveCluster(c.Request.Context(), cluster); err != nil {
+		if errors.Is(err, store.ErrClusterNameTaken) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":      "A cluster with this name already exists — pick a different name.",
+				"request_id": requestID,
+			})
+			return
+		}
 		log.Printf("ERROR [%s] createCluster save: %v", requestID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":      "Failed to register cluster, please try again",

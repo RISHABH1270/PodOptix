@@ -17,7 +17,8 @@ Every decision here was made intentionally. This doc records what we chose, what
 | Auth | JWT + API tokens | Simple · stateless |
 | ID Strategy | UUID v4 (string) | Globally unique · secure · no collision risk |
 | Recommendation storage | UPSERT | One row per container — clean dashboard |
-| Resource percentile | p99 × 2 | Real usage + smart buffer — not freak spikes |
+| Resource percentile | request = ceil(p99) · limit = ceil(p99 × 2) | Real usage + smart buffer — both levers set correctly |
+| Savings units | Cores + GiB (no $) | `$/core-hour` varies wildly per cloud/region/contract |
 
 ---
 
@@ -211,12 +212,12 @@ ID          │ Name
 "def-456"   │ staging-cluster
 
 RECOMMENDATION TABLE
-──────────────────────────────────────────────
-ID          │ ClusterID   │ PodName
-────────────┼─────────────┼──────────────────
-"xyz-789"   │ "abc-123"   │ payment-api
-"xyz-790"   │ "abc-123"   │ auth-service
-"xyz-791"   │ "def-456"   │ payment-api
+──────────────────────────────────────────────────────────
+ID          │ ClusterID   │ WorkloadKind │ WorkloadName
+────────────┼─────────────┼──────────────┼────────────────
+"xyz-789"   │ "abc-123"   │ Deployment   │ payment-api
+"xyz-790"   │ "abc-123"   │ Deployment   │ auth-service
+"xyz-791"   │ "def-456"   │ StatefulSet  │ redis
 ```
 
 Cluster info is stored once and referenced many times — not repeated per recommendation.
@@ -264,6 +265,36 @@ These should not define your permanent resource limits.
 | Based on | Worst freak spike ever | Real sustained usage + smart buffer |
 | Result | Massive overprovisioning | Right-sized with safe headroom |
 | Optimizes for | Paranoia | Reality |
+
+### Both `request` AND `limit` — not just a limit number
+
+PodOptix recommends BOTH values per resource — not one. This is a deliberate correction over tools that emit "a limit" and call it a day.
+
+```
+request = ceil(p99)       ← what the K8s scheduler reserves on the node (= what you pay for)
+limit   = ceil(p99 × 2)   ← hard ceiling the kernel enforces (CPU throttle / OOMKill)
+```
+
+Kubernetes has **two levers**, and they do different things:
+
+| Field | Role in Kubernetes | What goes wrong if you ignore it |
+|-------|-------------------|----------------------------------|
+| `requests` | Scheduler reservation + QoS class + autoscaling signal + pays-the-bill number on your node | No request → pod lands on any node → noisy-neighbor evictions · wildly off request → nodes look full/empty when they aren't · HPA/VPA/cluster-autoscaler all misbehave |
+| `limits`   | Kernel-enforced ceiling — CPU gets throttled, memory gets OOMKilled | No limit → one runaway pod can starve the node · limit = request → zero headroom for bursts |
+
+**Why half the advice (limit only) is misleading:**
+
+If a tool only recommends a limit, you have no principled answer for what to put under `requests:` — users typically either (a) copy the limit (over-reserves, destroys bin-packing), (b) leave requests unset (BestEffort QoS, first to evict), or (c) keep the stale pre-existing value (which is exactly the "set by guesswork" problem PodOptix exists to fix). All three outcomes defeat the point.
+
+**Why `request = p99` and `limit = p99 × 2`:**
+
+- `request = ceil(p99)` reserves what the container actually uses 99% of the time — tight bin-packing without starving the workload at steady state. Node capacity planning becomes accurate.
+- `limit = ceil(p99 × 2)` keeps the same 2× burst buffer argued above as the ceiling, so one bad minute doesn't OOMKill a healthy service.
+- The two together produce a **Burstable QoS class** (requests < limits, both set) — the correct class for 99% of application workloads. Guaranteed (request = limit) sacrifices bin-packing; BestEffort (neither set) is first to evict.
+
+**Why savings math uses requests, not limits:**
+
+Node cost is driven by reserved capacity, not ceilings. If a pod has `requests.cpu: 1000m` and `limits.cpu: 2000m`, the scheduler blocks 1 full core on that node — you pay for 1 core whether the pod uses it or not. The 2000m ceiling costs nothing until the pod actually bursts. Therefore PodOptix's Savings page computes reclaim as `Σ (current_cpu_request − recommended_cpu_request)` — that is the number that moves your cloud bill.
 
 ---
 
@@ -439,13 +470,16 @@ A pod running for 360 days with a daily scheduler = 360 recommendation rows per 
 
 ```sql
 INSERT INTO recommendations (...) VALUES (...)
-ON CONFLICT (cluster_id, namespace, pod_name, container_name)
+ON CONFLICT (cluster_id, namespace, workload_kind, workload_name, container_name)
 DO UPDATE SET
     p99_cpu = EXCLUDED.p99_cpu,
     p99_mem = EXCLUDED.p99_mem,
     recommended_cpu_limit = EXCLUDED.recommended_cpu_limit,
     recommended_mem_limit = EXCLUDED.recommended_mem_limit,
-    updated_at = EXCLUDED.updated_at;
+    first_missed_at = NULL,   -- un-tombstone: a workload we just saw is alive
+    updated_at = NOW();
+    -- NOTE: `applied` is deliberately absent from UPDATE SET so the operator's
+    -- choice (set via PATCH) is preserved across scheduler runs.
 ```
 
 One row per container, always showing the latest values. `updated_at` shows when it was last recalculated.
@@ -489,7 +523,7 @@ ALTER TABLE clusters RENAME COLUMN id TO cluster_id;
 
 **Dirty database recovery:**
 
-golang-migrate marks a migration dirty the moment it starts. If the app crashes halfway — the flag stays dirty. On next startup, PodOptix detects this, forces the version clean, and retries. Safe because migrations use `IF NOT EXISTS`.
+golang-migrate marks a migration dirty the moment it starts. If the app crashes halfway, the flag stays dirty. On next startup, PodOptix **refuses to start** and prints an error directing the operator to the migrate CLI to roll back manually. Auto-forcing the dirty version to "clean" is unsafe — `Force()` only updates the `schema_migrations` metadata row, it does not inspect or repair the actual schema. Loud failure beats silent drift.
 
 ---
 
@@ -766,3 +800,158 @@ Cypress was the leader through ~2023 but Playwright surpassed it in 2024 with fa
 - `internal/api/routes.go` — `router.NoRoute` wires the dashboard handler; `/api/*` and `/auth/*` paths still return proper 404s
 
 Result: a 41 MB single binary that serves the API on `/api/v1/*` and the dashboard on everything else, from one port.
+
+---
+
+## 28. Savings Dashboard — Resource Units, Not Dollars
+
+### Decision: Report reclaimable CPU (cores) and memory (GiB) — no dollar figures
+
+The Savings page shows how much CPU and memory PodOptix's recommendations would reclaim across the fleet — as raw resource units. It never converts to `$` or a cloud bill line item.
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Resource units (cores + GiB)** ✅ | Honest · Verifiable · Same number regardless of cloud, region, contract | Operator does the final conversion if they want dollars |
+| Dollar figures (baked-in `$/core-hour` constant) | Marketing-friendly | Wrong for every customer — see below |
+| Full cost modeling (per-cloud pricing API + node type awareness) | Accurate | Massive scope creep — this is what Kubecost and OpenCost exist to do |
+
+**Why not dollars — `$/core-hour` is not a constant:**
+
+The same 1 core-hour costs radically different amounts depending on variables PodOptix has no visibility into:
+
+- **Cloud** — AWS, GCP, Azure, on-prem, bare metal all price CPU differently
+- **Region** — `us-east-1` vs `ap-south-1` vs `me-central-1` diverge 2–3×
+- **Instance family** — `m5`, `r5`, `c5`, Graviton (`m6g`), spot, reserved, savings-plans, committed use
+- **Enterprise contract** — private discounts, EDPs, committed spend rebates, marketplace credits
+- **Chargeback model** — some orgs allocate by node hours, some by pod requests, some by namespace tags
+
+Baking a single `$/core-hour` into the code would produce a number that is confidently wrong for every customer. Showing "You'll save $47,382/month" when the true figure is $8k or $110k destroys trust the first time a FinOps team checks the math.
+
+**What "real cost" needs:**
+
+Accurate cost attribution is [Kubecost](https://www.kubecost.com/) / [OpenCost](https://opencost.io/) territory — they scrape node prices, join with pod-to-node mappings, apply reservations and spot discounts, and reconcile against cloud billing exports. PodOptix intentionally does not duplicate that stack. If a customer wants dollar figures, they multiply our reclaimable cores/GiB by their own `$/core-hour` — a number they already know.
+
+**What we show instead:**
+
+- Potential reclaim: `Σ (current_cpu_request − recommended_cpu_request)` for `applied = false` rows → cores (requests, because that's what the scheduler reserves on nodes = what you pay for)
+- Realized reclaim: same math for `applied = true` rows → cores (proof the tool paid off)
+- Same for memory in GiB
+- Adoption %: applied rows / total ready rows
+- Top-10 CPU + memory waste, per-cluster breakdown, per-namespace breakdown
+
+These are all verifiable from the raw recommendations table — an operator can spot-check any number by running SQL. No opaque cost model, no wrong-by-default numbers.
+
+---
+
+## Workload-level recommendations (not pod-level)
+
+**Decision:** Store one recommendation per `(cluster, namespace, workload_kind, workload_name, container)` — not per pod.
+
+**Why:**
+
+A Kubernetes Deployment with 3 replicas creates 3 pods with ephemeral random suffixes: `auth-service-7f9c-abc12`, `auth-service-7f9c-def34`, `auth-service-7f9c-ghi56`. A rolling update rotates them. A HorizontalPodAutoscaler churns them further. Pod names are **ephemeral**; workload names are **stable**.
+
+Storing per-pod recommendations means:
+
+1. **Table explodes with stale rows.** Every rollout leaves N dead pod rows forever. After 100 rollouts of a 3-replica Deployment, you have 300 dead rows and 3 live ones — same workload.
+2. **Divergent recommendations for replicas that must be sized identically.** Three pods of the same Deployment got slightly different p99s this week — now the dashboard shows three different numbers and the operator has to average by eye. The three pods *must* get the same resources (K8s applies the spec to all of them), so divergent recommendations are false precision.
+3. **The dashboard is impossible to read.** 300 rows for `auth-service` instead of 1.
+
+**How we resolve the workload:** Query `kube_pod_owner` (pod → direct owner — ReplicaSet/StatefulSet/DaemonSet/Job) and `kube_replicaset_owner{owner_kind="Deployment"}` (ReplicaSet → Deployment). Walk the chain: pod → ReplicaSet → Deployment. Bare pods and unknown owners fall back to `("Pod", pod-name)` so we degrade gracefully if kube-state-metrics is missing.
+
+**Why PromQL, not Kubernetes API string parsing:** `auth-service-7f9c-abc12` *looks* like it belongs to Deployment `auth-service`, but string-stripping breaks for every workload with hyphens in its name (`my-app-worker-7f9c-abc12` could be `my-app-worker` or `my-app`). `kube_pod_owner` is the authoritative source — kube-state-metrics already walks the owner refs for us.
+
+---
+
+## MAX across replicas, then p99 across time
+
+**Decision:** Aggregation formula is `usage(t) = MAX over all replicas of container_usage(replica, t)`, then `p99` of `usage(t)` across the lookback window.
+
+**Why MAX:**
+
+- `request` and `limit` are **per-pod** values in Kubernetes. The scheduler reserves `request` on a node for *each* replica; the kernel enforces `limit` on *each* pod individually. If replica A hit 500m while replica B hit 100m at the same instant, we need to size for 500m — otherwise A gets throttled.
+- **AVG would under-provision.** Averaging the loud replica with 2 quiet ones hides the real demand. First real traffic spike → throttle or OOMKill.
+- **SUM would make no sense.** Pods don't share CPU limits. You can't give one pod 1500m because three others summed to 1500m.
+
+**Why p99, not p95 or max:**
+
+- `max` of a 7-day window captures every noisy spike (GC pause, debugger attach, cold-start) and over-provisions. Operators would reject it as wasteful.
+- `p95` leaves a visible margin of outages. 5% of a week = 8 hours of throttling or OOMKills.
+- `p99` is the sweet spot: ignore ~1 hour of spikes per week (acceptable brief tail), accommodate everything else.
+
+**Timestamp alignment:** We fetch range queries with `step=3600` (one point per hour). All replica series land on the same hourly grid, so `MAX(replica, t)` is a straightforward map merge keyed on the Unix timestamp. If a replica didn't exist at some `t`, its series just doesn't contribute to that bucket.
+
+---
+
+## Tombstone with manual review, not auto-delete
+
+**Decision:** When a workload disappears from a scheduler run, stamp `first_missed_at=NOW()`. **Never auto-delete** — the operator reviews orphans in the dashboard and deletes explicitly (per-row trash or "Delete all orphaned" bulk).
+
+**The alternative we rejected:** Auto-delete after N consecutive misses. Rejected because:
+
+1. **Deleted-by-mistake wipes history.** If someone accidentally scales a Deployment to 0 or does a `kubectl delete` during a mis-aimed cleanup, their historical recommendation is also gone. The next time the workload returns, the row is a fresh insert — the `applied=true` flag is lost, savings-realised silently drops. There's no audit trail of what the right-sized state used to be.
+2. **No safe N.** 1 miss is too eager (one Prometheus hiccup wipes real data). 7 misses is too lazy (operators asked us to clean up quickly). Any N we pick is wrong for some workload cadence.
+3. **The user, not us, knows if the workload is really gone.** PodOptix sees a snapshot every 24h; the operator knows the deployment calendar.
+
+**Why tombstone (not just a hidden flag):**
+
+- Operators can see *when* the workload went missing — orphaned since 2 days ago vs 60 days ago drives totally different triage.
+- The partial index `idx_recommendations_orphaned ON (cluster_id) WHERE first_missed_at IS NOT NULL` keeps the "orphaned workloads" count query O(orphans), not O(all recommendations).
+- Un-tombstone is just `first_missed_at = NULL` in `UpsertRecommendation`'s ON CONFLICT clause — zero extra code for the come-back case.
+
+**Safety gate.** `MarkOrphaned` is a no-op if `seenKeys` is empty. If the collector returned 0 workloads (Prometheus down, kube-state-metrics broken), we refuse to mark *every* workload orphaned. Only an actually-smaller set triggers tombstones.
+
+**Why `?orphaned=true` is required on bulk delete.** `DELETE /api/v1/clusters/:id/recommendations` without the query parameter returns 400 instead of wiping everything. A typo'd curl or a buggy client cannot accidentally delete every recommendation for a cluster — the opt-in is explicit, in the URL, impossible to send by mistake.
+
+---
+
+## Fencing-token distributed lock (not plain SETNX + DEL)
+
+**Decision:** The per-cluster recalculate lock uses a random UUID token stored as the lock VALUE. Release runs atomic Lua CAS on the Redis server: `if GET(key) == our_token then DEL(key) else 0`.
+
+**The classic bug we avoid** — "lost lock" race on a plain SETNX + DEL implementation:
+
+| Time | What happens |
+|---|---|
+| t=0 | Scheduler A acquires lock (TTL 10m) |
+| t>10m | Lock TTL expires on Redis |
+| t>10m | Scheduler B (or a user clicking Recalculate) acquires fresh lock — SETNX succeeds because the key is gone |
+| t=11m | Scheduler A's pipeline finally finishes → defer release → DELs B's lock |
+| t=11m | A third actor acquires the lock → **B and C now run concurrently** on the same cluster → double Prometheus load, MarkOrphaned race, metrics double-counted |
+
+The scheduler + manual-recalculate handler share the same lock key. Without fencing, scaling the Hub to multiple replicas (or a long-running pipeline exceeding the TTL in a single replica) would reliably hit this race.
+
+**Why Lua, not Go-side CAS:** Lua runs atomically on the Redis server. A naive Go implementation (`GET → if match → DEL`) is NOT atomic — a parallel actor could insert between the GET and DEL. Lua guarantees no interleaving.
+
+**TTL vs pipeline-duration margin:** The lock TTL is 10 min; `RunForCluster` has a 10-min context timeout for the pipeline. If a pipeline hits the context deadline, the Lua CAS catches the "we lost the lock" case silently (no-op release). The combination of (a) context timeout + (b) fencing-token release means the system is race-safe even if a Prometheus endpoint hangs just long enough to burn through the TTL.
+
+---
+
+## Parallel per-cluster scheduler (max 5 concurrent)
+
+**Decision:** `runAll` processes clusters via goroutines with a buffered-channel semaphore (size 5) + `sync.WaitGroup` barrier.
+
+**Why not sequential:** 10 clusters × 10-min worst-case timeout = 100-min cycle. Doesn't scale past a handful of clusters.
+
+**Why not unbounded parallelism:** 100 clusters × 8 PromQL queries each = 800 concurrent HTTP calls out at once. Would hammer every cluster's observability stack simultaneously. 5 concurrent gives us ~5× speedup without a thundering herd.
+
+**Why WaitGroup barrier:** `wg.Wait()` holds `runAll` until the entire batch is done. The 24h ticker is `time.NewTicker` (not `time.AfterFunc` loop), so late tickers queue harmlessly — but we never want two batches live at once (would thrash the fencing-token lock + confuse metrics).
+
+**Hardcoded to 5 for now.** Easy to lift to an env var when someone deploys with 50+ clusters. The per-cluster Redis lock still guards against double-execution within a batch (via the fencing-token pattern above), so this cap is only about avoiding thundering-herd load, not about correctness.
+
+---
+
+## HTTP graceful shutdown (http.Server.Shutdown over listener.Close)
+
+**Decision:** On SIGTERM, call `server.Shutdown(10s ctx)` instead of `listener.Close()`.
+
+**Why not just listener.Close():** closing the listener stops accepting NEW connections but YANKS existing in-flight requests mid-handler. Clients see TCP connection resets during rolling updates / `helm upgrade`. We'd ship a few hundred 500-equivalent responses per deploy on a busy cluster.
+
+**What Shutdown does:**
+1. Stop accepting new connections (closes the listener)
+2. Wait for in-flight handlers to return naturally
+3. Return `nil` when drained, or `context.DeadlineExceeded` if a handler is stuck past the 10s deadline
+
+Combined with Kubernetes' `terminationGracePeriodSeconds` (default 30s), we get a clean handoff: pod gets SIGTERM → Shutdown drains → pod exits cleanly before the 30s SIGKILL.
+
+**10s deadline:** matches the recalculate pipeline's "return 202 immediately" pattern — no handler should block longer than that. Longer-running work (the collect pipeline) uses `context.Background()` + its own internal 10-min timeout, surviving the HTTP handler lifecycle on purpose.

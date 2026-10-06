@@ -10,13 +10,20 @@ image:
 
 # ── PodOptix workload (stateless) ────────────────────────────────────
 podoptix:
-  replicaCount: 1    # can scale to N — all replicas share the same Postgres/Redis
+  replicaCount: 1    # ignored when autoscaling.enabled — the HPA owns the replica count
   resources:
     requests: { cpu: 100m, memory: 128Mi }
     limits:   { cpu: 500m, memory: 256Mi }
   # Required secrets — MUST be overridden in production
   jwtSecret: ""      # ≥32 chars; auto-generated if empty (regenerates every upgrade — DON'T rely on that in prod)
   encryptionKey: ""  # exactly 32 bytes; auto-generated if empty (same warning)
+
+autoscaling:
+  enabled: false            # opt-in — makes sense once you have >1 user or noisy dashboards
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage:    70
+  targetMemoryUtilizationPercentage: 80
 
 # ── PostgreSQL (stateful, StatefulSet + PVC) ─────────────────────────
 postgres:
@@ -46,6 +53,31 @@ service:
   #     type: LoadBalancer
   #     annotations:
   #       service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+# ── Security hardening ──────────────────────────────────────────────
+securityContext:
+  # Applied to every PodOptix container.
+  # Postgres/Redis containers keep their upstream defaults — see per-workload notes in templates.
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+# NetworkPolicy — restricts pod-to-pod traffic.
+# When enabled, ONLY traffic to/from the labels we allow can flow.
+# Requires a CNI that enforces NetworkPolicy (Calico, Cilium, Weave, GKE dataplane v2 — most managed K8s work).
+networkPolicy:
+  enabled: false            # opt-in — some clusters don't have a policy-enforcing CNI
+  # Extra ingress sources allowed to reach the PodOptix service.
+  # By default we allow same-namespace traffic + kube-system (for probes and Prometheus scraping).
+  # Add your ingress controller's namespace here if it's separate.
+  extraIngressNamespaces: []  # e.g. ["ingress-nginx", "monitoring"]
 
 # ── Global scheduling / pod hygiene ──────────────────────────────────
 nodeSelector: {}

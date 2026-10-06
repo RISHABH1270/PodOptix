@@ -2,16 +2,37 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/RISHABH1270/PodOptix/internal/auth"
 	"github.com/RISHABH1270/PodOptix/internal/collector"
+	"github.com/RISHABH1270/PodOptix/internal/metrics"
 	"github.com/RISHABH1270/PodOptix/internal/recommender"
+	"github.com/RISHABH1270/PodOptix/internal/store"
 	"github.com/RISHABH1270/PodOptix/pkg/models"
 	"github.com/gin-gonic/gin"
 )
+
+// listAllRecommendations returns every recommendation across every cluster,
+// joined with the cluster name. Used by the cross-cluster overview page.
+// Ordered by biggest CPU delta first — surfaces the biggest wins on top.
+func (s *Server) listAllRecommendations(c *gin.Context) {
+	requestID := c.GetString("request_id")
+
+	recs, err := s.store.ListAllWithClusterName(c.Request.Context())
+	if err != nil {
+		log.Printf("ERROR [%s] listAllRecommendations db: %v", requestID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to fetch recommendations",
+			"request_id": requestID,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, recs)
+}
 
 // listRecommendations returns all recommendations for a cluster.
 // Checks Redis cache first — falls back to PostgreSQL on miss.
@@ -27,9 +48,11 @@ func (s *Server) listRecommendations(c *gin.Context) {
 			log.Printf("WARN  [%s] listRecommendations cache get: %v", requestID, err)
 		}
 		if hit {
+			metrics.CacheHitsTotal.WithLabelValues("recommendations").Inc()
 			c.JSON(http.StatusOK, cached)
 			return
 		}
+		metrics.CacheMissesTotal.WithLabelValues("recommendations").Inc()
 	}
 
 	// cache miss — fetch from PostgreSQL
@@ -53,6 +76,111 @@ func (s *Server) listRecommendations(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendations)
 }
 
+// deleteRecommendation hard-deletes a single recommendation row.
+// Used by the dashboard per-row trash button on an orphaned workload.
+// Invalidates the cluster's cached recommendation list.
+func (s *Server) deleteRecommendation(c *gin.Context) {
+	requestID := c.GetString("request_id")
+	clusterID := c.Param("id")
+	recID := c.Param("recId")
+
+	if err := s.store.DeleteRecommendation(c.Request.Context(), recID); err != nil {
+		if errors.Is(err, store.ErrRecommendationNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":      "Recommendation not found",
+				"request_id": requestID,
+			})
+			return
+		}
+		log.Printf("ERROR [%s] deleteRecommendation cluster=%s rec=%s: %v", requestID, clusterID, recID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to delete recommendation",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if s.cache != nil {
+		s.cache.InvalidateRecommendations(c.Request.Context(), clusterID)
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": 1, "recommendation_id": recID})
+}
+
+// patchRecommendation toggles the applied flag on one recommendation.
+// This is the ONLY write path for `applied` — scheduler/upsert never touch it.
+// Flipping drives the Savings page math (reclaimed vs still-on-the-table).
+// Request body: {"applied": true | false}
+func (s *Server) patchRecommendation(c *gin.Context) {
+	requestID := c.GetString("request_id")
+	clusterID := c.Param("id")
+	recID := c.Param("recId")
+
+	// *bool so we can distinguish "omitted" from "false"
+	var body struct {
+		Applied *bool `json:"applied"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.Applied == nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      `body must include {"applied": true | false}`,
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if err := s.store.SetRecommendationApplied(c.Request.Context(), recID, *body.Applied); err != nil {
+		if errors.Is(err, store.ErrRecommendationNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":      "Recommendation not found",
+				"request_id": requestID,
+			})
+			return
+		}
+		log.Printf("ERROR [%s] patchRecommendation cluster=%s rec=%s: %v", requestID, clusterID, recID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to update recommendation",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if s.cache != nil {
+		s.cache.InvalidateRecommendations(c.Request.Context(), clusterID)
+	}
+	c.JSON(http.StatusOK, gin.H{"recommendation_id": recID, "applied": *body.Applied})
+}
+
+// deleteOrphanedRecommendations bulk-deletes every orphaned row for a cluster.
+// Gated by ?orphaned=true so the endpoint can't accidentally wipe all rows —
+// a non-orphaned bulk delete would be a huge footgun, so we force the query
+// parameter to make the intent explicit.
+func (s *Server) deleteOrphanedRecommendations(c *gin.Context) {
+	requestID := c.GetString("request_id")
+	clusterID := c.Param("id")
+
+	if c.Query("orphaned") != "true" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":      "bulk delete requires ?orphaned=true",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	n, err := s.store.DeleteOrphaned(c.Request.Context(), clusterID)
+	if err != nil {
+		log.Printf("ERROR [%s] deleteOrphanedRecommendations cluster=%s: %v", requestID, clusterID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":      "Failed to delete orphaned recommendations",
+			"request_id": requestID,
+		})
+		return
+	}
+
+	if s.cache != nil {
+		s.cache.InvalidateRecommendations(c.Request.Context(), clusterID)
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": n})
+}
+
 // recalculate triggers a manual recommendation recalculation for a cluster.
 // Uses a distributed lock to prevent duplicate jobs.
 // Returns 202 Accepted immediately — runs in background with 10 min timeout.
@@ -70,9 +198,12 @@ func (s *Server) recalculate(c *gin.Context) {
 		return
 	}
 
-	// try to acquire distributed lock — prevents duplicate jobs
+	// Try to acquire the distributed lock — prevents duplicate jobs. Captures the
+	// fencing token so Release can CAS against it (won't delete a lock that's been
+	// reclaimed by someone else after TTL expiry).
+	var lockToken string
 	if s.cache != nil {
-		locked, err := s.cache.AcquireRecalculateLock(c.Request.Context(), clusterID)
+		token, locked, err := s.cache.AcquireRecalculateLock(c.Request.Context(), clusterID)
 		if err != nil {
 			log.Printf("WARN  [%s] recalculate lock error cluster=%s: %v", requestID, clusterID, err)
 		}
@@ -83,6 +214,7 @@ func (s *Server) recalculate(c *gin.Context) {
 			})
 			return
 		}
+		lockToken = token
 	}
 
 	// decrypt token before using for Prometheus
@@ -102,7 +234,7 @@ func (s *Server) recalculate(c *gin.Context) {
 		defer cancel()
 		defer func() {
 			if s.cache != nil {
-				s.cache.ReleaseRecalculateLock(ctx, clusterID)
+				s.cache.ReleaseRecalculateLock(ctx, clusterID, lockToken)
 			}
 		}()
 
@@ -123,10 +255,27 @@ func (s *Server) recalculate(c *gin.Context) {
 			return
 		}
 
+		// seenKeys populated BEFORE upsert — Prometheus observation is authoritative.
+		// If an upsert fails transiently, we still don't want MarkOrphaned to stamp
+		// the workload as missing. See scheduler.RunForCluster for the same pattern.
+		seenKeys := make([]models.WorkloadKey, 0, len(recs))
 		for _, rec := range recs {
+			seenKeys = append(seenKeys, models.WorkloadKey{
+				Namespace:     rec.Namespace,
+				WorkloadKind:  rec.WorkloadKind,
+				WorkloadName:  rec.WorkloadName,
+				ContainerName: rec.ContainerName,
+			})
 			if err = s.store.UpsertRecommendation(ctx, rec); err != nil {
 				log.Printf("ERROR recalculate upsert cluster=%s: %v", clusterID, err)
+				continue
 			}
+		}
+
+		if orphaned, err := s.store.MarkOrphaned(ctx, clusterID, seenKeys); err != nil {
+			log.Printf("WARN  recalculate mark orphaned cluster=%s: %v", clusterID, err)
+		} else if orphaned > 0 {
+			log.Printf("INFO  recalculate marked %d workloads as orphaned cluster=%s", orphaned, clusterID)
 		}
 
 		if err := s.store.UpdateClusterHealth(ctx, clusterID, models.ClusterStatusConnected, time.Now()); err != nil {

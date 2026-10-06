@@ -5,6 +5,8 @@ import { ClustersPage } from './pages/Clusters'
 import { RegisterClusterPage } from './pages/RegisterCluster'
 import { EditClusterPage } from './pages/EditCluster'
 import { ClusterDetailPage } from './pages/ClusterDetail'
+import { RecommendationsPage } from './pages/Recommendations'
+import { SavingsPage } from './pages/Savings'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
@@ -23,6 +25,8 @@ export default function App() {
           <Route path="/clusters/new"      element={<RegisterClusterPage />} />
           <Route path="/clusters/:id"      element={<ClusterDetailPage />} />
           <Route path="/clusters/:id/edit" element={<EditClusterPage />} />
+          <Route path="/recommendations"   element={<RecommendationsPage />} />
+          <Route path="/savings"           element={<SavingsPage />} />
         </Route>
       </Route>
 

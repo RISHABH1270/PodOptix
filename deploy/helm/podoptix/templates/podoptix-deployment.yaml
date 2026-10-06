@@ -6,7 +6,9 @@ metadata:
     {{- include "podoptix.labels" . | nindent 4 }}
     app.kubernetes.io/component: app
 spec:
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.podoptix.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -35,6 +37,13 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser:    {{ .Values.securityContext.runAsUser }}
+        runAsGroup:   {{ .Values.securityContext.runAsGroup }}
+        fsGroup:      {{ .Values.securityContext.fsGroup }}
+        seccompProfile:
+          type: {{ .Values.securityContext.seccompProfile.type }}
       # Wait until Postgres is reachable before starting PodOptix — avoids restart-loop noise.
       initContainers:
         - name: wait-for-postgres
@@ -59,6 +68,11 @@ spec:
         - name: podoptix
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop: {{ .Values.securityContext.capabilities.drop | toYaml | nindent 16 }}
           ports:
             - name: http
               containerPort: 8080

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Layers, LogOut } from 'lucide-react'
+import { Layers, LogOut, ListChecks, TrendingDown } from 'lucide-react'
 import { auth } from '../lib/auth'
 import { Logo } from './Logo'
 
@@ -28,7 +28,9 @@ export function Layout() {
           <div className="px-5 pt-3 pb-2 text-[10px] uppercase tracking-widest text-dim font-semibold">
             Overview
           </div>
-          <SideLink to="/clusters" icon={<Layers className="w-4 h-4" />} label="Clusters" />
+          <SideLink to="/clusters"        icon={<Layers className="w-4 h-4" />}         label="Clusters" />
+          <SideLink to="/recommendations" icon={<ListChecks className="w-4 h-4" />}     label="Recommendations" />
+          <SideLink to="/savings"         icon={<TrendingDown className="w-4 h-4" />}   label="Savings" />
         </nav>
 
         <div className="border-t border-border p-3">
