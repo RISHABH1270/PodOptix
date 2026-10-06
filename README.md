@@ -209,7 +209,7 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 
 ## Roadmap
 
-Shipped in the order a well-run engineering cycle would deliver them — foundation first, domain logic next, reliability and operator UX last. Not a chronological "what we built first" log.
+Delivered in the order a well-run engineering cycle would ship them — foundation first, domain logic next, reliability and operator UX last.
 
 ### 1 · Foundation
 
@@ -259,10 +259,6 @@ Shipped in the order a well-run engineering cycle would deliver them — foundat
 - [x] Helm chart — stateless Hub Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
 - [x] Helm security hardening — PodSecurityContext (non-root, read-only FS, drop caps), optional NetworkPolicy
 - [x] Helm autoscaling — optional HorizontalPodAutoscaler (CPU + memory targets)
-
-### 8 · Not yet shipped
-
-- [ ] Grafana dashboard + Prometheus alert rules for the `/metrics` endpoint
 - [ ] Grafana dashboard + Prometheus alert rules for the `/metrics` endpoint
 
 ---
