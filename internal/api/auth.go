@@ -14,15 +14,20 @@ import (
 )
 
 // RegisterRequest defines the expected JSON body for registration.
+// Password: min 8 (so bcrypt isn't trivially brute-forced); max 128 so a huge
+// payload can't DoS the hashing path (bcrypt truncates at 72 bytes but the
+// allocation + encode still runs on whatever we accept).
 type RegisterRequest struct {
-	Email    string `json:"email"    binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email"    binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
 // LoginRequest defines the expected JSON body for login.
+// Same length caps on password — stops the same cheap DoS on CheckPassword.
+// Email format validation here keeps 400s crisp before we even hit the store.
 type LoginRequest struct {
-	Email    string `json:"email"    binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email"    binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
 // register creates a new user account.
@@ -32,7 +37,7 @@ func (s *Server) register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "Email and password are required",
+			"error":      "Invalid request — email must be a valid email address, password must be 8–128 characters.",
 			"request_id": requestID,
 		})
 		return
@@ -97,7 +102,7 @@ func (s *Server) login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":      "Email and password are required",
+			"error":      "Invalid request — email must be a valid email address, password must be 8–128 characters.",
 			"request_id": requestID,
 		})
 		return
