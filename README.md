@@ -46,9 +46,11 @@ PodOptix connects to your Prometheus, computes **p99** from real usage, and reco
 
 **The formula** (same for CPU and memory):
 
-```
-request = ceil(p99)         ← scheduler reserves this · pod is guaranteed this much
-limit   = ceil(p99 × 2)     ← hard ceiling · CPU gets throttled, pod gets OOMKilled on memory overrun
+```text
+request = ceil(p99)      # scheduler reserves this on the node
+                         # pod is guaranteed at least this much
+limit   = ceil(p99 × 2)  # hard ceiling
+                         # CPU → throttled   ·   Memory → OOMKilled
 ```
 
 **Example** — a container averaging 120m CPU and 180Mi RAM at the 99th percentile:
