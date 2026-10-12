@@ -9,11 +9,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// RequestIDMiddleware assigns a unique UUID to every request.
-// Stored in context as "request_id" and returned in X-Request-ID response header.
+// RequestIDMiddleware honors an incoming X-Request-ID (set by an upstream ingress /
+// LB / API gateway for trace propagation) and falls back to a fresh UUID if none
+// was supplied. Stored in context as "request_id" and echoed in the response header
+// so clients can correlate their logs with ours.
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		requestID := uuid.New().String()
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
 		c.Set("request_id", requestID)
 		c.Header("X-Request-ID", requestID)
 		c.Next()

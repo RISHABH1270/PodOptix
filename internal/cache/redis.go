@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -23,6 +24,8 @@ type Cache struct {
 }
 
 // New connects to Redis and returns a Cache.
+// Startup Ping is capped at 30s so an unreachable Redis fails fast with a clean
+// error instead of hanging the pod until Kubernetes' liveness probe fires.
 func New(redisURL string) (*Cache, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
@@ -31,7 +34,10 @@ func New(redisURL string) (*Cache, error) {
 
 	client := redis.NewClient(opts)
 
-	if err = client.Ping(context.Background()).Err(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err = client.Ping(ctx).Err(); err != nil {
+		client.Close() // don't leak the half-open client on startup error
 		return nil, fmt.Errorf("ping redis: %w", err)
 	}
 
@@ -88,19 +94,56 @@ func (c *Cache) InvalidateRecommendations(ctx context.Context, clusterID string)
 
 // ── Distributed lock ─────────────────────────────────────────────────────────
 
-// AcquireRecalculateLock tries to acquire a distributed lock for a cluster recalculation.
-// Returns true if lock acquired, false if already locked (recalculation in progress).
-// Uses SETNX — atomic, no race conditions.
-func (c *Cache) AcquireRecalculateLock(ctx context.Context, clusterID string) (bool, error) {
-	ok, err := c.client.SetNX(ctx, fmt.Sprintf("lock:cluster:%s:recalculate", clusterID), "1", RecalculateLockTTL).Result()
-	if err != nil {
-		return false, fmt.Errorf("acquire recalculate lock: %w", err)
-	}
-	return ok, nil
+// Lua script runs atomically on the Redis server: deletes the lock key ONLY if its
+// current value matches our token. Prevents a long-running job from accidentally
+// deleting a NEW lock acquired by someone else after the original lock expired.
+//
+// KEYS[1] = lock key
+// ARGV[1] = token the caller stored when acquiring the lock
+// Returns 1 if deleted (we still held it), 0 if the lock was ours no more (TTL expired
+// and someone else holds a fresh one, or it was already deleted).
+var releaseLockScript = redis.NewScript(`
+	if redis.call("GET", KEYS[1]) == ARGV[1] then
+		return redis.call("DEL", KEYS[1])
+	else
+		return 0
+	end
+`)
+
+func recalculateLockKey(clusterID string) string {
+	return fmt.Sprintf("lock:cluster:%s:recalculate", clusterID)
 }
 
-// ReleaseRecalculateLock releases the recalculate lock for a cluster.
-// Always called on goroutine exit — success or failure.
-func (c *Cache) ReleaseRecalculateLock(ctx context.Context, clusterID string) error {
-	return c.client.Del(ctx, fmt.Sprintf("lock:cluster:%s:recalculate", clusterID)).Err()
+// AcquireRecalculateLock tries to acquire a distributed lock for a cluster recalculation.
+// Returns (token, true) if acquired; the caller MUST pass that token to
+// ReleaseRecalculateLock. Returns ("", false) if the lock is already held.
+//
+// The token is a random UUID stored as the lock's value — ReleaseRecalculateLock
+// compares against it so a stale caller can't delete a lock that was re-acquired
+// by someone else after TTL expiry.
+func (c *Cache) AcquireRecalculateLock(ctx context.Context, clusterID string) (string, bool, error) {
+	token := uuid.New().String()
+	ok, err := c.client.SetNX(ctx, recalculateLockKey(clusterID), token, RecalculateLockTTL).Result()
+	if err != nil {
+		return "", false, fmt.Errorf("acquire recalculate lock: %w", err)
+	}
+	if !ok {
+		return "", false, nil
+	}
+	return token, true, nil
+}
+
+// ReleaseRecalculateLock releases the lock IFF the stored value still matches our
+// token. Safe to call even if the TTL already expired and someone else owns the lock
+// now — the Lua CAS turns the delete into a no-op in that case.
+//
+// Always called via defer on goroutine exit (success or failure).
+func (c *Cache) ReleaseRecalculateLock(ctx context.Context, clusterID, token string) error {
+	_, err := releaseLockScript.Run(ctx, c.client, []string{recalculateLockKey(clusterID)}, token).Result()
+	// redis.Nil is "script returned nothing" — happens when the Lua returns 0 (key gone).
+	// That's not an error for us; we treat it as "no-op release" per the comment above.
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("release recalculate lock: %w", err)
+	}
+	return nil
 }

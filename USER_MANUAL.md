@@ -8,7 +8,7 @@ Everything an end user needs to install PodOptix, register their first cluster, 
 
 ## What is PodOptix
 
-A single Hub that connects to your workload clusters' Prometheus, computes p99 CPU/memory usage over a rolling window (7d, 10d, or 30d), and recommends resource limits at `ceil(p99 × 2)`. No agents, no sidecars — one Hub queries every cluster's Prometheus remotely.
+A single Hub that connects to your workload clusters' Prometheus, computes p99 CPU/memory usage over a rolling window (7d, 10d, or 30d), and recommends BOTH `request` and `limit` per container — `request = ceil(p99)` (what the scheduler reserves on nodes) and `limit = ceil(p99 × 2)` (hard ceiling before CPU throttle / OOMKill). No agents, no sidecars — one Hub queries every cluster's Prometheus remotely.
 
 ---
 
@@ -19,7 +19,7 @@ A single Hub that connects to your workload clusters' Prometheus, computes p99 C
 | Kubernetes (for Helm install) | 1.24+ |
 | Helm | 3.8+ (OCI support required) |
 | A Prometheus endpoint per cluster you want to analyze | Reachable from the Hub with a bearer token |
-| `kube-state-metrics` scraped by Prometheus | Optional — needed to see current limits alongside recommendations |
+| `kube-state-metrics` scraped by Prometheus | Optional — needed to see current requests + limits alongside recommendations |
 
 > **Air-gapped clusters:** the image + chart live at `ghcr.io/rishabh1270/podoptix` and `ghcr.io/rishabh1270/charts/podoptix` — both public, no auth. Mirror them to your internal registry and override `image.repository` in Helm values.
 
@@ -108,42 +108,84 @@ Click **Register cluster**. Behind the scenes:
 - **`connected` + first sync running** → recommendations appear as they're computed
 - **`disconnected`** → check the URL and token, then click **Edit** to fix
 
+Once recommendations start populating, you have three views:
+
+| Page | URL | What it shows |
+|------|-----|---------------|
+| **Cluster Detail** | `/clusters/:id` | Every recommendation for one cluster |
+| **Recommendations** | `/recommendations` | Cross-cluster view — every container from every cluster, sorted by biggest CPU waste first |
+| **Savings** | `/savings` | Total CPU + memory you can reclaim, adoption %, top-10 waste, per-cluster + per-namespace breakdown |
+
+The Recommendations and Savings pages are the fastest way to see where the biggest wins are across your entire fleet.
+
 ### 4. Reviewing recommendations
 
 The cluster detail page shows a table with:
 
 | Column | What it means |
 |--------|---------------|
-| Namespace / Pod / Container | The workload |
+| Namespace / Workload / Container | The workload — e.g. Deployment `auth-service`, container `api`. All replicas aggregate into one row. |
 | Status | `ready` = has data · `new_service` = not enough history yet |
-| Current CPU / Mem | What's set today, from `kube_pod_container_resource_limits` |
-| Recommended CPU / Mem | `ceil(p99 × 2)` — the engineering sweet spot |
-| ↓% / ↑% | How much smaller/bigger the recommendation is vs current |
+| Current CPU req + limit | What's set today, from `kube_pod_container_resource_requests` and `kube_pod_container_resource_limits` |
+| Current Mem req + limit | Same, for memory |
+| Recommended CPU req + limit | `request = ceil(p99)` · `limit = ceil(p99 × 2)` |
+| Recommended Mem req + limit | Same, for memory |
+| ↓% / ↑% | How much smaller/bigger the recommendation is vs current (savings math uses requests — that's what the scheduler reserves) |
 | Applied | Toggle when you apply the change to your cluster |
+
+> **Why both?** Kubernetes has two levers. `requests` drive scheduling and define the resources the node reserves for your pod (= what you pay for). `limits` are the hard ceiling the kernel enforces (CPU throttle, memory OOMKill). Recommending only one is misleading — PodOptix sets both from the same p99 so you get right-sized scheduling AND a safe runtime ceiling.
 
 ### 5. Applying a recommendation
 
 PodOptix does NOT apply changes automatically — you decide. To apply:
 
-1. Note the recommended values
+1. Note the recommended values — both `request` and `limit` for CPU and memory
 2. Update your Deployment/StatefulSet manifest, e.g.:
    ```yaml
    resources:
+     requests:
+       cpu:    "250m"    # was 1000m — what the scheduler reserves on the node
+       memory: "256Mi"   # was 1Gi
      limits:
-       cpu:    "500m"    # was 2000m
-       memory: "512Mi"   # was 2Gi
+       cpu:    "500m"    # was 2000m — hard ceiling (CPU throttle)
+       memory: "512Mi"   # was 2Gi   — hard ceiling (OOMKill)
    ```
 3. `kubectl apply` the change
-4. In PodOptix, toggle the **Applied** checkbox on that row — used later for savings reports
+4. In PodOptix, click the **✓** button on that row — it flips the recommendation's `applied` flag. Clicking again toggles it back off. The scheduler NEVER touches this flag — it's your audit trail.
+
+**Why toggling matters:** the Savings page splits reclaimed capacity into "already reclaimed" (applied=true) and "still on the table" (applied=false). Without toggling, your Savings dashboard shows zero realized savings forever.
+
+**Under the hood:** `PATCH /api/v1/clusters/:id/recommendations/:recId` with body `{"applied": true}`. The store has exactly one method that writes this flag (`SetRecommendationApplied`) — the scheduler's upsert path cannot touch it. This guarantees that re-syncing a cluster never resets your applied state.
 
 ### 6. Triggering a fresh scan
 
 Click **▶ Recalculate** at the top of the cluster detail page. Behind the scenes:
-- Distributed Redis lock prevents duplicate runs
+- **Fencing-token Redis lock** prevents duplicate runs — scheduler ticks and manual recalcs share the same lock. If a run is already in progress, you get **429 Too Many Requests** with "Recalculation already in progress"
 - Same collect → compute → recommend → upsert pipeline as the scheduler
-- Status updates in real time via polling
+- Status updates in real time via polling (2-min deadline, then "taking longer than expected")
 
 If **Recalculate** is disabled → cluster is currently `disconnected`. Fix connectivity first.
+
+### 7. Orphaned workloads
+
+Every scheduler run (and every manual Recalculate) builds a list of the workloads it just observed in Prometheus. Any recommendation row for the cluster that wasn't observed is **tombstoned** — stamped with a `first_missed_at` timestamp (the time the scheduler **first noticed** the workload was missing — NOT when it was deleted, which we have no way to know). These rows appear in a collapsed **Orphaned workloads** section at the top of the cluster detail page, with a count badge.
+
+Why a workload goes orphan:
+- The Deployment/StatefulSet/DaemonSet was deleted
+- The namespace was deleted
+- The workload was renamed (old name goes orphan, new name appears alive)
+- kube-state-metrics stopped exposing it
+
+**Nothing is deleted automatically.** PodOptix will not touch orphaned rows on its own because a deleted-by-mistake workload would also wipe its historical recommendation — your savings-realised totals would silently drop. You review and clean up:
+
+- **Per row** — the trash icon on an orphan deletes just that row
+- **Bulk** — "Delete all orphaned" wipes every orphan for the cluster in one shot (confirm dialog)
+
+**If the workload comes back**, the next scheduler run clears `first_missed_at` back to NULL and the row returns to the alive table. No action needed on your part.
+
+**Safety gate.** If a scheduler run observes zero workloads (Prometheus hiccupped, kube-state-metrics went missing), PodOptix refuses to mark anything orphaned. Only an actual missing-from-the-set signal creates a tombstone — not an empty scan.
+
+The cross-cluster **Recommendations** page hides orphans by default. Flip the orphan filter to "Only orphaned" to audit across all clusters, or "Include orphaned" to see everything.
 
 ---
 
@@ -171,11 +213,15 @@ All configuration is via environment variables (for direct/binary/Docker) or Hel
 | Value | Default | Purpose |
 |-------|---------|---------|
 | `image.tag` | `0.1.0` | Container image version |
-| `podoptix.replicaCount` | `1` | Scale to N — PodOptix is stateless |
+| `podoptix.replicaCount` | `1` | Scale to N — PodOptix is stateless (ignored when `autoscaling.enabled`) |
 | `postgres.storage.size` | `10Gi` | PVC size for Postgres data |
 | `service.type` | `ClusterIP` | Set to `LoadBalancer` for public access |
 | `service.port` | `8080` | External port |
 | `service.annotations` | `{}` | e.g. AWS NLB / GCP LB tuning |
+| `autoscaling.enabled` | `false` | Turn on HPA — CPU target 70%, memory target 80%, min 1 / max 5 |
+| `networkPolicy.enabled` | `false` | Opt-in NetworkPolicy — restricts pod-to-pod traffic (requires a policy-enforcing CNI) |
+| `networkPolicy.extraIngressNamespaces` | `[]` | Extra namespaces allowed to reach PodOptix (e.g. `["ingress-nginx"]`) |
+| `securityContext.*` | secure defaults | Non-root UID 65532, read-only root FS, all caps dropped, seccomp `RuntimeDefault` — already applied |
 
 Full list: `helm show values oci://ghcr.io/rishabh1270/charts/podoptix --version 0.1.0`
 
@@ -242,7 +288,7 @@ The cluster is `disconnected`. Click **Edit**, verify URL + token, save. PodOpti
 ### No recommendations appear after sync
 
 - Prometheus must have `container_cpu_usage_seconds_total` and `container_memory_working_set_bytes` (from cAdvisor). Most K8s Prometheus installs do.
-- For "current limit" columns to populate, `kube-state-metrics` must be scraped by Prometheus and expose `kube_pod_container_resource_limits`.
+- For "current request" and "current limit" columns to populate, `kube-state-metrics` must be scraped by Prometheus and expose both `kube_pod_container_resource_requests` and `kube_pod_container_resource_limits`.
 - `new_service` status = the pod exists but has no metric history yet. Wait for one full lookback window (7d default).
 
 ### Login fails after upgrade
@@ -274,8 +320,8 @@ No. PodOptix runs as a single Hub in your management cluster and queries each wo
 **Q: How often do recommendations refresh?**
 Automatically every 24 hours per cluster. Also once on startup, once when a cluster is registered, and on-demand via **Recalculate**.
 
-**Q: Why p99 × 2?**
-The p99 covers 99% of real traffic and ignores freak spikes. Doubling gives headroom for growth and unforeseen bursts without the overhead of provisioning for the peak of the peak. It's the engineering sweet spot between reliability (OOMKill avoidance) and cost.
+**Q: Why `request = p99` and `limit = p99 × 2`?**
+The p99 covers 99% of real traffic and ignores freak spikes — that's the right number to reserve on the node (`request`), so the scheduler packs nodes tightly without starving your workload at steady state. Doubling to set the hard ceiling (`limit`) gives headroom for growth and unforeseen bursts without the overhead of provisioning for the peak of the peak. It's the engineering sweet spot between reliability (OOMKill avoidance) and cost.
 
 **Q: Where are Prometheus tokens stored?**
 Encrypted at rest with AES-256-GCM before being written to Postgres. The `ENCRYPTION_KEY` env var is the master key — losing it means all stored tokens become undecryptable. Never rotate mid-deployment.
@@ -291,6 +337,28 @@ Tested on 1.24+. Should work on older versions but not tested.
 
 **Q: What Prometheus versions are supported?**
 Any version supporting `/api/v1/query_range`. Tested on Prometheus 2.x.
+
+---
+
+## Monitoring PodOptix itself
+
+PodOptix exposes its own Prometheus metrics on `GET /metrics` (public, no auth). All metrics use the `podoptix_*` prefix and cover HTTP traffic, scheduler runs, cache hit rate, and container scan counts.
+
+Sample Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: podoptix
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['podoptix.podoptix.svc.cluster.local:8080']
+```
+
+Useful queries once scraped:
+- `rate(podoptix_http_requests_total[5m])` — request rate per endpoint
+- `histogram_quantile(0.99, rate(podoptix_http_request_duration_seconds_bucket[5m]))` — API p99 latency
+- `rate(podoptix_scheduler_runs_total{outcome="failure"}[1h])` — recent scheduler failures
+- `rate(podoptix_cache_hits_total[5m]) / (rate(podoptix_cache_hits_total[5m]) + rate(podoptix_cache_misses_total[5m]))` — Redis cache hit ratio
 
 ---
 

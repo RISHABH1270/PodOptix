@@ -23,7 +23,7 @@ Most Kubernetes teams set resource limits by guessing or copying from similar se
 1. **Over-provisioning** — limits set too high. You pay for CPU and memory that is never used. At scale (hundreds of pods), this waste compounds quickly.
 2. **Under-provisioning** — limits set too low. Pods get OOMKilled or CPU-throttled under load. Incidents happen.
 
-PodOptix queries historical usage data from Prometheus, computes the 99th percentile over a rolling 7-day window, and applies a 2× safety multiplier to produce a right-sized limit recommendation. No guesswork. No manual analysis.
+PodOptix queries historical usage data from Prometheus, computes the 99th percentile over a rolling 7-day window, and recommends BOTH `request` (= `ceil(p99)` — what the scheduler reserves) and `limit` (= `ceil(p99 × 2)` — hard ceiling before CPU throttle / OOMKill). No guesswork. No manual analysis.
 
 **Key design principle:** No agents. No sidecars. Nothing to deploy inside workload clusters. PodOptix runs as a single Hub in your management cluster and queries each workload cluster's existing Prometheus directly.
 
@@ -84,14 +84,15 @@ PodOptix queries historical usage data from Prometheus, computes the 99th percen
 
 | Component | Layer | Description |
 |-----------|-------|-------------|
-| **Web Dashboard** | Presentation | React 18 + TypeScript + Vite + Tailwind — Grafana-style dark theme. Pages: Login, Register, Clusters, Register/Edit Cluster, Cluster Detail (recommendations + recalculate). Talks to backend via `/auth/*` and `/api/v1/*`. Details: [web/DASHBOARD.md](../web/DASHBOARD.md). |
+| **Web Dashboard** | Presentation | React 18 + TypeScript + Vite + Tailwind — Grafana-style dark theme. Pages: Login, Register, Clusters, Register/Edit Cluster, Cluster Detail (per-cluster recommendations + recalculate), **Recommendations (cross-cluster view sorted by biggest waste)**, **Savings dashboard (reclaimable CPU/memory, adoption %, top waste, per-cluster & per-namespace breakdown)**. Talks to backend via `/auth/*` and `/api/v1/*`. Details: [web/DASHBOARD.md](../web/DASHBOARD.md). |
 | **REST API Server** | Presentation | HTTP server (Gin) — CRUD for clusters + recommendations, JWT-protected `/api/v1/*` routes. Serves JSON. |
+| **Metrics** | Presentation | Prometheus `/metrics` endpoint (public, no auth) — exposes `podoptix_*` families for HTTP traffic, scheduler runs, cache hit rate, containers scanned. Self-observability for operators. |
 | **Auth Service** | Service | User registration + login · bcrypt password hashing · JWT token issuance · middleware verifies all protected routes |
 | **Cluster Registry** | Service | Stores Prometheus endpoint URLs and encrypted auth tokens |
 | **Scheduler** | Service | Cron-based job runner — triggers data collection per cluster once per day |
 | **PromQL Engine** | Processing | Queries Prometheus `/api/v1/query_range` with PromQL expressions |
 | **p99 Computation Engine** | Processing | Computes 99th percentile from raw time series over a rolling 7-day window |
-| **Recommendation Engine** | Processing | Applies 2× multiplier · Formats output as YAML resource patches |
+| **Recommendation Engine** | Processing | Emits `request = ceil(p99)` and `limit = ceil(p99 × 2)` per container (CPU + memory) · Formats output as YAML resource patches |
 | **Database (PostgreSQL)** | Storage | Persists cluster config and recommendations — one row per container, updated daily |
 | **Cache (Redis)** | Storage | Caches recommendations per cluster — TTL: 3 hours |
 
@@ -142,14 +143,24 @@ The Hub stores the token encrypted at rest (AES-256-GCM) and begins scheduling d
   Step 4   p99 Computation Engine processes raw time series
            Computes 99th percentile over a rolling window (default: 7 days)
 
-  Step 5   Recommendation Engine calculates new limits
-           CPU  limit = p99_cpu × 2   (unit: millicores)
-           Mem  limit = p99_mem × 2   (unit: MiB)
+  Step 5   Recommendation Engine calculates new requests + limits
+           CPU  request = ceil(p99_cpu)       limit = ceil(p99_cpu × 2)   (unit: millicores)
+           Mem  request = ceil(p99_mem)       limit = ceil(p99_mem × 2)   (unit: MiB)
+           request = what the K8s scheduler reserves on the node (= what you pay for)
+           limit   = hard ceiling before CPU throttle / memory OOMKill
 
-  Step 6   Recommendations UPSERTed — one row per container, updated in place
-           Unique key: (cluster_id, namespace, pod_name, container_name)
+  Step 6   Recommendations UPSERTed — one row per workload-container, updated in place
+           Unique key: (cluster_id, namespace, workload_kind, workload_name, container_name)
+           Workload resolved from pod via kube_pod_owner → kube_replicaset_owner
+           ReplicaSet collapses to parent Deployment; all replicas aggregate into one row
 
-  Step 7   Dashboard displays per namespace / per pod recommendations
+  Step 7   Workloads NOT observed this run are stamped first_missed_at = NOW()
+           (SAFETY GATE: no-op if the scheduler saw zero workloads — Prometheus hiccup
+            must never orphan an entire cluster)
+
+  Step 8   Dashboard displays per namespace / per workload recommendations
+           Orphaned workloads appear in a collapsed section with the first-missed-at timestamp
+           Operator reviews + deletes per-row or in bulk; nothing is auto-deleted
            REST API serves YAML patches ready for kubectl apply
 ```
 
@@ -157,29 +168,47 @@ The Hub stores the token encrypted at rest (AES-256-GCM) and begins scheduling d
 
 ## Scheduler Flow
 
-The Scheduler is a cron-based job runner. It runs once per day and iterates over every registered cluster:
+The Scheduler is a cron-based job runner. It runs once per day and iterates over every registered cluster, processing up to **5 clusters in parallel** (buffered-channel semaphore + WaitGroup barrier so the next tick never overlaps the current batch):
 
 ```
-Scheduler (cron: once/day)
+Scheduler (cron: once/day · max 5 clusters parallel)
         │
-        ├── For each cluster in Cluster Registry
+        ├── For each cluster (via goroutine pool of 5)
+        │         │
+        │         ├── Acquire fencing-token Redis lock
+        │         │   (shared with manual /recalculate — see below)
+        │         │   If already held → log "skipped" and return
         │         │
         │         ├── Decrypt Prometheus token (AES-256-GCM)
         │         │
         │         ├── PromQL Engine → query_range (CPU + Memory, lookback window)
+        │         │                   + kube_pod_owner + kube_replicaset_owner
+        │         │                   → collapse pods into workloads
+        │         │                   → MAX-across-replicas aggregation per timestamp
         │         │
         │         ├── p99 Computation Engine → quantile(0.99, time_series)
         │         │
-        │         ├── Recommendation Engine → p99 × 2
+        │         ├── Recommendation Engine → request = ceil(p99), limit = ceil(p99 × 2)
         │         │
-        │         └── UPSERT into recommendations table
+        │         ├── UPSERT into recommendations table (one row per workload-container)
+        │         │   seenKeys captured BEFORE the upsert (false-orphan guard — a transient
+        │         │   DB failure must not cause MarkOrphaned to stamp a workload that
+        │         │   Prometheus just confirmed exists)
+        │         │
+        │         ├── MarkOrphaned(cluster, seenKeys) → stamp first_missed_at = NOW()
+        │         │                                      on rows NOT in seenKeys
+        │         │                                      (no-op if seenKeys is empty)
+        │         │
+        │         └── Release lock via Lua CAS (only deletes OUR lock, by token)
         │
-        └── Done — next run in 24 hours
+        └── wg.Wait() — all parallel runs done; next tick in 24h
 ```
 
-**Two triggers for recalculation:**
+**Two triggers for recalculation (never run concurrently thanks to the shared lock):**
 1. **Automatic** — scheduler runs once per day for all clusters (also runs on startup for all registered clusters)
-2. **Manual** — `POST /api/v1/clusters/:id/recalculate` triggers on-demand refresh; returns 202 immediately; uses a distributed Redis lock (10 min) to prevent duplicate runs — returns 429 if already in progress
+2. **Manual** — `POST /api/v1/clusters/:id/recalculate` triggers on-demand refresh; returns 202 immediately; uses the **same** fencing-token Redis lock (10 min TTL) as the scheduler — returns 429 if already in progress
+
+**Why fencing tokens (not plain SETNX + DEL):** if a pipeline run exceeds the lock TTL (10 min), the lock expires, someone else acquires it, and our stale "release" could DEL their lock. The fencing-token pattern stores a random UUID as the lock value; the release Lua script does `if GET(key)==our_token then DEL(key) else 0` atomically on the Redis server — our stale release becomes a no-op if we lost ownership.
 
 ---
 

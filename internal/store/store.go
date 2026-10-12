@@ -23,29 +23,35 @@ type Store struct {
 // ── Step 1: EnsureDatabase ────────────────────────────────────────────────────
 
 // EnsureDatabase creates the target database if it does not already exist.
-// Connects to the default "postgres" database first since the target may not exist yet.
+// Connects to the default "postgres" admin database first since the target may not exist yet.
+//
+// Uses the ORIGINAL parsed connection config (mutated to target the "postgres" DB) so
+// TLS settings, cert paths, connect_timeout, and anything else the operator put in
+// DATABASE_URL are preserved for the admin connection too.
 func EnsureDatabase(databaseURL string) error {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return fmt.Errorf("parse database url: %w", err)
 	}
-
 	dbName := cfg.ConnConfig.Database
 
-	adminURL := fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=disable",
-		cfg.ConnConfig.User,
-		cfg.ConnConfig.Password,
-		cfg.ConnConfig.Host,
-		cfg.ConnConfig.Port,
-	)
+	// Copy the parsed config and point it at the "postgres" admin DB.
+	// Copy() is defensive — ensures we never mutate the caller's cfg struct.
+	adminCfg := cfg.ConnConfig.Copy()
+	adminCfg.Database = "postgres"
 
-	conn, err := pgx.Connect(context.Background(), adminURL)
+	// Startup timeouts — if PG is unreachable, fail fast with a clean error instead
+	// of hanging until Kubernetes' livenessProbe kills the pod minutes later.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	conn, err := pgx.ConnectConfig(ctx, adminCfg)
 	if err != nil {
-		return fmt.Errorf("connect to postgres: %w", err)
+		return fmt.Errorf("connect to postgres admin db: %w", err)
 	}
 	defer conn.Close(context.Background())
 
-	_, err = conn.Exec(context.Background(), "CREATE DATABASE "+dbName)
+	_, err = conn.Exec(ctx, "CREATE DATABASE "+dbName)
 	if err != nil {
 		// 42P04 = "database already exists" — stable across PostgreSQL versions and locales
 		var pgErr *pgconn.PgError
@@ -54,45 +60,59 @@ func EnsureDatabase(databaseURL string) error {
 		}
 		return fmt.Errorf("create database: %w", err)
 	}
-
 	return nil
 }
 
 // ── Step 2: SyncSchema ────────────────────────────────────────────────────────
 
-// SyncSchema runs all SQL migration files from migrations/ in sequence.
-// Skips already applied migrations. Auto-fixes dirty state from a previous crash.
+// SyncSchema applies pending migration files from migrations/ in sequence.
+// If a previous run crashed mid-migration, the schema_migrations table will be
+// in a "dirty" state. We DO NOT auto-fix dirty state — Force() only updates
+// metadata, it doesn't inspect the actual schema. Auto-forcing to the current
+// (failed) version would silently mark an unfinished migration as applied,
+// leaving the schema partially migrated with no warning. That's worse than a
+// loud failure.
+//
+// On dirty state: SyncSchema returns an error pointing the operator at the
+// migrate CLI so they can inspect, roll back manually, and force to the last
+// known-good version before restarting the service.
 func SyncSchema(databaseURL string) error {
 	m, err := migrate.New("file://migrations", databaseURL)
 	if err != nil {
 		return fmt.Errorf("create schema syncer: %w", err)
 	}
 
+	// Pre-flight: is the migrations table in a dirty state from a previous crash?
+	version, dirty, vErr := m.Version()
+	if vErr != nil && vErr != migrate.ErrNilVersion {
+		return fmt.Errorf("read current migration version: %w", vErr)
+	}
+	if dirty {
+		return fmt.Errorf(
+			"migrations are in a DIRTY state at version %d (a previous migration crashed).\n"+
+				"  Inspect the schema manually, then force to the last known-good version:\n"+
+				"    migrate -database $DATABASE_URL -path migrations force %d\n"+
+				"  Then restart the service",
+			version, version-1,
+		)
+	}
+
+	// Clean state — apply any pending migrations.
 	err = m.Up()
 	if err == migrate.ErrNoChange {
 		return nil
 	}
 	if err != nil {
-		version, _, vErr := m.Version()
-		if vErr == nil && version > 0 {
-			if fErr := m.Force(int(version)); fErr == nil {
-				if rErr := m.Up(); rErr != nil && rErr != migrate.ErrNoChange {
-					return fmt.Errorf("sync schema after force: %w", rErr)
-				}
-				return nil
-			}
-		}
-		return fmt.Errorf("sync schema: %w", err)
+		return fmt.Errorf("apply migrations: %w", err)
 	}
-
 	return nil
 }
 
 // ── Step 3: New ───────────────────────────────────────────────────────────────
 
-// New creates the connection pool and returns *Store — a pointer to the Store
-// which holds the address of the pool allocated in heap memory.
-// Ping() is called on startup to fail fast if the database is unreachable.
+// New opens the connection pool with 10/2 max/min tuning and verifies connectivity
+// with Ping. Startup is capped at 30s so an unreachable DB fails fast with a clean
+// error instead of hanging until K8s' livenessProbe fires.
 func New(databaseURL string) (*Store, error) {
 	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
@@ -104,12 +124,16 @@ func New(databaseURL string) (*Store, error) {
 	config.MaxConnLifetime = time.Hour
 	config.MaxConnIdleTime = 30 * time.Minute
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("connect to database: %w", err)
 	}
 
-	if err := pool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close() // don't leak the half-open pool on a ping failure
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 

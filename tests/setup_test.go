@@ -20,6 +20,7 @@ import (
 
 var (
 	ts      *httptest.Server
+	db      *store.Store // exposed for tests that exercise store methods directly
 	client  = &http.Client{}
 	passed  int
 	failed  int
@@ -146,7 +147,7 @@ func TestMain(m *testing.M) {
 		panic("failed to sync test schema: " + err.Error())
 	}
 
-	db, err := store.New(testDBURL)
+	db, err = store.New(testDBURL)
 	if err != nil {
 		panic("failed to connect to test database: " + err.Error())
 	}

@@ -104,10 +104,18 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 ### `health_test.go` (1 test)
 - `GET /healthz` returns 200 + `{"status":"ok"}`
 
-### `auth_test.go` (~10 tests)
+### `metrics_test.go` (~3 tests)
+- `GET /metrics` returns 200 with Prometheus text exposition format (no auth required)
+- Response body contains the `podoptix_*` metric families (HTTP, scheduler, cache)
+- HTTP counter increments after a real request through the router
+
+### `auth_test.go` (~15 tests)
 - Register creates user, returns JWT
 - Register with duplicate email → 409
-- Register without password → 400
+- Register with short password (<8) → 400
+- Register with malformed email (missing `@`) → 400
+- Case-variant emails collide (`CASE@PodOptix.IO` === `case@podoptix.io`)
+- Login accepts case variants of registered email
 - Login with correct password → 200 + JWT
 - Login with wrong password → 401
 - Login with unknown email → 401 (same message — anti-enumeration)
@@ -116,12 +124,13 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 - Protected route with invalid token → 401
 - Protected route with valid token → 200
 
-### `clusters_test.go` (~13 tests)
+### `clusters_test.go` (~15 tests)
 - POST creates cluster, returns 201 with `last_synced_at: "not yet synced"`
 - POST without required fields → 400
 - POST with invalid lookback_window (e.g. `99d`) → 400
 - POST without auth → 401
-- GET list returns array (empty if none)
+- POST with duplicate `cluster_name` → 409 (via `ErrClusterNameTaken` sentinel)
+- GET list returns array (empty if none, never null)
 - GET by ID returns cluster
 - GET unknown ID → 404
 - PUT updates name
@@ -130,15 +139,35 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 - DELETE returns 204
 - DELETE then GET → 404
 - DELETE unknown ID → 404
+- DELETE cascade — deleting a cluster also deletes all its recommendations (via `ON DELETE CASCADE`)
 
-### `recommendations_test.go` (~7 tests)
+### `recommendations_test.go` (~20 tests)
 - GET returns empty array for new cluster
 - GET unknown cluster → empty array
 - GET without auth → 401
 - POST recalculate → 202 accepted
-- POST recalculate twice → 429 (distributed lock)
+- POST recalculate twice → 429 (fencing-token Redis lock)
 - POST recalculate unknown cluster → 404
 - POST without auth → 401
+- **PATCH applied** — toggle true then false, verify DB state
+- **PATCH applied** — flag survives next scheduler upsert (regression guard — scheduler must never reset operator's choice)
+- PATCH with missing `applied` field → 400
+- PATCH unknown recId → 404
+- PATCH without auth → 401
+- DELETE single rec → removed from list, cache invalidated
+- DELETE unknown recId → 404
+- DELETE single without auth → 401
+- DELETE bulk `?orphaned=true` → removes only orphaned rows
+- DELETE bulk WITHOUT `?orphaned=true` → 400 (footgun guard)
+- DELETE bulk without auth → 401
+
+### `orphan_test.go` (6 tests — direct store-level)
+- `MarkOrphaned` stamps rows NOT in `seenKeys`
+- Re-upserting an orphaned workload clears its tombstone (un-orphan)
+- Safety gate — empty `seenKeys` is a no-op (Prometheus hiccup must not stamp everything orphaned)
+- Already-orphaned rows keep their ORIGINAL `first_missed_at` on subsequent misses (not re-stamped)
+- `DeleteOrphaned` removes only orphaned rows, leaves live ones alone
+- `DeleteRecommendation` removes one row by id, returns `ErrRecommendationNotFound` sentinel on unknown id
 
 ### `auth_encrypt_test.go` (5 tests — unit)
 - AES round-trip works
@@ -157,20 +186,20 @@ This is EXACTLY what `curl` does — full HTTP round trip through the real Gin s
 - Typical 7d workload — 168 values + 1 spike → spike ignored
 
 ### `recommender_test.go` (7 tests — unit)
-- p99 × 2 = recommended limit (main formula)
+- request = ceil(p99), limit = ceil(p99 × 2) — main formula, both CPU + memory
 - Nil metrics → error
 - Empty CPU values → error
 - Empty memory values → error
-- Single value → recommended is double
+- Single value → recommended request = value, limit = 2 × value
 - GenerateAll with mixed containers → some ready, some new_service
 - GenerateAll with no containers → empty slice
 
-### `collector_test.go` (13 tests — unit)
+### `collector_test.go` — unit
 - ParseDuration handles days/hours/minutes
 - ParseDuration with invalid input → error
-- ExtractValues parses Prometheus JSON format
-- ExtractValues skips invalid values
 - Collect (with mock Prometheus via `httptest.NewServer`) — HTTP calls, merging, auth header attachment
+- Multi-replica collapse — two pods owned by same Deployment produce one row with MAX aggregation
+- Owner lookup unavailable → falls back to bare Pod naming
 
 ---
 

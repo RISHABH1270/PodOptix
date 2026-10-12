@@ -72,6 +72,12 @@ helm install podoptix ./deploy/helm/podoptix \
 | `service.type` | `ClusterIP` | Set to `LoadBalancer` for public access |
 | `service.port` | `8080` | External port |
 | `service.annotations` | `{}` | e.g. AWS NLB tuning |
+| `autoscaling.enabled` | `false` | Enable HPA — scales PodOptix Deployment on CPU/memory |
+| `autoscaling.minReplicas` / `maxReplicas` | `1` / `5` | HPA bounds |
+| `networkPolicy.enabled` | `false` | Restrict pod-to-pod traffic (requires policy-enforcing CNI) |
+| `networkPolicy.extraIngressNamespaces` | `[]` | Extra namespaces allowed to reach PodOptix (e.g. `["ingress-nginx"]`) |
+| `securityContext.readOnlyRootFilesystem` | `true` | Prevent runtime modification of the filesystem |
+| `securityContext.runAsNonRoot` | `true` | Enforced by distroless image (UID 65532) |
 
 ## Public access
 

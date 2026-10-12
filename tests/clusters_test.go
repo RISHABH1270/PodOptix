@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -61,6 +62,16 @@ func TestClusters(t *testing.T) {
 				`{"cluster_name":"no-auth","prometheus_url":"http://p.test","prometheus_token":"tok"}`, "")
 			resp.Body.Close()
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		})
+
+		t.Run("duplicate cluster_name returns 409", func(t *testing.T) {
+			track(t)
+			createCluster(t, "dup-name", "http://p.first.test")
+			resp := do(t, http.MethodPost, "/api/v1/clusters",
+				`{"cluster_name":"dup-name","prometheus_url":"http://p.second.test","prometheus_token":"tok"}`, tok)
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusConflict, resp.StatusCode)
+			assert.Contains(t, body, "already exists")
 		})
 	})
 
@@ -143,6 +154,23 @@ func TestClusters(t *testing.T) {
 			resp := do(t, http.MethodDelete, "/api/v1/clusters/non-existent-id", "", tok)
 			resp.Body.Close()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		})
+
+		t.Run("cascade — deleting a cluster also deletes its recommendations", func(t *testing.T) {
+			track(t)
+			cid := createCluster(t, "cascade-test", "http://prom.cascade.test")
+			// Seed a recommendation directly so we hit the FK on delete.
+			rec := newRec(cid, "ns", "Deployment", "svc", "api")
+			assert.NoError(t, db.UpsertRecommendation(context.Background(), rec))
+
+			resp := do(t, http.MethodDelete, "/api/v1/clusters/"+cid, "", tok)
+			resp.Body.Close()
+			assert.Equal(t, http.StatusNoContent, resp.StatusCode, "cluster delete must succeed even when recommendations exist")
+
+			// Rec rows should be gone too (cascade)
+			recs, err := db.ListByCluster(context.Background(), cid)
+			assert.NoError(t, err)
+			assert.Empty(t, recs, "recommendations should cascade-delete with the cluster")
 		})
 	})
 }

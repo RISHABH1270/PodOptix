@@ -37,6 +37,49 @@ func TestAuth(t *testing.T) {
 			resp.Body.Close()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		})
+
+		t.Run("case variants of the same email are the same account", func(t *testing.T) {
+			track(t)
+			// First register with lowercase
+			do(t, http.MethodPost, "/auth/register",
+				`{"email":"case@podoptix.io","password":"secret123"}`, "").Body.Close()
+			// Try again with upper-case — must collide (store normalizes to lowercase)
+			resp := do(t, http.MethodPost, "/auth/register",
+				`{"email":"CASE@PodOptix.IO","password":"secret123"}`, "")
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusConflict, resp.StatusCode)
+			assert.Contains(t, body, "already exists")
+		})
+
+		t.Run("login accepts case variants of registered email", func(t *testing.T) {
+			track(t)
+			do(t, http.MethodPost, "/auth/register",
+				`{"email":"caselogin@podoptix.io","password":"secret123"}`, "").Body.Close()
+			// Same user, mixed-case login
+			resp := do(t, http.MethodPost, "/auth/login",
+				`{"email":"CaseLogin@PodOptix.IO","password":"secret123"}`, "")
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Contains(t, body, "token")
+		})
+
+		t.Run("short password rejected with 400", func(t *testing.T) {
+			track(t)
+			resp := do(t, http.MethodPost, "/auth/register",
+				`{"email":"shortpw@podoptix.io","password":"abc"}`, "")
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Contains(t, body, "8")
+		})
+
+		t.Run("malformed email rejected with 400", func(t *testing.T) {
+			track(t)
+			resp := do(t, http.MethodPost, "/auth/register",
+				`{"email":"not-an-email","password":"secret123"}`, "")
+			body := readBody(t, resp)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Contains(t, body, "valid email")
+		})
 	})
 
 	t.Run("POST /auth/login", func(t *testing.T) {
