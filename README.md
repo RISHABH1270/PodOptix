@@ -248,7 +248,7 @@ Delivered in the order a well-run engineering cycle would ship them — foundati
 
 ### 6 · Operator UX
 
-- [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind, Grafana-dark theme, served from the same Go binary via `go:embed`
+- [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind, dark theme, served from the same Go binary via `go:embed`
 - [x] Cross-cluster recommendations view — sortable by biggest waste, filterable by status / cluster / orphaned
 - [x] Resource savings dashboard — potential + realized CPU/memory, adoption %, per-cluster + per-namespace breakdown
 - [x] **Applied-flag toggle** — `PATCH` endpoint flips `applied`; the scheduler never touches it (hardcoded `FALSE` on INSERT, omitted from `ON CONFLICT UPDATE SET`), so operator choices survive every re-sync
