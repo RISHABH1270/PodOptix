@@ -19,7 +19,7 @@
 
 ## The Problem
 
-> [!CAUTION]
+> [!WARNING]
 > **3:12 AM.** PagerDuty fires — a **P1 alert**. The on-call engineer gets paged.
 >
 > **`payment-api` is OOMKilled in production.**
