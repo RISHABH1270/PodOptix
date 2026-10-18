@@ -115,7 +115,7 @@ cp .env.example .env
 docker compose up -d           # PostgreSQL + Redis + local Prometheus
 ```
 
-Then pick one:
+Then pick one. **Option A** is for fast frontend iteration (Vite HMR, <100 ms on CSS/TSX change). **Option B** is the exact single-binary artifact production ships — slower loop (~25 s per rebuild), zero divergence from prod. **Option C** goes one step further and runs that same artifact inside the distroless container image.
 
 ### Option A — Development (hot reload)
 
