@@ -68,7 +68,7 @@ No more guessing. No more waste.
 
 PodOptix runs as a single **Master Hub** deployed in your management or ops Kubernetes cluster. No agents. No sidecars. Nothing to deploy inside your workload clusters.
 
-The Hub connects directly to each cluster's Prometheus HTTP API, queries p99 metrics, and generates recommendations — all from one place.
+The Hub connects directly to each cluster's Prometheus — HTTP or HTTPS, authenticated with a Bearer token (encrypted at rest with AES-256-GCM) — queries p99 metrics, and generates recommendations, all from one place.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
