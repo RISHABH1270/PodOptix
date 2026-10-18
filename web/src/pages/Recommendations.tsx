@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RefreshCw, Server } from 'lucide-react'
 import { api, RecommendationWithCluster } from '../lib/api'
