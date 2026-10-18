@@ -221,7 +221,10 @@ export function ClusterDetailPage() {
       )}
 
       {/* ── recommendations panel ─────────────────────────────── */}
-      <div className="bg-surface border border-border rounded-lg shadow-card overflow-hidden">
+      {/* No overflow-hidden here — the Filters popover needs to escape the panel's
+          rounded edge. min-h gives the panel enough height that an empty state still
+          visually contains the popover. */}
+      <div className="bg-surface border border-border rounded-lg shadow-card min-h-[480px]">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="text-base font-semibold text-ink">Recommendations</div>

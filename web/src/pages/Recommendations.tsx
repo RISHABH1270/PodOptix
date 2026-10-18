@@ -74,7 +74,9 @@ export function RecommendationsPage() {
       )}
 
       {/* ── filters ────────────────────────────────────────────── */}
-      <div className="bg-surface border border-border rounded-lg shadow-card">
+      {/* min-h ensures the panel is tall enough to visually contain the
+          Filters popover even when the table is empty. */}
+      <div className="bg-surface border border-border rounded-lg shadow-card min-h-[480px]">
         <RecommendationsToolbar
           state={filters}
           onChange={setFilters}
