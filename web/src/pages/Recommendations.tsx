@@ -50,7 +50,7 @@ export function RecommendationsPage() {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-accent font-semibold mb-1">Recommendations</div>
           <h1 className="text-2xl font-bold text-ink">Cross-cluster overview</h1>
-          <p className="text-sm text-muted mt-1">Every container in every cluster, sorted by biggest waste first.</p>
+          <p className="text-sm text-muted mt-1">Every workload-container in every cluster, sorted by biggest waste first.</p>
         </div>
         <button
           onClick={load}
@@ -63,7 +63,7 @@ export function RecommendationsPage() {
 
       {/* ── stat cards ──────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total containers"     value={rows.length.toString()} />
+        <StatCard label="Workload containers"  value={rows.length.toString()} />
         <StatCard label="Ready"                value={stats.ready.toString()}   accent="ok" />
         <StatCard label="CPU waste (m)"        value={stats.totalCpuSaved.toLocaleString()} accent="warn"   suffix="m" />
         <StatCard label="Memory waste (Mi)"    value={stats.totalMemSaved.toLocaleString()} accent="warn"   suffix="Mi" />
