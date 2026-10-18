@@ -20,7 +20,8 @@
 ## The Problem
 
 > [!CAUTION]
-> **3:12 AM.** PagerDuty fires. The on-call engineer gets paged.
+> **3:12 AM.** PagerDuty fires — a **P1 alert**. The on-call engineer gets paged.
+>
 > **`payment-api` is OOMKilled in production.**
 
 The root cause? Someone copied resource limits from an unrelated service six months ago. The fix takes 2 minutes. Finding it took 40 minutes. It will happen again.
@@ -45,9 +46,11 @@ PodOptix connects to your Prometheus, computes **p99** from real usage, and reco
 
 **The formula** (same for CPU and memory):
 
-```
-request = ceil(p99)         ← scheduler reserves this · pod is guaranteed this much
-limit   = ceil(p99 × 2)     ← hard ceiling · CPU gets throttled, pod gets OOMKilled on memory overrun
+```text
+request = ceil(p99)      # scheduler reserves this on the node
+                         # pod is guaranteed at least this much
+limit   = ceil(p99 × 2)  # hard ceiling
+                         # CPU → throttled   ·   Memory → OOMKilled
 ```
 
 **Example** — a container averaging 120m CPU and 180Mi RAM at the 99th percentile:
@@ -65,7 +68,7 @@ No more guessing. No more waste.
 
 PodOptix runs as a single **Master Hub** deployed in your management or ops Kubernetes cluster. No agents. No sidecars. Nothing to deploy inside your workload clusters.
 
-The Hub connects directly to each cluster's Prometheus HTTP API, queries p99 metrics, and generates recommendations — all from one place.
+The Hub connects directly to each cluster's Prometheus — HTTP or HTTPS, authenticated with a Bearer token (encrypted at rest with AES-256-GCM) — queries p99 metrics, and generates recommendations, all from one place.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -92,8 +95,8 @@ PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tail
 - **Login / Register** — email + password, JWT in localStorage
 - **Clusters** — list all registered clusters with status pills + stat cards
 - **Register Cluster / Edit Cluster** — form with lookback picker (7d | 10d | 30d)
-- **Cluster Detail** — per-container recommendations table + one-click recalculate
-- **Recommendations** — every recommendation across every cluster, with applied vs pending status, sortable by cluster, namespace, or biggest potential saving
+- **Cluster Detail** — per workload-container recommendations table (replicas collapsed via `kube_pod_owner` + `kube_replicaset_owner`), one-click recalculate
+- **Recommendations** — every recommendation across every cluster · search by namespace/workload/container · multi-select Filters (Status: Ready / New service · Applied: Pending / Applied · Lifecycle: Alive / Orphaned) · sort by biggest CPU waste, biggest memory waste, cluster, or namespace
 - **Savings** — CPU and memory already **reclaimed** (applied) + still **on the table** (pending), adoption %, top opportunities, per-cluster + per-namespace breakdown
 
 Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
