@@ -95,7 +95,7 @@ PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tail
 - **Login / Register** — email + password, JWT in localStorage
 - **Clusters** — list all registered clusters with status pills + stat cards
 - **Register Cluster / Edit Cluster** — form with lookback picker (7d | 10d | 30d)
-- **Cluster Detail** — per-container recommendations table + one-click recalculate
+- **Cluster Detail** — per workload-container recommendations table (replicas collapsed via `kube_pod_owner` + `kube_replicaset_owner`), orphan section, one-click recalculate
 - **Recommendations** — every recommendation across every cluster, with applied vs pending status, sortable by cluster, namespace, or biggest potential saving
 - **Savings** — CPU and memory already **reclaimed** (applied) + still **on the table** (pending), adoption %, top opportunities, per-cluster + per-namespace breakdown
 
