@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, RefreshCw, Server, ArrowUpDown } from 'lucide-react'
+import { RefreshCw, Server } from 'lucide-react'
 import { api, RecommendationWithCluster } from '../lib/api'
 import { StatusPill } from '../components/StatusPill'
-
-type SortKey = 'cpu_delta' | 'mem_delta' | 'cluster' | 'namespace'
+import { RecommendationsToolbar } from '../components/RecommendationsToolbar'
+import { useRecommendationFilters, RECOMMENDATIONS_SORT } from '../lib/useRecommendationFilters'
 
 export function RecommendationsPage() {
-  const [rows, setRows]         = useState<RecommendationWithCluster[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
-  const [search, setSearch]     = useState('')
+  const [rows, setRows]                   = useState<RecommendationWithCluster[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState<string | null>(null)
   const [clusterFilter, setClusterFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter]   = useState<string>('all')
-  const [orphanFilter, setOrphanFilter]   = useState<'alive' | 'orphaned' | 'all'>('alive')
-  const [sortKey, setSortKey]   = useState<SortKey>('cpu_delta')
+
+  // Shared filter / sort state (search + multi-select Filters + Sort)
+  const { state: filters, setState: setFilters, visible: filteredByShared } =
+    useRecommendationFilters(rows)
+
+  // Cross-cluster-only: narrow by cluster_name AFTER the shared filters run.
+  const filtered = useMemo(
+    () => clusterFilter === 'all' ? filteredByShared : filteredByShared.filter(r => r.cluster_name === clusterFilter),
+    [filteredByShared, clusterFilter],
+  )
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -35,44 +41,11 @@ export function RecommendationsPage() {
     }
   }
 
-  // unique cluster names for the filter dropdown
+  // unique cluster names for the extra "before" dropdown
   const clusterOptions = useMemo(() => {
     const set = new Set(rows.map(r => r.cluster_name))
     return Array.from(set).sort()
   }, [rows])
-
-  // filter + sort
-  const filtered = useMemo(() => {
-    let out = rows
-    if (orphanFilter === 'alive')    out = out.filter(r => !r.first_missed_at)
-    if (orphanFilter === 'orphaned') out = out.filter(r =>  r.first_missed_at)
-    if (clusterFilter !== 'all')     out = out.filter(r => r.cluster_name === clusterFilter)
-    if (statusFilter !== 'all')      out = out.filter(r => r.status === statusFilter)
-    if (search) {
-      const q = search.toLowerCase()
-      out = out.filter(r =>
-        r.namespace.toLowerCase().includes(q) ||
-        r.workload_name.toLowerCase().includes(q) ||
-        r.container_name.toLowerCase().includes(q),
-      )
-    }
-    const sorted = [...out]
-    switch (sortKey) {
-      case 'cpu_delta':
-        sorted.sort((a, b) => (b.current_cpu_limit - b.recommended_cpu_limit) - (a.current_cpu_limit - a.recommended_cpu_limit))
-        break
-      case 'mem_delta':
-        sorted.sort((a, b) => (b.current_mem_limit - b.recommended_mem_limit) - (a.current_mem_limit - a.recommended_mem_limit))
-        break
-      case 'cluster':
-        sorted.sort((a, b) => a.cluster_name.localeCompare(b.cluster_name))
-        break
-      case 'namespace':
-        sorted.sort((a, b) => a.namespace.localeCompare(b.namespace))
-        break
-    }
-    return sorted
-  }, [rows, clusterFilter, statusFilter, orphanFilter, search, sortKey])
 
   const stats = useMemo(() => {
     const ready       = rows.filter(r => r.status === 'ready').length
@@ -113,17 +86,11 @@ export function RecommendationsPage() {
 
       {/* ── filters ────────────────────────────────────────────── */}
       <div className="bg-surface border border-border rounded-lg shadow-card">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative">
-              <Search className="w-4 h-4 text-dim absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Filter namespace, workload, container…"
-                className="w-72 bg-elevated border border-border focus:border-accent rounded-md pl-9 pr-3 py-1.5 text-sm text-ink placeholder:text-dim outline-none transition"
-              />
-            </div>
+        <RecommendationsToolbar
+          state={filters}
+          onChange={setFilters}
+          sortOptions={RECOMMENDATIONS_SORT}
+          before={
             <select
               value={clusterFilter}
               onChange={(e) => setClusterFilter(e.target.value)}
@@ -132,41 +99,8 @@ export function RecommendationsPage() {
               <option value="all">All clusters</option>
               {clusterOptions.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-elevated border border-border rounded-md px-2 py-1.5 text-sm text-ink outline-none"
-            >
-              <option value="all">All statuses</option>
-              <option value="ready">ready</option>
-              <option value="new_service">new_service</option>
-            </select>
-            <select
-              value={orphanFilter}
-              onChange={(e) => setOrphanFilter(e.target.value as 'alive' | 'orphaned' | 'all')}
-              className="bg-elevated border border-border rounded-md px-2 py-1.5 text-sm text-ink outline-none"
-              title="Orphans are workloads that disappeared from the last scheduler scan"
-            >
-              <option value="alive">Hide orphaned</option>
-              <option value="orphaned">Only orphaned</option>
-              <option value="all">Include orphaned</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted">
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            <span>Sort:</span>
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="bg-elevated border border-border rounded-md px-2 py-1 text-xs text-ink outline-none"
-            >
-              <option value="cpu_delta">Biggest CPU waste</option>
-              <option value="mem_delta">Biggest memory waste</option>
-              <option value="cluster">Cluster</option>
-              <option value="namespace">Namespace</option>
-            </select>
-          </div>
-        </div>
+          }
+        />
 
         {loading && rows.length === 0 ? (
           <div className="text-center py-16 text-dim text-sm">Loading recommendations…</div>
