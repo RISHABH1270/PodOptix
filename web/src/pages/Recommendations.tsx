@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { RefreshCw, Server } from 'lucide-react'
 import { api, RecommendationWithCluster } from '../lib/api'
@@ -7,20 +7,15 @@ import { RecommendationsToolbar } from '../components/RecommendationsToolbar'
 import { useRecommendationFilters, RECOMMENDATIONS_SORT } from '../lib/useRecommendationFilters'
 
 export function RecommendationsPage() {
-  const [rows, setRows]                   = useState<RecommendationWithCluster[]>([])
-  const [loading, setLoading]             = useState(true)
-  const [error, setError]                 = useState<string | null>(null)
-  const [clusterFilter, setClusterFilter] = useState<string>('all')
+  const [rows, setRows]         = useState<RecommendationWithCluster[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
 
-  // Shared filter / sort state (search + multi-select Filters + Sort)
-  const { state: filters, setState: setFilters, visible: filteredByShared } =
+  // Shared filter / sort state. Cluster narrowing is handled via the
+  // "Cluster" sort key (groups rows) and the search box (type the name).
+  // A dedicated cluster dropdown was redundant and crowded the toolbar.
+  const { state: filters, setState: setFilters, visible: filtered } =
     useRecommendationFilters(rows)
-
-  // Cross-cluster-only: narrow by cluster_name AFTER the shared filters run.
-  const filtered = useMemo(
-    () => clusterFilter === 'all' ? filteredByShared : filteredByShared.filter(r => r.cluster_name === clusterFilter),
-    [filteredByShared, clusterFilter],
-  )
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -40,12 +35,6 @@ export function RecommendationsPage() {
       setRows(prev); setError(err.message ?? 'Failed to update applied flag')
     }
   }
-
-  // unique cluster names for the extra "before" dropdown
-  const clusterOptions = useMemo(() => {
-    const set = new Set(rows.map(r => r.cluster_name))
-    return Array.from(set).sort()
-  }, [rows])
 
   const stats = useMemo(() => {
     const ready       = rows.filter(r => r.status === 'ready').length
@@ -90,16 +79,6 @@ export function RecommendationsPage() {
           state={filters}
           onChange={setFilters}
           sortOptions={RECOMMENDATIONS_SORT}
-          before={
-            <select
-              value={clusterFilter}
-              onChange={(e) => setClusterFilter(e.target.value)}
-              className="bg-elevated border border-border rounded-md px-2 py-1.5 text-sm text-ink outline-none"
-            >
-              <option value="all">All clusters</option>
-              {clusterOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          }
         />
 
         {loading && rows.length === 0 ? (

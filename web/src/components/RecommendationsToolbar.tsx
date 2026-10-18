@@ -97,31 +97,26 @@ function FiltersDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-56 bg-surface border border-border rounded-md shadow-lg z-10 py-2">
+        <div className="absolute left-0 top-full mt-1.5 w-48 bg-surface border border-border rounded-md shadow-xl z-10 overflow-hidden">
           <FilterGroup label="Status">
             <FilterItem checked={state.showReady}      onClick={() => toggle('showReady')}      label="Ready" />
             <FilterItem checked={state.showNewService} onClick={() => toggle('showNewService')} label="New service" />
           </FilterGroup>
-          <div className="border-t border-border my-1.5" />
           <FilterGroup label="Applied">
             <FilterItem checked={state.showPending}    onClick={() => toggle('showPending')}    label="Pending" />
             <FilterItem checked={state.showApplied}    onClick={() => toggle('showApplied')}    label="Applied" />
           </FilterGroup>
-          <div className="border-t border-border my-1.5" />
-          <FilterGroup label="Lifecycle">
+          <FilterGroup label="Lifecycle" last={active === 0}>
             <FilterItem checked={state.showAlive}      onClick={() => toggle('showAlive')}      label="Alive" />
             <FilterItem checked={state.showOrphaned}   onClick={() => toggle('showOrphaned')}   label="Orphaned" />
           </FilterGroup>
           {active > 0 && (
-            <>
-              <div className="border-t border-border my-1.5" />
-              <button
-                onClick={() => onChange({ ...DEFAULT_FILTERS, search: state.search, sortKey: state.sortKey })}
-                className="w-full text-left px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-elevated transition"
-              >
-                Reset filters
-              </button>
-            </>
+            <button
+              onClick={() => onChange({ ...DEFAULT_FILTERS, search: state.search, sortKey: state.sortKey })}
+              className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-elevated border-t border-border transition"
+            >
+              Reset filters
+            </button>
           )}
         </div>
       )}
@@ -129,11 +124,11 @@ function FiltersDropdown({
   )
 }
 
-function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
+function FilterGroup({ label, children, last }: { label: string; children: ReactNode; last?: boolean }) {
   return (
-    <div>
-      <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-dim font-semibold">{label}</div>
-      {children}
+    <div className={last ? '' : 'border-b border-border/60'}>
+      <div className="px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-dim font-semibold">{label}</div>
+      <div className="pb-1.5">{children}</div>
     </div>
   )
 }
@@ -150,14 +145,16 @@ function FilterItem({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink hover:bg-elevated transition text-left"
+      className="w-full flex items-center gap-2.5 px-3 py-1 text-[13px] text-ink hover:bg-elevated transition text-left"
     >
       <span
-        className={`inline-flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 ${
-          checked ? 'bg-accent border-accent text-white' : 'bg-elevated border-border'
+        className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm border flex-shrink-0 transition ${
+          checked
+            ? 'bg-accent/15 border-accent text-accent'
+            : 'bg-elevated border-border text-transparent'
         }`}
       >
-        {checked && <Check className="w-3 h-3" />}
+        <Check className="w-2.5 h-2.5 stroke-[3]" />
       </span>
       {label}
     </button>
