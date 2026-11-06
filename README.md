@@ -62,6 +62,9 @@ limit   = ceil(p99 × 2)  # hard ceiling
 
 No more guessing. No more waste.
 
+> [!NOTE]
+> **Why "PodOptix"?** **Pod** (the Kubernetes thing you're paying for) + **Optix** (optimize + optics). We give you clear eyes on where your pod resources are wasted, then tell you exactly what to set them to.
+
 ---
 
 ## Architecture
