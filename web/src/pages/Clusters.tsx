@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus, RefreshCw, Server, ExternalLink, Trash2 } from 'lucide-react'
 import { api, Cluster } from '../lib/api'
 import { StatusPill } from '../components/StatusPill'
@@ -8,6 +8,7 @@ export function ClustersPage() {
   const [clusters, setClusters] = useState<Cluster[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
+  const navigate                = useNavigate()
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -95,12 +96,16 @@ export function ClustersPage() {
             </thead>
             <tbody>
               {clusters.map((c) => (
-                <tr key={c.cluster_id} className="border-b border-border last:border-b-0 hover:bg-elevated/40 transition">
+                <tr
+                  key={c.cluster_id}
+                  onClick={() => navigate(`/clusters/${c.cluster_id}`)}
+                  className="border-b border-border last:border-b-0 hover:bg-elevated/40 transition cursor-pointer"
+                >
                   <td className="px-4 py-3">
-                    <Link to={`/clusters/${c.cluster_id}`} className="text-ink font-medium hover:text-accent inline-flex items-center gap-2">
+                    <span className="text-ink font-medium inline-flex items-center gap-2">
                       <Server className="w-3.5 h-3.5 text-dim" />
                       {c.cluster_name}
-                    </Link>
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     {c.status === 'connected'
@@ -112,7 +117,7 @@ export function ClustersPage() {
                   </td>
                   <td className="px-4 py-3 text-muted font-mono text-xs">{c.lookback_window}</td>
                   <td className="px-4 py-3 text-muted text-xs">{formatSynced(c.last_synced_at)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="inline-flex items-center gap-1">
                       <Link
                         to={`/clusters/${c.cluster_id}`}
