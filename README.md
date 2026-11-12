@@ -32,7 +32,7 @@ This is what happens when 150 containers across 50 microservices all have limits
 |---------|---------|
 | Pods OOMKilled at midnight | Memory **limits** set too low with no data |
 | Cloud bill up 40-60% | **Requests** set too high — nodes reserve capacity nobody uses |
-| Engineers afraid to reduce limits | Nobody knows actual usage |
+| Engineers afraid to reduce limits | Nobody knows actual usage — might trigger another prod incident |
 | Cascading failures | Requests and limits copied from unrelated workloads |
 | Finance blind to cost drivers | No per-service visibility across clusters |
 
