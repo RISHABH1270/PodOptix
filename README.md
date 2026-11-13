@@ -99,10 +99,10 @@ PodOptix ships with a first-class web UI. For readers new to frontend — here's
 |---|---|---|
 | **React 18** | The JavaScript library that renders the UI. You write components (`<ClusterCard />`, `<RecommendationsTable />`) and React keeps the screen in sync with your data. | Industry default · huge ecosystem · the one thing every frontend dev already knows. |
 | **TypeScript** | JavaScript + types. Instead of `function toggle(id)` you write `function toggle(id: string): Promise<void>`. The compiler catches typos like `cluster.cluster_id` vs `cluster.clusterId` BEFORE you hit refresh. | Removes a whole class of "undefined is not a function" bugs. Backend is in Go (typed) — frontend matches that discipline. |
-| **Vite** | The dev server + build tool. Runs on `:5173`, reloads the browser in <100ms when you change a file (HMR = Hot Module Replacement). On `npm run build` it compiles everything to static files in `web/dist/`. | Modern, fast. Older alternatives (webpack / create-react-app) take 10-30 seconds per rebuild. Vite is near-instant. |
+| **Vite** | The dev server + build tool. In **dev mode** (`npm run dev` on `:5173`) you just edit a file — Vite transpiles it on the fly in memory and the browser updates in <100ms (HMR = Hot Module Replacement). **No manual build, no refresh.** Only for the production artifact (`npm run build`) does it output real static files in `web/dist/` for the Go binary to embed. | Modern, fast. Older alternatives (webpack / create-react-app) take 10-30 seconds per rebuild AND require a browser refresh. Vite is near-instant AND preserves component state across the reload. |
 | **Tailwind CSS** | A CSS framework where you style by stringing utility classes directly in the JSX — `<div className="px-4 py-2 rounded-md bg-surface">` instead of writing separate `.css` files. | Zero `styles.css` churn · no "what's `.btn-primary` supposed to look like?" moments · the style IS the markup. |
 
-**Together:** you edit a `.tsx` file in `web/src/pages/`, Vite picks up the change, TypeScript checks types, React re-renders the visible component, Tailwind applies the styling — all in under a second.
+**Together:** you edit a `.tsx` file in `web/src/pages/` → save → Vite transpiles it in memory → TypeScript checks types → React re-renders just the visible component (not the whole page) → Tailwind applies the styling — all without a page refresh or a build command, in under a second.
 
 **Pages:**
 - **Login / Register** — email + password, JWT in localStorage
