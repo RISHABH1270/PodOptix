@@ -93,7 +93,16 @@ Register a cluster with its Prometheus URL + auth token. The first sync fires im
 
 ## Web Dashboard
 
-PodOptix ships with a first-class web UI — React 18 + TypeScript + Vite + Tailwind.
+PodOptix ships with a first-class web UI. For readers new to frontend — here's what each tool does and why it's in the stack:
+
+| Tool | What it is | Why we picked it |
+|---|---|---|
+| **React 18** | The JavaScript library that renders the UI. You write components (`<ClusterCard />`, `<RecommendationsTable />`) and React keeps the screen in sync with your data. | Industry default · huge ecosystem · the one thing every frontend dev already knows. |
+| **TypeScript** | JavaScript + types. Instead of `function toggle(id)` you write `function toggle(id: string): Promise<void>`. The compiler catches typos like `cluster.cluster_id` vs `cluster.clusterId` BEFORE you hit refresh. | Removes a whole class of "undefined is not a function" bugs. Backend is in Go (typed) — frontend matches that discipline. |
+| **Vite** | The dev server + build tool. Runs on `:5173`, reloads the browser in <100ms when you change a file (HMR = Hot Module Replacement). On `npm run build` it compiles everything to static files in `web/dist/`. | Modern, fast. Older alternatives (webpack / create-react-app) take 10-30 seconds per rebuild. Vite is near-instant. |
+| **Tailwind CSS** | A CSS framework where you style by stringing utility classes directly in the JSX — `<div className="px-4 py-2 rounded-md bg-surface">` instead of writing separate `.css` files. | Zero `styles.css` churn · no "what's `.btn-primary` supposed to look like?" moments · the style IS the markup. |
+
+**Together:** you edit a `.tsx` file in `web/src/pages/`, Vite picks up the change, TypeScript checks types, React re-renders the visible component, Tailwind applies the styling — all in under a second.
 
 **Pages:**
 - **Login / Register** — email + password, JWT in localStorage
