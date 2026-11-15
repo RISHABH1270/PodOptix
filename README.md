@@ -112,7 +112,7 @@ PodOptix ships with a first-class web UI. For readers new to frontend — here's
 - **Recommendations** — every recommendation across every cluster · search by namespace/workload/container · multi-select Filters (Status: Ready / New service · Applied: Pending / Applied · Lifecycle: Alive / Orphaned) · sort by biggest CPU waste, biggest memory waste, cluster, or namespace
 - **Savings** — CPU and memory already **reclaimed** (applied) + still **on the table** (pending), adoption %, top opportunities, per-cluster + per-namespace breakdown
 
-Lives in [`web/`](web/). Local development: `cd web && npm run dev` (Vite on `:5173` proxying to the backend on `:8080`).
+Lives in [`web/`](web/). Local development: `cd web && npm install && npm run dev` (first run downloads deps from `package.json`; subsequent runs just need `npm run dev`). Vite on `:5173` proxying to the backend on `:8080`.
 
 **Production ships as a single binary.** `make build` compiles the React dashboard, embeds `web/dist/` into the Go binary via `//go:embed`, and outputs `bin/podoptix` — one artifact serving the API and dashboard on the same origin. No separate frontend server. No CORS. See [web/DASHBOARD.md](web/DASHBOARD.md) for the full guide.
 
