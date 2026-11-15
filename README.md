@@ -128,6 +128,8 @@ cp .env.example .env
 docker compose up -d           # PostgreSQL + Redis + local Prometheus
 ```
 
+Choose one development style based on your need:
+
 ### Option A — Development (hot reload)
 
 ```bash
