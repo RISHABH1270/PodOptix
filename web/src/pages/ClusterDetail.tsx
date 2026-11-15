@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, RefreshCw, Play, Search, Server, AlertTriangle, Settings, Ghost, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Play, Server, AlertTriangle, Settings, Trash2 } from 'lucide-react'
 import { api, Cluster, Recommendation } from '../lib/api'
 import { StatusPill } from '../components/StatusPill'
+import { RecommendationsToolbar } from '../components/RecommendationsToolbar'
+import { useRecommendationFilters, CLUSTER_DETAIL_SORT } from '../lib/useRecommendationFilters'
 
 export function ClusterDetailPage() {
   const { id = '' } = useParams()
@@ -13,9 +15,13 @@ export function ClusterDetailPage() {
   const [recalculating, setRe]  = useState(false)
   const [error, setError]       = useState<string | null>(null)
   const [flash, setFlash]       = useState<string | null>(null)
-  const [search, setSearch]     = useState('')
-  const [orphansOpen, setOrphansOpen] = useState(false)
   const pollRef = useRef<number | null>(null)
+
+  // Shared filter / sort state. Orphans flow INTO the main table once the
+  // operator ticks "Orphaned" in the Filters dropdown — no more separate
+  // collapsible section. Default state: alive-only (matches old behavior).
+  const { state: filters, setState: setFilters, visible: filtered } =
+    useRecommendationFilters(recs)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -84,28 +90,18 @@ export function ClusterDetailPage() {
     }
   }
 
-  // Orphaned workloads live in their own section so operators can review/delete explicitly.
-  // Main table shows only alive rows (first_missed_at === null).
-  const aliveRecs   = useMemo(() => recs.filter((r) => !r.first_missed_at), [recs])
-  const orphanedRecs = useMemo(() => recs.filter((r) =>  r.first_missed_at), [recs])
+  // Orphan counts come from the raw rows (not the filtered view) so the badge
+  // reflects reality regardless of which filters are on.
+  const orphanedCount = useMemo(() => recs.filter((r) => r.first_missed_at).length, [recs])
 
-  const filtered = useMemo(() => {
-    if (!search) return aliveRecs
-    const q = search.toLowerCase()
-    return aliveRecs.filter(
-      (r) =>
-        r.namespace.toLowerCase().includes(q) ||
-        r.workload_name.toLowerCase().includes(q) ||
-        r.container_name.toLowerCase().includes(q),
-    )
-  }, [aliveRecs, search])
-
+  // Stats across all alive rows — "what's in the cluster right now."
   const stats = useMemo(() => {
-    const ready       = aliveRecs.filter((r) => r.status === 'ready').length
-    const newService  = aliveRecs.length - ready
-    const applied     = aliveRecs.filter((r) => r.applied).length
-    return { ready, newService, applied }
-  }, [aliveRecs])
+    const alive       = recs.filter((r) => !r.first_missed_at)
+    const ready       = alive.filter((r) => r.status === 'ready').length
+    const newService  = alive.length - ready
+    const applied     = alive.filter((r) => r.applied).length
+    return { total: alive.length, ready, newService, applied }
+  }, [recs])
 
   const deleteOne = async (recId: string) => {
     const prev = recs
@@ -118,9 +114,9 @@ export function ClusterDetailPage() {
   }
 
   const deleteAllOrphans = async () => {
-    if (!confirm(`Delete all ${orphanedRecs.length} orphaned workloads? This cannot be undone.`)) return
+    if (!confirm(`Delete all ${orphanedCount} orphaned workloads? This cannot be undone.`)) return
     const prev = recs
-    setRecs(aliveRecs) // optimistic
+    setRecs(recs.filter((r) => !r.first_missed_at)) // optimistic
     try {
       await api.deleteOrphanedRecommendations(id)
     } catch (err: any) {
@@ -224,97 +220,41 @@ export function ClusterDetailPage() {
         </div>
       )}
 
-      {/* ── orphaned workloads section (collapsed by default) ─── */}
-      {orphanedRecs.length > 0 && (
-        <div className="bg-surface border border-warn/30 rounded-lg shadow-card overflow-hidden mb-4">
-          <button
-            onClick={() => setOrphansOpen(!orphansOpen)}
-            className="w-full px-5 py-3 flex items-center justify-between hover:bg-elevated/40 transition"
-          >
-            <div className="flex items-center gap-3">
-              {orphansOpen ? <ChevronDown className="w-4 h-4 text-warn" /> : <ChevronRight className="w-4 h-4 text-warn" />}
-              <Ghost className="w-4 h-4 text-warn" />
-              <div className="text-left">
-                <div className="text-sm font-semibold text-ink">
-                  Orphaned workloads
-                  <span className="ml-2 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-warnBg text-warn text-xs font-mono">
-                    {orphanedRecs.length}
-                  </span>
-                </div>
-                <div className="text-xs text-muted mt-0.5">
-                  These workloads were not observed in the last scheduler run. Review and delete — or leave them (next sync restores if they return).
-                </div>
-              </div>
-            </div>
-            {orphansOpen && (
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteAllOrphans() }}
-                className="inline-flex items-center gap-2 bg-dangerBg hover:bg-danger text-danger hover:text-white text-xs font-semibold px-3 py-1.5 rounded-md border border-danger/30 transition"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete all orphaned
-              </button>
-            )}
-          </button>
-          {orphansOpen && (
-            <div className="border-t border-border overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-widest text-dim font-semibold bg-elevated/40 border-b border-border">
-                    <th className="px-4 py-3">Namespace</th>
-                    <th className="px-4 py-3">Workload / Container</th>
-                    <th className="px-4 py-3">Kind</th>
-                    <th className="px-4 py-3">Missing since</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orphanedRecs.map((r) => (
-                    <tr key={r.recommendation_id} className="border-b border-border last:border-b-0 hover:bg-elevated/40 transition">
-                      <td className="px-4 py-3 text-muted font-mono text-xs">{r.namespace}</td>
-                      <td className="px-4 py-3">
-                        <div className="text-ink text-xs font-medium">{r.workload_name}</div>
-                        <div className="text-dim text-[11px] font-mono">{r.container_name}</div>
-                      </td>
-                      <td className="px-4 py-3 text-muted text-xs">{r.workload_kind}</td>
-                      <td className="px-4 py-3 text-dim text-xs">{formatSynced(r.first_missed_at ?? '')}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => deleteOne(r.recommendation_id)}
-                          className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-dangerBg/50 hover:bg-danger text-danger hover:text-white border border-danger/20 transition"
-                          title="Delete this recommendation"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── recommendations panel ─────────────────────────────── */}
-      <div className="bg-surface border border-border rounded-lg shadow-card overflow-hidden">
+      {/* No overflow-hidden here — the Filters popover needs to escape the panel's
+          rounded edge. min-h gives the panel enough height that an empty state still
+          visually contains the popover. */}
+      <div className="bg-surface border border-border rounded-lg shadow-card min-h-[480px]">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="text-base font-semibold text-ink">Recommendations</div>
             <div className="text-xs text-muted mt-0.5">
-              {recs.length} containers · {stats.ready} ready · {stats.newService} new service · {stats.applied} applied
+              {stats.total} alive · {stats.ready} ready · {stats.newService} new service · {stats.applied} applied
+              {orphanedCount > 0 && (
+                <>
+                  {' · '}
+                  <span className="text-warn">{orphanedCount} orphaned</span>
+                  <span className="text-dim"> (tick "Orphaned" in Filters to see)</span>
+                </>
+              )}
             </div>
           </div>
-          <div className="relative">
-            <Search className="w-4 h-4 text-dim absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter by namespace, workload, or container…"
-              className="w-72 bg-elevated border border-border focus:border-accent rounded-md pl-9 pr-3 py-1.5 text-sm text-ink placeholder:text-dim outline-none transition"
-            />
-          </div>
+          {orphanedCount > 0 && filters.showOrphaned && (
+            <button
+              onClick={deleteAllOrphans}
+              className="inline-flex items-center gap-2 bg-dangerBg hover:bg-danger text-danger hover:text-white text-xs font-semibold px-3 py-1.5 rounded-md border border-danger/30 transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete all orphaned ({orphanedCount})
+            </button>
+          )}
         </div>
+
+        <RecommendationsToolbar
+          state={filters}
+          onChange={setFilters}
+          sortOptions={CLUSTER_DETAIL_SORT}
+        />
 
         {loading && recs.length === 0 ? (
           <div className="text-center py-16 text-dim text-sm">Loading recommendations…</div>
@@ -349,10 +289,23 @@ export function ClusterDetailPage() {
               </thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.recommendation_id} className="border-b border-border last:border-b-0 hover:bg-elevated/40 transition">
+                  <tr
+                    key={r.recommendation_id}
+                    className={`border-b border-border last:border-b-0 hover:bg-elevated/40 transition ${
+                      r.first_missed_at ? 'bg-warnBg/20' : ''
+                    }`}
+                    title={r.first_missed_at ? `Orphaned — missing since ${formatSynced(r.first_missed_at)}` : undefined}
+                  >
                     <td className="px-4 py-3 text-muted font-mono text-xs">{r.namespace}</td>
                     <td className="px-4 py-3">
-                      <div className="text-ink text-xs font-medium">{r.workload_name}</div>
+                      <div className="text-ink text-xs font-medium flex items-center gap-2">
+                        {r.workload_name}
+                        {r.first_missed_at && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-warnBg text-warn text-[9px] font-mono uppercase tracking-wider">
+                            orphan
+                          </span>
+                        )}
+                      </div>
                       <div className="text-dim text-[11px] font-mono">{r.container_name}</div>
                     </td>
                     <td className="px-4 py-3">
