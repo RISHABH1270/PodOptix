@@ -46,6 +46,8 @@ PodOptix connects to your Prometheus, computes **p99** from real usage, and reco
 
 **The formula** (same for CPU and memory):
 
+> `p99` here is computed per workload — MAX across replicas at each timestamp, then p99 across time. So a 3-pod Deployment produces one number that captures "the loudest pod at any moment."
+
 ```text
 request = ceil(p99)      # scheduler reserves this on the node
                          # pod is guaranteed at least this much
