@@ -44,8 +44,8 @@ export function LoginPage() {
           </h1>
           <p className="text-muted leading-relaxed">
             PodOptix queries your Prometheus, computes p99 usage over a rolling window
-            (7d, 10d, or 30d), and recommends limits at the engineering sweet spot — 2× the p99.
-            One Hub. No sidecars inside your workload clusters.
+            (7d, 10d, or 30d), and recommends both requests (= p99) and limits (= p99 × 2) —
+            the engineering sweet spot. One Hub. No sidecars inside your workload clusters.
           </p>
           <div className="grid grid-cols-3 gap-3 pt-4">
             <Stat value="p99×2" label="formula" />
