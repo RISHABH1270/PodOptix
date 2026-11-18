@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react'
 // Both Recommendation and RecommendationWithCluster satisfy this.
 export interface FilterableRec {
   namespace: string
+  workload_kind: string
   workload_name: string
   container_name: string
   status: 'ready' | 'new_service'
@@ -104,10 +105,11 @@ export function applyFilters<T extends FilterableRec & { cluster_name?: string }
   const q = f.search.trim().toLowerCase()
 
   const filtered = items.filter((r) => {
-    // search ─ namespace / workload / container
+    // search ─ namespace / workload_kind / workload_name / container
     if (q) {
       const hit =
         r.namespace.toLowerCase().includes(q) ||
+        r.workload_kind.toLowerCase().includes(q) ||
         r.workload_name.toLowerCase().includes(q) ||
         r.container_name.toLowerCase().includes(q)
       if (!hit) return false

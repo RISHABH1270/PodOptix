@@ -32,7 +32,7 @@ export function RecommendationsToolbar({
           <input
             value={state.search}
             onChange={(e) => onChange({ ...state, search: e.target.value })}
-            placeholder="Filter namespace, workload, container…"
+            placeholder="Filter namespace, kind, workload, container…"
             className="w-72 bg-elevated border border-border focus:border-accent rounded-md pl-9 pr-3 py-1.5 text-sm text-ink placeholder:text-dim outline-none transition"
           />
         </div>

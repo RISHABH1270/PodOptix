@@ -111,7 +111,7 @@ PodOptix ships with a first-class web UI. For readers new to frontend — here's
 - **Clusters** — list all registered clusters with status pills + stat cards
 - **Register Cluster / Edit Cluster** — form with lookback picker (7d | 10d | 30d)
 - **Cluster Detail** — per workload-container recommendations table (replicas collapsed via `kube_pod_owner` + `kube_replicaset_owner`), one-click recalculate
-- **Recommendations** — every recommendation across every cluster · search by namespace/workload/container · multi-select Filters (Status: Ready / New service · Applied: Pending / Applied · Lifecycle: Alive / Orphaned) · sort by biggest CPU waste, biggest memory waste, cluster, or namespace
+- **Recommendations** — every recommendation across every cluster · search by namespace/workload-kind/workload-name/container · multi-select Filters (Status: Ready / New service · Applied: Pending / Applied · Lifecycle: Alive / Orphaned) · sort by biggest CPU waste, biggest memory waste, cluster, or namespace
 - **Savings** — CPU and memory already **reclaimed** (applied) + still **on the table** (pending), adoption %, top opportunities, per-cluster + per-namespace breakdown
 
 Lives in [`web/`](web/). Local development: `cd web && npm install && npm run dev` (first run downloads deps from `package.json`; subsequent runs just need `npm run dev`). Vite on `:5173` proxying to the backend on `:8080`.
