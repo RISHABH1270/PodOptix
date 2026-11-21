@@ -42,7 +42,7 @@ This is what happens when 150 containers across 50 microservices all have limits
 
 ## The Solution
 
-PodOptix connects to your Prometheus, computes **p99** from real usage, and recommends both `requests` and `limits` — the engineering sweet spot between reliability and cost.
+PodOptix queries your Prometheus, computes **p99** from real usage, and recommends both `requests` and `limits` — the engineering sweet spot between reliability and cost.
 
 **The formula** (same for CPU and memory):
 
