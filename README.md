@@ -153,19 +153,7 @@ export $(cat .env | xargs) && ./bin/podoptix   # one process, one port
 
 Open <http://localhost:8080>. Dashboard and API on the same origin — same as production.
 
-### Option C — Docker container
-
-```bash
-make docker-build                              # builds podoptix:local (44 MB distroless image)
-make docker-run                                # runs against docker compose Postgres/Redis
-```
-
-Multi-arch push (linux/amd64 + linux/arm64) once you have a registry:
-```bash
-make docker-push IMAGE=ghcr.io/<your-user>/podoptix TAG=0.1.0
-```
-
-### Option D — Kubernetes (production)
+### Option C — Kubernetes (production)
 
 One `helm install` — deploys PodOptix + Postgres StatefulSet + Redis, no repo clone needed:
 
