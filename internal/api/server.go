@@ -48,13 +48,19 @@ func NewServer(st *store.Store, ca *cache.Cache, sched *scheduler.Scheduler, jwt
 	return server
 }
 
-// Listen binds the TCP port. Returns the listener if successful.
+// Listen binds the TCP port.
+// Pre-flights both loopbacks because net.Listen(":PORT") would silently coexist
+// with a process already bound to a specific-address loopback (e.g. Jenkins
+// on [::1]:8080), splitting connections between us and them.
 func (s *Server) Listen(port string) (net.Listener, error) {
-	listener, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		return nil, fmt.Errorf("bind port %s: %w", port, err)
+	for _, addr := range []string{"127.0.0.1:" + port, "[::1]:" + port} {
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			return nil, fmt.Errorf("port %s is already in use on %s: %w", port, addr, err)
+		}
+		l.Close()
 	}
-	return listener, nil
+	return net.Listen("tcp", ":"+port)
 }
 
 // Serve starts accepting HTTP requests on the given listener. Blocking call.

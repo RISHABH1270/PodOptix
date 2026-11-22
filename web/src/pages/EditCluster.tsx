@@ -170,6 +170,9 @@ function Field(props: {
         placeholder={props.placeholder}
         autoFocus={props.autoFocus}
         required={props.required}
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore="true"
         className="w-full bg-elevated border border-border focus:border-accent rounded-md px-3 py-2 text-sm text-ink placeholder:text-dim outline-none transition font-mono"
       />
       {props.hint && <div className="text-xs text-dim mt-1.5">{props.hint}</div>}
