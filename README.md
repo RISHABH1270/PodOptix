@@ -193,56 +193,48 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 
 ## Roadmap
 
-Delivered in the order a well-run engineering cycle would ship them — foundation first, domain logic next, reliability and operator UX last.
+Delivered in dependency order — foundation first, domain logic next, reliability and UX last.
 
 ### 1 · Foundation
-
-- [x] Architecture design + data models (Cluster, Recommendation, User) · HLD + LLD + engineering trade-offs
-- [x] Config loader with **startup validation** — ENCRYPTION_KEY exactly 32B, JWT_SECRET ≥ 32B, DATABASE_URL / REDIS_URL parsed and shape-checked before accepting any traffic
-- [x] PostgreSQL — migrations, `*Store` layer, `pgxpool` connection pool with 30s startup timeout and TLS settings preserved from the parsed URL
-- [x] Token encryption at rest — AES-256-GCM with random per-nonce, base64 at storage
+- [x] Architecture + data models · HLD + LLD + trade-offs docs
+- [x] Config loader with startup validation (key lengths, URL shapes)
+- [x] PostgreSQL store — `pgxpool` with 30s startup timeout, TLS-preserving
+- [x] Token encryption at rest — AES-256-GCM, random per-nonce
 
 ### 2 · Core API & Security
-
-- [x] HTTP server (Gin) with middleware stack — RequestID (honors incoming `X-Request-ID` for upstream trace stitching), JWT (HMAC with explicit allowlist), per-request Prometheus metrics
-- [x] REST API — full CRUD for clusters + recommendations, including PATCH to toggle the `applied` flag and footgun-guarded bulk delete of orphans
-- [x] Auth — bcrypt password hashing, JWT HS256, **email normalization** at the store (lowercase + trim prevents case-variant impersonation), **HTTP-boundary input validation** (email format, password 8-128 chars)
+- [x] Gin HTTP server — RequestID propagation, JWT, per-request metrics
+- [x] Full CRUD REST API for clusters + recommendations
+- [x] bcrypt + JWT HS256 · email normalization · 8–128 char passwords
 
 ### 3 · Core Domain Logic
-
-- [x] Prometheus collector — PromQL `/api/v1/query_range` + `/api/v1/query`, pod → workload resolution via `kube_pod_owner` + `kube_replicaset_owner`, **MAX across replicas** per timestamp
-- [x] p99 computation engine — nearest-rank method, in-place-safe (copies before sort)
-- [x] Recommendation engine — `request = ceil(p99)`, `limit = ceil(p99 × 2)` for both CPU and memory
-- [x] Scheduler — 24h ticker + immediate on startup, **max 5 clusters in parallel** via buffered-channel semaphore + `sync.WaitGroup` barrier so the next tick never overlaps the current
+- [x] Prometheus collector — pod → workload resolution, **MAX across replicas**
+- [x] p99 engine (nearest-rank, in-place-safe)
+- [x] Recommendation engine — `request = ceil(p99)` · `limit = ceil(p99 × 2)`
+- [x] Scheduler — 24h ticker, **max 5 clusters in parallel**
 
 ### 4 · Reliability & Coordination
-
-- [x] Redis cache — 3h TTL per cluster recommendations list, cache-aside pattern, invalidation on writes
-- [x] **Fencing-token distributed lock** — scheduler and manual recalculate share one lock per cluster, race-safe via atomic Lua CAS (prevents the classic "lost lock" bug when a long-running job's TTL expires)
-- [x] **Orphan tombstone** — workloads not seen in last run get `first_missed_at` stamped, safety-gated to no-op on empty-scan Prometheus hiccups; operator reviews + deletes explicitly (per-row or bulk)
-- [x] **Graceful HTTP shutdown** — `http.Server.Shutdown` drains in-flight requests on SIGTERM with a 10s deadline (no more connection resets during rolling updates)
-- [x] Readiness probe (`/readyz`) — pings Postgres + Redis, reports per-dependency status
-- [x] Structured logging — INFO/WARN/ERROR levels, request_id correlation, duration measurements
+- [x] Redis cache — 3h TTL, cache-aside, invalidation on writes
+- [x] **Fencing-token lock** — scheduler + recalculate share one lock, Lua CAS
+- [x] **Orphan tombstone** — safety-gated, operator reviews + deletes
+- [x] **Graceful HTTP shutdown** — 10s drain on SIGTERM
+- [x] `/readyz` + structured logging (level, request_id, duration)
 
 ### 5 · Observability & Quality
-
-- [x] Prometheus `/metrics` endpoint — self-observability for HTTP (per route template, bounded cardinality), scheduler (runs, duration, containers scanned), cache (hits/misses)
-- [x] Backend integration tests — **100+ subtests** against real TCP server + PostgreSQL + Redis (no mocks), isolated DB/port/Redis-index
-- [x] UI end-to-end tests — Playwright + Chromium, isolated test harness
+- [x] `/metrics` endpoint — HTTP, scheduler, cache
+- [x] 100+ integration subtests · real PG + Redis · no mocks
+- [x] Playwright + Chromium UI E2E tests
 
 ### 6 · Operator UX
-
-- [x] Web Dashboard — React 18 + TypeScript + Vite + Tailwind, dark theme, served from the same Go binary via `go:embed`
-- [x] Cross-cluster recommendations view — sortable by biggest waste, filterable by status / cluster / orphaned
-- [x] Resource savings dashboard — potential + realized CPU/memory, adoption %, per-cluster + per-namespace breakdown
-- [x] **Applied-flag toggle** — `PATCH` endpoint flips `applied`; the scheduler never touches it (hardcoded `FALSE` on INSERT, omitted from `ON CONFLICT UPDATE SET`), so operator choices survive every re-sync
+- [x] Web Dashboard — React 18 + TS + Vite + Tailwind, embedded via `go:embed`
+- [x] Cross-cluster recommendations view — sort by waste, multi-filter
+- [x] Savings dashboard — potential + realized, per-cluster + per-namespace
+- [x] **Applied-flag toggle** — PATCH endpoint; scheduler never touches it
 
 ### 7 · Deployment
-
-- [x] Multi-arch Docker image — linux/amd64 + linux/arm64, 44 MB distroless, `make docker-build` / `make docker-push`
-- [x] Helm chart — stateless Hub Deployment + Postgres StatefulSet + Redis Deployment, one `helm install`
-- [x] Helm security hardening — PodSecurityContext (non-root, read-only FS, drop caps), optional NetworkPolicy
-- [x] Helm autoscaling — optional HorizontalPodAutoscaler (CPU + memory targets)
+- [x] Multi-arch Docker image — amd64 + arm64, 44 MB distroless
+- [x] Helm chart — one `helm install` for Hub + Postgres + Redis
+- [x] Helm hardening — PodSecurityContext, optional NetworkPolicy
+- [x] Helm autoscaling — optional HPA (CPU + memory)
 
 ---
 
