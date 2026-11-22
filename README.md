@@ -173,29 +173,6 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 
 ---
 
-## API
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/auth/register` | — | Create a user account |
-| `POST` | `/auth/login` | — | Login and receive JWT token |
-| `GET` | `/healthz` | — | Liveness probe |
-| `GET` | `/readyz` | — | Readiness probe (checks DB + Redis) |
-| `GET` | `/metrics` | — | Prometheus scrape endpoint — `podoptix_*` metrics (HTTP, scheduler, cache) |
-| `GET` | `/api/v1/clusters` | JWT | List all clusters |
-| `POST` | `/api/v1/clusters` | JWT | Register a cluster |
-| `GET` | `/api/v1/clusters/:id` | JWT | Get cluster by ID |
-| `PUT` | `/api/v1/clusters/:id` | JWT | Update cluster details |
-| `DELETE` | `/api/v1/clusters/:id` | JWT | Remove a cluster |
-| `GET` | `/api/v1/clusters/:id/recommendations` | JWT | Get recommendations for one cluster (cached) |
-| `PATCH` | `/api/v1/clusters/:id/recommendations/:recId` | JWT | Toggle the `applied` flag — body `{"applied": true\|false}`. Drives the Savings page's realized-vs-pending math |
-| `DELETE` | `/api/v1/clusters/:id/recommendations/:recId` | JWT | Delete a single recommendation (operator cleanup of orphans) |
-| `DELETE` | `/api/v1/clusters/:id/recommendations?orphaned=true` | JWT | Bulk-delete orphaned recommendations for a cluster — `?orphaned=true` is required (footgun guard) |
-| `POST` | `/api/v1/clusters/:id/recalculate` | JWT | Trigger manual recalculation (fencing-token lock prevents concurrent runs) |
-| `GET` | `/api/v1/recommendations` | JWT | Cross-cluster recommendations — every cluster, joined with `cluster_name`, sorted by biggest CPU delta |
-
----
-
 ## Documentation
 
 | Doc | Description |
@@ -203,6 +180,7 @@ See [deploy/helm/podoptix/HELM_CHART.md](deploy/helm/podoptix/HELM_CHART.md) for
 | **[User Manual](USER_MANUAL.md)** | **End-user install + first cluster setup + troubleshooting** |
 | [HLD](docs/hld.md) | High Level Design — system overview, architecture, data flow |
 | [LLD](docs/lld.md) | Low Level Design — DB schema, API contract, Redis design, security model |
+| [REST API Reference](docs/api.md) | Every endpoint in one table — method, path, auth, status codes |
 | [Engineering Trade-offs](docs/engineering-trade-offs.md) | Every technical decision with full reasoning |
 | [Code Map](docs/code-map.md) | Living class diagram — grows as the walkthrough progresses |
 | [Dev Setup](docs/dev-setup.md) | How to run locally in 5 minutes |
