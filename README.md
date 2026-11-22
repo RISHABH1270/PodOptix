@@ -95,14 +95,14 @@ Register a cluster with its Prometheus URL + auth token. The first sync fires im
 
 ## Web Dashboard
 
-PodOptix ships with a first-class web UI. For readers new to frontend — here's what each tool does and why it's in the stack:
+PodOptix ships with a first-class web UI. For readers new to frontend — here's what each tool does:
 
-| Tool | What it is | Why we picked it |
-|---|---|---|
-| **React 18** | The JavaScript library that renders the UI. React keeps the screen in sync with your data. | Industry default · huge ecosystem · the one thing every frontend dev already knows. |
-| **TypeScript** | JavaScript + types. Catches typos (`cluster.cluster_id` vs `cluster.clusterId`) at compile time, not after a refresh. | Removes a whole class of "undefined is not a function" bugs. Backend is in Go (typed) — frontend matches that discipline. |
-| **Vite** | The dev server + build tool. In **dev mode** (`npm run dev` on `:5173`) you just edit a file — Vite transpiles it on the fly in memory and the browser updates in <100ms (HMR = Hot Module Replacement). **No manual build, no refresh.** Only for the production artifact (`npm run build`) does it output real static files in `web/dist/` for the Go binary to embed. | Modern, fast. Older alternatives (webpack / create-react-app) take 10-30 seconds per rebuild AND require a browser refresh. Vite is near-instant AND preserves component state across the reload. |
-| **Tailwind CSS** | A CSS framework where you style by stringing utility classes directly in the JSX — `<div className="px-4 py-2 rounded-md bg-surface">` instead of writing separate `.css` files. | Zero `styles.css` churn · no "what's `.btn-primary` supposed to look like?" moments · the style IS the markup. |
+| Tool | What it is |
+|---|---|
+| **React 18** | The JavaScript library that renders the UI. React keeps the screen in sync with your data. |
+| **TypeScript** | JavaScript + types. Catches typos (`cluster.cluster_id` vs `cluster.clusterId`) at compile time, not after a refresh. |
+| **Vite** | The dev server + build tool. In **dev mode** (`npm run dev` on `:5173`) you just edit a file — Vite transpiles it on the fly in memory and the browser updates in <100ms (HMR = Hot Module Replacement). **No manual build, no refresh.** Only for the production artifact (`npm run build`) does it output real static files in `web/dist/` for the Go binary to embed. |
+| **Tailwind CSS** | A CSS framework where you style by stringing utility classes directly in the JSX — `<div className="px-4 py-2 rounded-md bg-surface">` instead of writing separate `.css` files. |
 
 **Together:** you edit a `.tsx` file in `web/src/pages/` → save → Vite transpiles it in memory → TypeScript checks types → React re-renders just the visible component (not the whole page) → Tailwind applies the styling — all without a page refresh or a build command, in under a second.
 
